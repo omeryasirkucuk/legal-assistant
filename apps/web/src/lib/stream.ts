@@ -4,11 +4,14 @@ import { API_URL, ApiError, type Checked, type Evidence } from "./api";
 export type StreamEvent =
   | { type: "question"; data: { id: string } }
   | { type: "status"; data: { message: string } }
+  | { type: "plan"; data: { branches: Array<{ label: string; asks: string[] }> } }
   | { type: "evidence"; data: Evidence }
+  | { type: "atom"; data: { branch: number; index: number; ask: string; found: boolean;
+                              segments: Array<{ text: string; keys: string[] }> } }
   | { type: "delta"; data: { text: string } }
   | { type: "reset"; data: Record<string, never> }
   | { type: "checked"; data: Checked }
-  | { type: "final"; data: { text: string; repaired: boolean; refused: boolean } }
+  | { type: "final"; data: { text: string; cost_usd: number; timings: Record<string, number> } }
   | { type: "saved"; data: { id: string } }
   | { type: "error"; data: Record<string, never> };
 

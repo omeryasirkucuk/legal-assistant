@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from legal_api import llm
-from legal_api.agent.atoms import Segment
+from legal_api.agent.atoms import Segment, openai_segments_from
 from legal_api.config import get_settings
 from legal_api.prompts import prompt
 
@@ -21,12 +21,20 @@ async def detail_stream(question: str, short_answer: str, sources: list[tuple[st
     documents = [{"type": "document",
                   "source": {"type": "text", "media_type": "text/plain",
                              "data": text[:MAX_DOCUMENT_CHARS]},
-                  "title": citation, "citations": {"enabled": True}}
-                 for _, citation, text in sources]
+                  "title": f"{key} | {citation}", "citations": {"enabled": True}}
+                 for key, citation, text in sources]
     request = f"Question: {question}\n\nShort answer already shown to the lawyer:\n{short_answer}"
+    system = prompt("detail")
+    if llm.uses_openai_compatible():
+        keys = ", ".join(key for key, _, _ in sources)
+        system += (f"\n\nKaynak kimlikleri: {keys}. Her maddi hukuki cümleden sonra ilgili "
+                   "kaynağın birebir, kısa bir alıntısını <quote ref=\"E1\">alıntı</quote>[[E1]] "
+                   "biçiminde ekle; E1'i gerçek kaynak kimliğiyle değiştir. Alıntı kaynakta "
+                   "harfiyen bulunmalı. Kaynak kimliği ya da alıntı uydurma; desteklenemeyen "
+                   "cümleyi yazma.")
     final = None
     async for item in llm.stream("main", usage, "detail", max_tokens=6000,
-                                 system=prompt("detail"),
+                                 system=system,
                                  output_config={"effort": get_settings().answer_effort},
                                  messages=[{"role": "user", "content": [
                                      *documents, {"type": "text", "text": request}]}]):
@@ -35,6 +43,10 @@ async def detail_stream(question: str, short_answer: str, sources: list[tuple[st
         else:
             final = item
     segments = []
+    if llm.uses_openai_compatible() and final:
+        segments = openai_segments_from(final.content, sources)
+        yield segments
+        return
     for block in final.content if final else []:
         if block.type != "text":
             continue
