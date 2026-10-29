@@ -7,7 +7,18 @@ export type Health = {
   pgvector: boolean;
 };
 
-export type User = { id: string; email: string; name: string };
+export type User = { id: string; email: string; name: string; is_admin: boolean };
+export type LLMSettings = {
+  provider: "openai_compatible";
+  is_saved: boolean;
+  base_url: string;
+  model_main: string;
+  model_draft: string;
+  model_cheap: string;
+  model_judge: string;
+  api_key_configured: boolean;
+};
+export type LLMModel = { id: string; name: string };
 export type ChatSummary = { id: string; title: string; updated_at: string };
 export type Evidence = { key: string; kind: "decision" | "article"; citation: string; url: string };
 export type Issue = { kind: string; severity: "error" | "warning"; paragraph: number; message: string };
@@ -71,6 +82,12 @@ export const api = {
     call<SourceText>(`/chats/${chatId}/messages/${messageId}/evidence/${key}`),
   searchDecisions: (q: string) =>
     call<DecisionHit[]>(`/search/decisions?q=${encodeURIComponent(q)}`),
+  llmSettings: () => call<LLMSettings>("/settings/llm"),
+  saveLLMSettings: (body: Omit<LLMSettings, "provider" | "is_saved" | "api_key_configured"> &
+    { api_key?: string; clear_api_key: boolean }) =>
+    call<LLMSettings>("/settings/llm", { method: "PUT", body: JSON.stringify(body) }),
+  llmModels: () => call<LLMModel[]>("/settings/llm/models"),
+  testLLM: () => call<{ ok: boolean; model: string }>("/settings/llm/test", { method: "POST" }),
 };
 
 export async function fetchHealth(): Promise<Health | null> {

@@ -7,6 +7,7 @@ import { Composer, type Mode } from "@/components/Composer";
 import { SearchResults } from "@/components/SearchResults";
 import { Sidebar } from "@/components/Sidebar";
 import { SourceDrawer } from "@/components/SourceDrawer";
+import { SettingsPanel } from "@/components/SettingsPanel";
 import {
   api,
   ApiError,
@@ -32,6 +33,8 @@ type Pending = {
   refused?: boolean;
   error?: boolean;
   budget?: boolean;
+  plan?: Array<{ label: string; asks: string[] }>;
+  atoms?: Record<string, { found: boolean; segments: Array<{ text: string; keys: string[] }> }>;
 };
 
 type Drawer = { evidence: Evidence; number: number; messageId: string | null };
@@ -47,6 +50,7 @@ export default function ChatApp() {
   const [search, setSearch] = useState<{ query: string; hits: DecisionHit[] | null } | null>(null);
   const [drawer, setDrawer] = useState<Drawer | null>(null);
   const [source, setSource] = useState<SourceText | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
@@ -62,7 +66,7 @@ export default function ChatApp() {
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
-  }, [messages, pending?.question, search]);
+  }, [messages, pending?.question, pending?.raw, search]);
 
   const openChat = useCallback(async (id: string) => {
     abort.current?.abort();
@@ -109,6 +113,13 @@ export default function ChatApp() {
               return update((p) => ({ ...p, status: e.data.message }));
             case "evidence":
               return update((p) => ({ ...p, evidence: [...p.evidence, e.data] }));
+            case "plan":
+              return update((p) => ({ ...p, plan: e.data.branches, atoms: {} }));
+            case "atom":
+              return update((p) => {
+                const atoms = { ...(p.atoms ?? {}), [`${e.data.branch}:${e.data.index}`]: e.data };
+                return { ...p, atoms, raw: renderProgress(p.plan ?? [], atoms) || p.raw };
+              });
             case "delta":
               return update((p) => ({ ...p, raw: p.raw + e.data.text }));
             case "reset":
@@ -119,8 +130,6 @@ export default function ChatApp() {
               return update((p) => ({
                 ...p,
                 raw: e.data.text,
-                repaired: e.data.repaired,
-                refused: e.data.refused,
                 status: undefined,
               }));
             case "saved":
@@ -173,6 +182,7 @@ export default function ChatApp() {
         onNew={newChat}
         onDelete={deleteChat}
         onLogout={() => api.logout().then(() => router.replace("/login"))}
+        onSettings={() => setSettingsOpen(true)}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -251,8 +261,27 @@ export default function ChatApp() {
         source={source}
         onClose={() => setDrawer(null)}
       />
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   );
+}
+
+function renderProgress(
+  plan: Array<{ label: string; asks: string[] }>,
+  atoms: Record<string, { found: boolean; segments: Array<{ text: string; keys: string[] }> }>,
+): string {
+  return plan.flatMap((branch, branchIndex) => {
+    const answers = branch.asks.flatMap((_, atomIndex) => {
+      const atom = atoms[`${branchIndex}:${atomIndex}`];
+      if (!atom) return [];
+      if (!atom.found) return ["kaynaklarda bulunamadı"];
+      const text = atom.segments.map((segment) =>
+        segment.text + segment.keys.map((key) => ` [[${key}]]`).join(""),
+      ).join("").trim();
+      return text ? [text] : [];
+    });
+    return answers.length ? [`- ${branch.label}: ${answers.join(" ")}`] : [];
+  }).join("\n");
 }
 
 function Question({ text }: { text: string }) {

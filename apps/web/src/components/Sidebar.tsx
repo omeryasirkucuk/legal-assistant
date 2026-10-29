@@ -12,9 +12,11 @@ type Props = {
   onNew: () => void;
   onDelete: (id: string) => void;
   onLogout: () => void;
+  onSettings: () => void;
 };
 
-export function Sidebar({ user, chats, activeId, onSelect, onNew, onDelete, onLogout }: Props) {
+export function Sidebar({ user, chats, activeId, onSelect, onNew, onDelete, onLogout,
+  onSettings }: Props) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<HistoryHit[] | null>(null);
 
@@ -94,11 +96,18 @@ export function Sidebar({ user, chats, activeId, onSelect, onNew, onDelete, onLo
         )}
       </nav>
 
-      <div className="flex items-center justify-between border-t border-rule px-4 py-3 text-sm">
-        <span className="truncate text-muted">{user.name}</span>
-        <button onClick={onLogout} className="text-faint hover:text-ink">
-          {t("logout")}
-        </button>
+      <div className="border-t border-rule px-4 py-3 text-sm">
+        <span className="block truncate text-muted">{user.name}</span>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          {user.is_admin ? (
+            <button onClick={onSettings} className="text-faint hover:text-ink">
+              {t("settings")}
+            </button>
+          ) : <span />}
+          <button onClick={onLogout} className="text-faint hover:text-ink">
+            {t("logout")}
+          </button>
+        </div>
       </div>
     </aside>
   );

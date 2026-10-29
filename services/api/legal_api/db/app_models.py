@@ -5,7 +5,18 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Computed, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Computed,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,7 +35,26 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True)
     name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class LLMConnectionSettings(Base):
+    """Shared provider connection edited by app administrators; credentials are encrypted."""
+
+    __tablename__ = "llm_connection_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    base_url: Mapped[str] = mapped_column(Text)
+    api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_main: Mapped[str] = mapped_column(String(200))
+    model_draft: Mapped[str] = mapped_column(String(200))
+    model_cheap: Mapped[str] = mapped_column(String(200))
+    model_judge: Mapped[str] = mapped_column(String(200))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now,
+                                                 onupdate=_now)
+
+    __table_args__ = (CheckConstraint("id = 1", name="ck_llm_connection_settings_singleton"),)
 
 
 class Chat(Base):
