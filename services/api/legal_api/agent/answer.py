@@ -24,7 +24,12 @@ from pgvector.asyncpg import register_vector
 
 from legal_api import llm
 from legal_api.agent.atoms import AtomAnswer, answer_atom
-from legal_api.agent.decompose import Branch, candidate_provisions, decompose
+from legal_api.agent.decompose import (
+    Branch,
+    candidate_provisions,
+    decompose,
+    payment_order_branches,
+)
 from legal_api.agent.sources import SourceFinder
 from legal_api.corpus.ingest import asyncpg_dsn
 from legal_api.grounding.evidence import EvidenceLedger
@@ -72,8 +77,15 @@ def atom_dict(a: AtomAnswer) -> dict:
 def plain_text(structure: dict) -> str:
     lines = []
     for b in structure["branches"]:
-        parts = ["".join(s["text"] for s in a["segments"]).strip() if a["found"]
-                 else message("status", "not_found", ask=a["ask"]) for a in b["atoms"]]
+        parts = []
+        for atom in b["atoms"]:
+            if not atom["found"]:
+                parts.append(message("status", "not_found", ask=atom["ask"]))
+                continue
+            text = "".join(s["text"] for s in atom["segments"]).strip()
+            keys = dict.fromkeys(key for segment in atom["segments"] for key in segment["keys"])
+            markers = "".join(f" [[{key}]]" for key in keys if f"[[{key}]]" not in text)
+            parts.append(text + markers)
         lines.append(f"- {b['label']}: {' '.join(parts)}")
     return "\n".join(lines)
 
@@ -97,8 +109,10 @@ async def answer_events(question: str, history: list[dict] | None = None,
     try:
         finder = SourceFinder(ledger, db, gateway)
         yield _status("planning")
-        candidates = await candidate_provisions(db, question)
-        branches = await decompose(question, history or [], usage, candidates)
+        branches = payment_order_branches(question)
+        if branches is None:
+            candidates = await candidate_provisions(db, question)
+            branches = await decompose(question, history or [], usage, candidates)
         mark("decompose_s")
         yield Event("plan", {"branches": [{"label": b.label, "asks": [a.ask for a in b.atoms]}
                                           for b in branches]})

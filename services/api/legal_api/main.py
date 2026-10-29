@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from legal_api.api import auth, chats, health, search
+from legal_api.api import auth, chats, health, search, settings
 from legal_api.config import get_settings
 from legal_api.embeddings import embed_query
 
@@ -28,7 +28,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (health, auth, chats, search):
+    for module in (health, auth, chats, search, settings):
         app.include_router(module.router)
     return app
 
