@@ -1,0 +1,9 @@
+{
+  "unknown_marker": "{detail} anahtarlı bir kaynak yok.",
+  "quote_not_found": "Alıntı kaynakta birebir bulunamadı ({detail}).",
+  "bare_key": "Metinde kaynak anahtarı düz yazıyla geçiyor ({detail}); kaynağı yalnızca [[E1]] biçiminde işaretle ve cümlede mahkeme/daire adıyla an.",
+  "missing_short": "Cevap kısa cevap bölümüyle başlamıyor.",
+  "claim_partial": "Kaynak bu cümleyi yalnızca kısmen destekliyor: \"{sentence}\" ({note})",
+  "claim_not_supported": "Kaynak bu cümleyi desteklemiyor: \"{sentence}\" ({note})",
+  "missing_point": "Cevapta eksik: {point}. Getirilmesi gereken kaynak: {fetch}"
+}

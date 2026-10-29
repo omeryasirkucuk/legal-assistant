@@ -1,0 +1,8 @@
+{
+  "decision": "{chamber}, E. {case_no}, K. {decision_no}, T. {date}",
+  "decision_aym_individual": "{chamber}, B. No: {case_no}, K.T. {date}",
+  "article": "{number} sayılı {title}, m. {article}",
+  "article_no_number": "{title}, m. {article}",
+  "user_file": "{filename}, s. {page}",
+  "title_lowercase_words": "ve ile veya ya da"
+}

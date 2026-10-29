@@ -1,0 +1,9 @@
+Third-party notices
+
+Court decision corpus: Turkish case-law corpus by Hamza Bağırsakçı, CC0-1.0,
+mirrored at https://huggingface.co/datasets/mrfg/turkish-court-decisions
+
+Source adapter logic in legal_api/sources is adapted from the following MIT-licensed projects,
+Copyright (c) 2026 Aydın Can Polatkan:
+  - https://github.com/aydincan/turk-hukuku-ictihat-mcp
+  - https://github.com/aydincan/turk-hukuku-mevzuat-mcp
