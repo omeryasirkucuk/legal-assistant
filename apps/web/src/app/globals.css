@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* Paper and ink: a research desk, not a chat toy. One accent (citation blue) carries the
+   product promise; green and amber only ever mean "verified" and "check this". */
+@theme {
+  --color-paper: #f4f5f2;
+  --color-sheet: #ffffff;
+  --color-ink: #1b2433;
+  --color-muted: #5a6474;
+  --color-faint: #8a93a1;
+  --color-rule: #dcdfe3;
+  --color-cite: #234b82;
+  --color-cite-soft: #e6edf6;
+  --color-verified: #2e6a4e;
+  --color-verified-soft: #e5f0ea;
+  --color-caution: #9a6212;
+  --color-caution-soft: #f8eedb;
+  --color-danger: #9b2c2c;
+
+  --font-sans: var(--font-plex), system-ui, sans-serif;
+  --font-serif: var(--font-source), Georgia, serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-cite);
+  outline-offset: 2px;
+}
+
+/* Answer body: long-form legal reading. */
+.answer {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+}
+/* The short answer is what the lawyer reads first: slightly larger, list lines spaced. */
+.answer-short {
+  font-size: 1.125rem;
+}
+.answer-short li + li {
+  margin-top: 0.35em;
+}
+.answer p + p,
+.answer ul,
+.answer ol {
+  margin-top: 0.9em;
+}
+.answer ul,
+.answer ol {
+  padding-left: 1.25em;
+}
+.answer ul {
+  list-style: disc;
+}
+.answer ol {
+  list-style: decimal;
+}
+.answer strong {
+  font-weight: 600;
+}
+.answer h1,
+.answer h2,
+.answer h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-top: 1.4em;
+  color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
