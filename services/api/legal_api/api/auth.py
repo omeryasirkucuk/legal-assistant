@@ -6,7 +6,7 @@ import hmac
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from legal_api.auth import (
     COOKIE,
@@ -37,10 +37,11 @@ class UserOut(BaseModel):
     id: str
     email: str
     name: str
+    is_admin: bool
 
 
 def _out(user: User) -> UserOut:
-    return UserOut(id=str(user.id), email=user.email, name=user.name)
+    return UserOut(id=str(user.id), email=user.email, name=user.name, is_admin=user.is_admin)
 
 
 def _set_cookie(response: Response, user: User) -> None:
@@ -56,7 +57,9 @@ async def register(body: Registration, response: Response, db: DB) -> UserOut:
     email = body.email.lower()
     if await db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
-    user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password))
+    is_admin = not bool(await db.scalar(select(func.count()).select_from(User)))
+    user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password),
+                is_admin=is_admin)
     db.add(user)
     await db.commit()
     _set_cookie(response, user)

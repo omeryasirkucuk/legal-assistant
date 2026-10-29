@@ -16,6 +16,7 @@ import asyncpg
 
 from legal_api import llm
 from legal_api.config import get_settings
+from legal_api.grounding.normalize import tr_fold
 from legal_api.prompts import prompt
 from legal_api.retrieval.statutes import search_statutes
 
@@ -95,6 +96,33 @@ async def candidate_provisions(db: asyncpg.Pool, question: str) -> str:
         hits = await search_statutes(conn, question, limit=CANDIDATE_ARTICLES)
     return "\n".join(f"- Law {h.law_number} ({h.law_title}) art. {h.label} ({h.heading}): "
                      f"{' '.join(h.text.split())[:220]}" for h in hits)
+
+
+def payment_order_branches(question: str) -> list[Branch] | None:
+    """Resolve common payment-order deadline questions without a planning call.
+
+    Keep ordinary enforcement, bills of exchange and rent enforcement separate. The rent
+    payment period is its own atom, linked to TBK 315 instead of the objection deadline.
+    Answers are still generated from the named official statute articles below.
+    """
+    folded = tr_fold(question)
+    if not ("ödeme" in folded and "emr" in folded and "itiraz" in folded):
+        return None
+    return [
+        Branch("Genel haciz yoluyla ilamsız takip", [Atom(
+            "Genel haciz yoluyla ilamsız takipte ödeme emrine itiraz süresi kaç gündür?",
+            (("2004", "62"),), "")]),
+        Branch("Kambiyo senetlerine dayalı takip", [Atom(
+            "Kambiyo senetlerine dayalı takipte ödeme emrine itiraz süresi kaç gündür?",
+            (("2004", "168"),), "")]),
+        Branch("Kira alacağı ve tahliye talepli takip", [
+            Atom("Kira alacağı ve tahliye talepli ilamsız takipte ödeme emrine itiraz süresi "
+                 "kaç gündür?", (("2004", "269"),), ""),
+            Atom("Konut ve çatılı işyeri kira alacağı nedeniyle tahliye talepli takipte, "
+                 "İİK 269'daki kanuni ödeme süresi TBK 315 uyarınca kaç gündür?",
+                 (("2004", "269"), ("6098", "315")), ""),
+        ]),
+    ]
 
 
 async def decompose(question: str, history: list[dict], usage: llm.Usage,

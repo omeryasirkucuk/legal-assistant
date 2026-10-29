@@ -18,8 +18,9 @@ from legal_api.agent.detail import detail_stream
 from legal_api.auth import DB, CurrentUser
 from legal_api.chat.service import history, save_answer, spent_today, title_from
 from legal_api.config import get_settings
-from legal_api.db.app_models import Chat, Message, MessageEvidence
+from legal_api.db.app_models import Chat, LLMConnectionSettings, Message, MessageEvidence
 from legal_api.db.session import get_sessionmaker
+from legal_api.privacy.llm_settings import runtime_config
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 logger = logging.getLogger(__name__)
@@ -161,23 +162,26 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
     db.add(question)
     await db.commit()
     question_id = str(question.id)
+    llm_config = runtime_config(await db.get(LLMConnectionSettings, 1))
 
     async def events() -> AsyncIterator[str]:
-        yield _sse("question", {"id": question_id})
-        holder: dict = {}
+        token = llm.set_runtime_config(llm_config)
         try:
+            yield _sse("question", {"id": question_id})
+            holder: dict = {}
             async for event in answer_events(body.content.strip(), turns, holder):
                 yield _sse(event.type, event.data)
+            # The request-scoped session is closed once streaming starts; use a fresh one.
+            async with get_sessionmaker()() as session:
+                stored_chat = await session.get(Chat, chat.id)
+                saved = await save_answer(session, stored_chat, holder["result"])
+            yield _sse("saved", {"id": str(saved.id)})
         except Exception:
             # Tell the client the answer failed instead of cutting the stream silently.
             logger.exception("answer stream failed for chat %s", chat.id)
             yield _sse("error", {})
-            return
-        # The request-scoped session is closed once streaming starts; use a fresh one.
-        async with get_sessionmaker()() as session:
-            stored_chat = await session.get(Chat, chat.id)
-            saved = await save_answer(session, stored_chat, holder["result"])
-        yield _sse("saved", {"id": str(saved.id)})
+        finally:
+            llm.reset_runtime_config(token)
 
     return _stream(events())
 
@@ -210,25 +214,30 @@ async def detail(chat_id: uuid.UUID, message_id: uuid.UUID, user: CurrentUser,
     sources = sorted(((k, c, t) for k, c, t in rows), key=lambda r: (r[0] not in cited,
                                                                      int(r[0][1:])))
     message_pk = msg.id
+    llm_config = runtime_config(await db.get(LLMConnectionSettings, 1))
 
     async def events() -> AsyncIterator[str]:
-        usage = llm.Usage()
-        segments = []
+        token = llm.set_runtime_config(llm_config)
         try:
-            async for item in detail_stream(question or "", msg.content, sources, usage):
-                if isinstance(item, str):
-                    yield _sse("delta", {"text": item})
-                else:
-                    segments = [{"text": s.text, "keys": list(s.keys)} for s in item]
-        except Exception:
-            logger.exception("detail stream failed for message %s", message_pk)
-            yield _sse("error", {})
-            return
-        async with get_sessionmaker()() as session:
-            stored = await session.get(Message, message_pk)
-            stored.meta = {**stored.meta, "detail": segments,
-                           "detail_cost_usd": round(usage.cost_usd, 4)}
-            await session.commit()
-        yield _sse("detail", {"segments": segments})
+            usage = llm.Usage()
+            segments = []
+            try:
+                async for item in detail_stream(question or "", msg.content, sources, usage):
+                    if isinstance(item, str):
+                        yield _sse("delta", {"text": item})
+                    else:
+                        segments = [{"text": s.text, "keys": list(s.keys)} for s in item]
+            except Exception:
+                logger.exception("detail stream failed for message %s", message_pk)
+                yield _sse("error", {})
+                return
+            async with get_sessionmaker()() as session:
+                stored = await session.get(Message, message_pk)
+                stored.meta = {**stored.meta, "detail": segments,
+                               "detail_cost_usd": round(usage.cost_usd, 4)}
+                await session.commit()
+            yield _sse("detail", {"segments": segments})
+        finally:
+            llm.reset_runtime_config(token)
 
     return _stream(events())
