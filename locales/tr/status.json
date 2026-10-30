@@ -2,5 +2,8 @@
   "planning": "Sorunun kapsamı ve alt soruları çıkarılıyor",
   "answering": "{count} alt soru kaynaklarıyla cevaplanıyor",
   "not_found": "kaynaklarda bulunamadı",
-  "detail": "Ayrıntı yazılıyor"
+  "detail": "Ayrıntı yazılıyor",
+  "composing": "Kısa cevap yazılıyor",
+  "reformatting": "Önceki cevap istenen biçimde yeniden yazılıyor",
+  "no_answer": "Bu soruya, incelenen kanun maddeleri ve kararlarda dayanağı gösterilebilecek bir cevap bulamadım. Böyle bir düzenleme olmayabilir ya da kaynak dizinimizin dışında olabilir."
 }

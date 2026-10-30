@@ -31,6 +31,6 @@ def test_rrf_rewards_items_ranked_by_both_retrievers():
 
 
 def test_status_message_accepts_any_keyword_including_name():
-    from legal_api.agent.answer import _status
+    from legal_api.agent.answer import status_event as _status
 
     assert "3" in _status("answering", count=3, name="ignored").data["message"]
