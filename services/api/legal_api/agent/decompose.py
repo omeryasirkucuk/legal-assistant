@@ -5,23 +5,34 @@ the granularity of one fact, which is what finds provisions a whole-question sea
 and (b) an answer can only draw on its own sources, so provisions of different regimes cannot
 be blended into one statement. Candidates from the statute index are shown to the model so
 coverage comes from the law itself, not only from what the model remembers.
+
+Articles referred to by an answering article were already judged relevant (follow.py). For
+each one the planner only writes the sub-question and names its branch (`referenced_review`);
+code adds it with both articles as its sources, so a rule stated through a reference cannot be
+dropped by how the plan is written.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 
-import asyncpg
-
 from legal_api import llm
+from legal_api.agent.candidates import Candidates
+from legal_api.agent.compose import tag_index
+from legal_api.agent.follow import Followed
 from legal_api.config import get_settings
 from legal_api.grounding.normalize import tr_fold
 from legal_api.prompts import prompt
-from legal_api.retrieval.statutes import search_statutes
+from legal_api.retrieval.statutes import StatuteHit, law_number_of
+from legal_api.sources.bedesten_statutes import parse_article_label
 
-CANDIDATE_ARTICLES = 15
 MAX_ATOMS = 8
+# Thinking plus a review of every candidate; 6,000 was cut off with 20 candidates.
+MAX_PLAN_TOKENS = 16000
+MAX_REFERENCE_ATOMS = 4
+MAX_COVERAGE_ATOMS = 3
 
 _STATUTE = {
     "type": "object",
@@ -72,8 +83,21 @@ _SCHEMA = {
                 "additionalProperties": False,
             },
         },
+        "referenced_review": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "branch": {"type": "string"},
+                    "ask": {"type": "string"},
+                },
+                "required": ["id", "branch", "ask"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["candidate_review", "varies_by", "branches"],
+    "required": ["candidate_review", "varies_by", "branches", "referenced_review"],
     "additionalProperties": False,
 }
 
@@ -91,48 +115,109 @@ class Branch:
     atoms: list[Atom] = field(default_factory=list)
 
 
-async def candidate_provisions(db: asyncpg.Pool, question: str) -> str:
-    async with db.acquire() as conn:
-        hits = await search_statutes(conn, question, limit=CANDIDATE_ARTICLES)
-    return "\n".join(f"- Law {h.law_number} ({h.law_title}) art. {h.label} ({h.heading}): "
-                     f"{' '.join(h.text.split())[:220]}" for h in hits)
+def _label(label: str) -> str | None:
+    parsed = parse_article_label(label)
+    return parsed[2] if parsed else None
 
 
-def payment_order_branches(question: str) -> list[Branch] | None:
-    """Resolve common payment-order deadline questions without a planning call.
+def _cites(branch: Branch, law_number: str, label: str, laws: dict[str, str]) -> bool:
+    return any(law_number_of(law, laws) == law_number and _label(art) == _label(label)
+               for atom in branch.atoms for law, art in atom.statutes)
 
-    Keep ordinary enforcement, bills of exchange and rent enforcement separate. The rent
-    payment period is its own atom, linked to TBK 315 instead of the objection deadline.
-    Answers are still generated from the named official statute articles below.
-    """
-    folded = tr_fold(question)
-    if not ("ödeme" in folded and "emr" in folded and "itiraz" in folded):
-        return None
-    return [
-        Branch("Genel haciz yoluyla ilamsız takip", [Atom(
-            "Genel haciz yoluyla ilamsız takipte ödeme emrine itiraz süresi kaç gündür?",
-            (("2004", "62"),), "")]),
-        Branch("Kambiyo senetlerine dayalı takip", [Atom(
-            "Kambiyo senetlerine dayalı takipte ödeme emrine itiraz süresi kaç gündür?",
-            (("2004", "168"),), "")]),
-        Branch("Kira alacağı ve tahliye talepli takip", [
-            Atom("Kira alacağı ve tahliye talepli ilamsız takipte ödeme emrine itiraz süresi "
-                 "kaç gündür?", (("2004", "269"),), ""),
-            Atom("Konut ve çatılı işyeri kira alacağı nedeniyle tahliye talepli takipte, "
-                 "İİK 269'daki kanuni ödeme süresi TBK 315 uyarınca kaç gündür?",
-                 (("2004", "269"), ("6098", "315")), ""),
-        ]),
-    ]
+
+def _branch_for(branches: list[Branch], f: Followed, label: str,
+                laws: dict[str, str]) -> Branch:
+    """The branch a referenced article belongs to: the one the planner named, else the one
+    citing the referring article, else a new branch."""
+    for b in branches:
+        if b.label.casefold() == label.casefold():
+            return b
+    for b in branches:
+        if _cites(b, f.by.law_number, f.by.label, laws):
+            return b
+    branches.append(Branch(label or f.by.heading))
+    return branches[-1]
+
+
+def _attach_references(branches: list[Branch], review: list[dict], candidates: Candidates
+                       ) -> None:
+    added = 0
+    for entry in review:
+        i = tag_index(entry["id"], "R")
+        f = candidates.referenced[i] if i is not None and 0 <= i < len(candidates.referenced) \
+            else None
+        if f is None or not entry["ask"].strip():
+            continue
+        if added == MAX_REFERENCE_ATOMS:
+            break
+        branch = _branch_for(branches, f, entry["branch"].strip(), candidates.laws)
+        branch.atoms.append(Atom(entry["ask"].strip(),
+                                 ((f.hit.law_number, f.hit.label), (f.by.law_number, f.by.label)),
+                                 ""))
+        added += 1
+
+
+def _review_of(hit: StatuteHit, review: list[dict]) -> dict | None:
+    """The planner's review entry for an article, matched by its label and law number."""
+    for entry in review:
+        tokens = set(re.findall(r"\d+(?:/\w)?", entry["article"]))
+        if hit.label in tokens and (hit.law_number in tokens or len(tokens) == 1):
+            return entry
+    return None
+
+
+def _situation(hit: StatuteHit, entry: dict | None) -> str:
+    """What the planner said this article regulates, else the article's heading."""
+    if entry and entry["situation"].strip():
+        return entry["situation"].strip()
+    return hit.heading.strip(" :") or f"{hit.law_number}/{hit.label}"
+
+
+def _cover_answering(branches: list[Branch], question: str, review: list[dict],
+                     candidates: Candidates) -> None:
+    """Every article screened as answering the question gets a sub-question, unless the
+    planner reviewed it and said it does not answer the question. The planner sometimes wrote
+    one branch where five regimes apply; this keeps coverage tied to the screened articles
+    instead of to how one plan came out, while an explicit rejection still counts."""
+    added = 0
+    created: dict[str, tuple[Branch, int]] = {}
+    for hit in candidates.answering:
+        if any(_cites(b, hit.law_number, hit.label, candidates.laws) for b in branches):
+            continue
+        if added == MAX_COVERAGE_ATOMS:
+            break
+        entry = _review_of(hit, review)
+        if entry is not None and not entry["answers_question"]:
+            continue
+        situation = _situation(hit, entry)
+        branch = next((b for b in branches if tr_fold(b.label) == tr_fold(situation)), None)
+        if branch is None:
+            branch = Branch(situation)
+            branches.append(branch)
+        key = tr_fold(situation)
+        if key in created:
+            # Two articles on the same situation: one sub-question reading both.
+            b, j = created[key]
+            same = b.atoms[j]
+            b.atoms[j] = Atom(same.ask, (*same.statutes, (hit.law_number, hit.label)),
+                              same.case_query)
+            continue
+        branch.atoms.append(Atom(f"{situation}: {question}", ((hit.law_number, hit.label),), ""))
+        created[key] = (branch, len(branch.atoms) - 1)
+        added += 1
 
 
 async def decompose(question: str, history: list[dict], usage: llm.Usage,
-                    candidates: str) -> list[Branch]:
-    content = f"{question}\n\n<candidate_provisions>\n{candidates}\n</candidate_provisions>"
+                    candidates: Candidates) -> list[Branch]:
+    content = (f"{question}\n\n<candidate_provisions>\n{candidates.text()}\n"
+               f"</candidate_provisions>")
     response = await llm.create(
-        "main", usage, "decompose", max_tokens=6000, system=prompt("decompose"),
+        "main", usage, "decompose", max_tokens=MAX_PLAN_TOKENS, system=prompt("decompose"),
         messages=[*history, {"role": "user", "content": content}],
         output_config={"effort": get_settings().plan_effort,
                        "format": {"type": "json_schema", "schema": _SCHEMA}})
+    if response.stop_reason == "max_tokens":
+        raise RuntimeError("plan cut off at the token limit")
     data = json.loads(next(b.text for b in response.content if b.type == "text"))
     branches, total, seen = [], 0, set()
     for b in data["branches"]:
@@ -147,4 +232,6 @@ async def decompose(question: str, history: list[dict], usage: llm.Usage,
             total += 1
         if atoms:
             branches.append(Branch(b["label"], atoms))
+    _cover_answering(branches, question, data["candidate_review"], candidates)
+    _attach_references(branches, data["referenced_review"], candidates)
     return branches

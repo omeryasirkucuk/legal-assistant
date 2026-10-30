@@ -1,0 +1,18 @@
+{
+ "seven_days": "Borçlu yedi gün içinde itiraz eder.",
+ "fifteen_days": "on beş gün içinde",
+ "digits": "en az 30 gün; 6 ay içinde",
+ "claim_5": "Süre 5 gündür.",
+ "claim_7_digits": "Süre 7 gündür.",
+ "joined": "müebbet hapis cezası yerine onsekiz yıldan yirmidört yıla, oniki yıldan onsekiz yıla kadar",
+ "joined_claim": "18-24 yıl; 12-18 yıl",
+ "hundreds": "ikiyüzelli gün ve binbeşyüz lira",
+ "eleven": "onbir gün",
+ "not_numbers": "onun altında, dokuzuncu fıkra, bir ay, ona bildirilir",
+ "fraction_words": "cezanın dörtte birinden dörtte üçüne kadarı indirilir",
+ "fraction_claim": "cezanın 1/4'ünden 3/4'üne kadar indirim",
+ "sixth": "altıda biri oranında",
+ "case_number": "E. 2025/6036 sayılı karar",
+ "quantity_words": "Beş gün; onsekiz yıldan yirmidört yıla; yüz yüze; bir ay",
+ "quantity_digits": "5 gün; 18 yıldan 24 yıla; yüz yüze; bir ay"
+}

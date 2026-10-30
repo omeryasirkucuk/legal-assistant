@@ -10,10 +10,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 from datetime import UTC, datetime
 
 from legal_api import llm
-from legal_api.agent.answer import AnswerResult, answer
+from legal_api.agent.answer import AnswerResult, answer, plain_text
 from legal_api.config import REPO_ROOT
 from legal_api.evaluation.coverage import grade_coverage
 
@@ -24,7 +25,10 @@ OUT_DIR = REPO_ROOT / "var" / "eval"
 async def metrics(item: dict, result: AnswerResult) -> dict:
     answers = list(result.answers.values())
     grading = llm.Usage()
-    text = result.text
+    # Graded on the short answer as the lawyer reads it: citation chips show the source.
+    citations = {e.key: e.citation for e in result.ledger}
+    text = re.sub(r"\[\[(E\d+)\]\]", lambda m: f"({citations.get(m.group(1), m.group(1))})",
+                  result.short)
     covered = await grade_coverage(item["question"], text, item["must_cover"], grading)
     cited = {k for a in answers if a.found for s in a.segments for k in s.keys}
     return {
@@ -37,6 +41,14 @@ async def metrics(item: dict, result: AnswerResult) -> dict:
         "covered": covered,
         "short_chars": len(text),
         "branches": [b.label for b in result.branches],
+        "referenced": result.referenced,
+        # What was asked and read per sub-question, to diagnose a miss without rerunning.
+        "plan": [{"branch": b.label, "ask": a.ask,
+                  "statutes": [f"{law} {label}" for law, label in a.statutes],
+                  "found": result.answers[(i, j)].found,
+                  "read": [result.ledger.get(k).citation for k in result.answers[(i, j)].source_keys
+                           if result.ledger.get(k)]}
+                 for i, b in enumerate(result.branches) for j, a in enumerate(b.atoms)],
         "cited": len(cited),
         "cost_usd": round(result.usage.cost_usd, 4),
         "cost_by_step": result.usage.by_purpose(),
@@ -44,6 +56,7 @@ async def metrics(item: dict, result: AnswerResult) -> dict:
         "seconds": result.timings.get("total_s", 0.0),
         "timings": result.timings,
         "answer": text,
+        "detail": plain_text(result.structure()),
         "sources": [f"[{e.key}] {e.citation}" for e in result.ledger if e.key in cited],
     }
 

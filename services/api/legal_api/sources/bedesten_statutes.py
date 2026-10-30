@@ -129,13 +129,16 @@ class BedestenStatutes:
 
 def parse_article_label(label: str) -> tuple[str, int, str] | None:
     """("main" | "additional" | "temporary", number, display label) from a free-form label."""
-    text = tr_lower(label).replace(statute_term("article"), " ").replace("m.", " ").strip()
+    text = tr_lower(label).replace(statute_term("article"), " ").replace("m.", " ")
+    # The planner may copy the English form of its candidate list ("art. 65").
+    text = re.sub(r"\b(?:article|art)\b\.?", " ", text).strip()
     for kind in ("additional", "temporary"):
         word = tr_lower(statute_term(kind))
         m = re.match(rf"^{word}\s*(\d+)$", text)
         if m:
             return kind, int(m.group(1)), f"{statute_term(kind)} {m.group(1)}"
-    m = re.match(r"^(\d+)\s*(?:/\s*(\w))?$", text)
+    # "269/a" is a lettered article; "352/2" names paragraph 2 of article 352.
+    m = re.match(r"^(\d+)\s*(?:/\s*([^\W\d_])|/\s*\d+)?$", text)
     if not m:
         return None
     display = f"{m.group(1)}/{m.group(2)}" if m.group(2) else m.group(1)
