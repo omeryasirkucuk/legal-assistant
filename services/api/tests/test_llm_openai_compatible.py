@@ -15,14 +15,14 @@ def _settings() -> Settings:
 
 
 def test_openai_answer_requires_a_known_source_key():
-    sources = [("E1", "İİK m. 62", "Borçlu yedi gün içinde itiraz edebilir.")]
-    good = 'Yedi gün. <quote ref="E1">yedi gün içinde itiraz edebilir</quote>[[E1]]'
-    bad_key = 'Beş gün. <quote ref="E9">yedi gün içinde itiraz edebilir</quote>[[E9]]'
-    bad_quote = 'Beş gün. <quote ref="E1">beş gün içinde itiraz eder</quote>[[E1]]'
+    sources = [("E1", "Enforcement Law art. 62", "The debtor may object within seven days.")]
+    good = 'Seven days. <quote ref="E1">may object within seven days</quote>[[E1]]'
+    bad_key = 'Five days. <quote ref="E9">may object within seven days</quote>[[E9]]'
+    bad_quote = 'Five days. <quote ref="E1">objects within five days</quote>[[E1]]'
     assert openai_segments_from([llm.TextBlock("text", good)], sources)[0].keys == ("E1",)
     assert openai_segments_from([llm.TextBlock("text", bad_key)], sources) == []
     assert openai_segments_from([llm.TextBlock("text", bad_quote)], sources) == []
-    assert openai_segments_from([llm.TextBlock("text", "Yedi gün [[E1]]")], sources) == []
+    assert openai_segments_from([llm.TextBlock("text", "Seven days [[E1]]")], sources) == []
 
 
 @pytest.mark.asyncio
@@ -36,7 +36,7 @@ async def test_openwebui_create_uses_api_route_and_normalizes_response(monkeypat
         seen["payload"] = json.loads(request.content)
         return httpx.Response(200, json={
             "model": "local/legal-model",
-            "choices": [{"message": {"content": "Yedi gün [[E1]]"}, "finish_reason": "stop"}],
+            "choices": [{"message": {"content": "Seven days [[E1]]"}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": 12, "completion_tokens": 4, "cost": 0.002},
         })
 
@@ -58,7 +58,7 @@ async def test_openwebui_create_uses_api_route_and_normalizes_response(monkeypat
     assert seen["authorization"] == "Bearer test-token"
     assert seen["payload"]["model"] == "local/legal-model"
     assert seen["payload"]["response_format"]["json_schema"]["strict"] is True
-    assert result.content[0].text == "Yedi gün [[E1]]"
+    assert result.content[0].text == "Seven days [[E1]]"
     assert result.usage.input_tokens == 12
     assert usage.cost_usd == 0.002
 
@@ -67,8 +67,8 @@ async def test_openwebui_create_uses_api_route_and_normalizes_response(monkeypat
 async def test_openai_stream_yields_text_and_final_usage(monkeypatch):
     settings = _settings()
     body = (
-        'data: {"model":"local/legal-model","choices":[{"delta":{"content":"Yedi "}}]}\n\n'
-        'data: {"choices":[{"delta":{"content":"gün [[E1]]"},"finish_reason":"stop"}]}\n\n'
+        'data: {"model":"local/legal-model","choices":[{"delta":{"content":"Seven "}}]}\n\n'
+        'data: {"choices":[{"delta":{"content":"days [[E1]]"},"finish_reason":"stop"}]}\n\n'
         'data: {"choices":[],"usage":{"prompt_tokens":8,"completion_tokens":3}}\n\n'
         'data: [DONE]\n\n'
     )
@@ -87,7 +87,7 @@ async def test_openai_stream_yields_text_and_final_usage(monkeypatch):
         messages=[{"role": "user", "content": "Question"}],
     )]
 
-    assert items[:-1] == ["Yedi ", "gün [[E1]]"]
-    assert items[-1].content[0].text == "Yedi gün [[E1]]"
+    assert items[:-1] == ["Seven ", "days [[E1]]"]
+    assert items[-1].content[0].text == "Seven days [[E1]]"
     assert items[-1].usage.input_tokens == 8
     assert usage.calls[0]["output"] == 3

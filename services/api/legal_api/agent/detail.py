@@ -27,11 +27,7 @@ async def detail_stream(question: str, short_answer: str, sources: list[tuple[st
     system = prompt("detail")
     if llm.uses_openai_compatible():
         keys = ", ".join(key for key, _, _ in sources)
-        system += (f"\n\nKaynak kimlikleri: {keys}. Her maddi hukuki cümleden sonra ilgili "
-                   "kaynağın birebir, kısa bir alıntısını <quote ref=\"E1\">alıntı</quote>[[E1]] "
-                   "biçiminde ekle; E1'i gerçek kaynak kimliğiyle değiştir. Alıntı kaynakta "
-                   "harfiyen bulunmalı. Kaynak kimliği ya da alıntı uydurma; desteklenemeyen "
-                   "cümleyi yazma.")
+        system += "\n\n" + prompt("quote_citations").replace("{keys}", keys)
     final = None
     async for item in llm.stream("main", usage, "detail", max_tokens=6000,
                                  system=system,

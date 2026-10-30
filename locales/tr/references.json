@@ -1,0 +1,38 @@
+{
+  "law": "Kanun",
+  "numbered": "sayılı",
+  "article": "madde",
+  "this": [
+    "bu",
+    "Bu",
+    "işbu",
+    "İşbu"
+  ],
+  "joiners": [
+    "ve",
+    "ile",
+    "veya",
+    "ilâ",
+    "ila"
+  ],
+  "ordinals": [
+    "inci",
+    "ıncı",
+    "uncu",
+    "üncü",
+    "nci",
+    "ncı",
+    "ncu",
+    "ncü",
+    "ci",
+    "cı",
+    "cu",
+    "cü",
+    "i",
+    "ı",
+    "u",
+    "ü"
+  ],
+  "upper_letters": "A-ZÇĞİÖŞÜÂÎÛ",
+  "lower_letters": "a-zçğıöşüâîû"
+}

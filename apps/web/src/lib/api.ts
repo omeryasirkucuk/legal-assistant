@@ -34,6 +34,7 @@ export type MessageMeta = {
   repaired?: boolean;
   refused?: boolean;
   cost_usd?: number;
+  timings?: { total_s?: number };
 };
 export type Message = {
   id: string;
@@ -45,6 +46,7 @@ export type Message = {
 };
 export type SourceText = Evidence & { text: string; fetched_at: string };
 export type DecisionHit = { id: string; citation: string; url: string; passage: string };
+export type TodayStats = { answers: number; average_s: number; longest_s: number };
 export type HistoryHit = { chat_id: string; title: string; snippet: string };
 
 export class ApiError extends Error {
@@ -77,6 +79,8 @@ export const api = {
     call<ChatSummary>(`/chats/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }),
   deleteChat: (id: string) => call<void>(`/chats/${id}`, { method: "DELETE" }),
   messages: (id: string) => call<Message[]>(`/chats/${id}/messages`),
+  cancelRun: (id: string) => call<void>(`/chats/${id}/run/cancel`, { method: "POST" }),
+  todayStats: () => call<TodayStats>("/chats/stats/today"),
   searchHistory: (q: string) => call<HistoryHit[]>(`/chats/search?q=${encodeURIComponent(q)}`),
   source: (chatId: string, messageId: string, key: string) =>
     call<SourceText>(`/chats/${chatId}/messages/${messageId}/evidence/${key}`),

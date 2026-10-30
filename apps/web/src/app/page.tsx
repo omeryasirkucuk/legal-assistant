@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AssistantAnswer } from "@/components/AssistantAnswer";
+import { StreamingAnswer } from "@/components/StreamingAnswer";
 import { Composer, type Mode } from "@/components/Composer";
 import { SearchResults } from "@/components/SearchResults";
 import { Sidebar } from "@/components/Sidebar";
@@ -12,30 +13,16 @@ import {
   api,
   ApiError,
   type ChatSummary,
-  type Checked,
   type DecisionHit,
   type Evidence,
   type Message,
   type SourceText,
+  type TodayStats,
   type User,
 } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { citationOrder } from "@/lib/markers";
-import { askStream } from "@/lib/stream";
-
-type Pending = {
-  question: string;
-  raw: string;
-  evidence: Evidence[];
-  status?: string;
-  checked?: Checked;
-  repaired?: boolean;
-  refused?: boolean;
-  error?: boolean;
-  budget?: boolean;
-  plan?: Array<{ label: string; asks: string[] }>;
-  atoms?: Record<string, { found: boolean; segments: Array<{ text: string; keys: string[] }> }>;
-};
+import { useChatRuns } from "@/lib/useChatRuns";
 
 type Drawer = { evidence: Evidence; number: number; messageId: string | null };
 
@@ -45,20 +32,36 @@ export default function ChatApp() {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [pending, setPending] = useState<Pending | null>(null);
   const [mode, setMode] = useState<Mode>("ask");
   const [search, setSearch] = useState<{ query: string; hits: DecisionHit[] | null } | null>(null);
   const [drawer, setDrawer] = useState<Drawer | null>(null);
   const [source, setSource] = useState<SourceText | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const abort = useRef<AbortController | null>(null);
+  const [today, setToday] = useState<TodayStats | null>(null);
+  const visibleChat = useRef<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+
+  const runs = useChatRuns({
+    onTitle: useCallback((id: string, title: string) =>
+      setChats((cs) => cs.map((c) => (c.id === id ? { ...c, title } : c))), []),
+    onFinished: useCallback((id: string) => {
+      if (visibleChat.current === id) api.messages(id).then(setMessages).catch(() => {});
+      api.chats().then(setChats).catch(() => {});
+      api.todayStats().then(setToday).catch(() => {});
+    }, []),
+  });
+  const pending = chatId ? runs.pending[chatId] ?? null : null;
+
+  useEffect(() => {
+    visibleChat.current = chatId;
+  }, [chatId]);
 
   useEffect(() => {
     api
       .me()
       .then((u) => {
         setUser(u);
+        api.todayStats().then(setToday).catch(() => {});
         return api.chats().then(setChats);
       })
       .catch((e) => e instanceof ApiError && e.status === 401 && router.replace("/login"));
@@ -66,25 +69,28 @@ export default function ChatApp() {
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
-  }, [messages, pending?.question, pending?.raw, search]);
+  }, [messages, pending?.question, pending?.lines, pending?.plan, search]);
 
+  const { attach } = runs;
   const openChat = useCallback(async (id: string) => {
-    abort.current?.abort();
-    setPending(null);
     setSearch(null);
     setChatId(id);
-    setMessages(await api.messages(id));
-  }, []);
+    visibleChat.current = id;
+    setMessages([]);
+    const loaded = await api.messages(id);
+    if (visibleChat.current === id) setMessages(loaded);
+    attach(id);
+  }, [attach]);
 
   function newChat() {
-    abort.current?.abort();
     setChatId(null);
+    visibleChat.current = null;
     setMessages([]);
-    setPending(null);
     setSearch(null);
   }
 
   async function deleteChat(id: string) {
+    runs.stop(id);
     await api.deleteChat(id);
     setChats((cs) => cs.filter((c) => c.id !== id));
     if (id === chatId) newChat();
@@ -97,57 +103,10 @@ export default function ChatApp() {
       const chat = await api.createChat(question);
       id = chat.id;
       setChatId(id);
+      visibleChat.current = id;
       setChats((cs) => [chat, ...cs]);
     }
-    const controller = new AbortController();
-    abort.current = controller;
-    setPending({ question, raw: "", evidence: [] });
-    const update = (fn: (p: Pending) => Pending) => setPending((p) => (p ? fn(p) : p));
-    try {
-      await askStream(
-        id,
-        question,
-        (e) => {
-          switch (e.type) {
-            case "status":
-              return update((p) => ({ ...p, status: e.data.message }));
-            case "evidence":
-              return update((p) => ({ ...p, evidence: [...p.evidence, e.data] }));
-            case "plan":
-              return update((p) => ({ ...p, plan: e.data.branches, atoms: {} }));
-            case "atom":
-              return update((p) => {
-                const atoms = { ...(p.atoms ?? {}), [`${e.data.branch}:${e.data.index}`]: e.data };
-                return { ...p, atoms, raw: renderProgress(p.plan ?? [], atoms) || p.raw };
-              });
-            case "delta":
-              return update((p) => ({ ...p, raw: p.raw + e.data.text }));
-            case "reset":
-              return update((p) => ({ ...p, raw: "" }));
-            case "checked":
-              return update((p) => ({ ...p, checked: e.data }));
-            case "final":
-              return update((p) => ({
-                ...p,
-                raw: e.data.text,
-                status: undefined,
-              }));
-            case "saved":
-              return;
-            case "error":
-              throw new Error("answer failed");
-          }
-        },
-        controller.signal,
-      );
-      setMessages(await api.messages(id));
-      setPending(null);
-      api.chats().then(setChats);
-    } catch (err) {
-      const budget = err instanceof ApiError && err.status === 429;
-      if (!controller.signal.aborted) update((p) => ({ ...p, error: true, budget, status: undefined }));
-      else setPending(null);
-    }
+    await runs.ask(id, question);
   }
 
   async function runSearch(query: string) {
@@ -158,6 +117,14 @@ export default function ChatApp() {
     } catch {
       setSearch({ query, hits: [] });
     }
+  }
+
+  function openPendingSource(key: string) {
+    if (!pending) return;
+    const ev = pending.evidence.find((e) => e.key === key);
+    if (!ev) return;
+    setSource(null);
+    setDrawer({ evidence: ev, number: 0, messageId: null });
   }
 
   function openSource(evidence: Evidence[], raw: string, messageId: string | null, key: string) {
@@ -183,6 +150,7 @@ export default function ChatApp() {
         onDelete={deleteChat}
         onLogout={() => api.logout().then(() => router.replace("/login"))}
         onSettings={() => setSettingsOpen(true)}
+        today={today}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -210,26 +178,21 @@ export default function ChatApp() {
                       checked={m.meta.checked}
                       repaired={m.meta.repaired}
                       refused={m.meta.refused}
+                      seconds={m.meta.timings?.total_s}
                       onOpenSource={(k) => openSource(m.evidence, m.content, m.id, k)}
                     />
                   ),
                 )}
                 {pending && (
                   <>
-                    <Question text={pending.question} />
+                    {/* A re-attached answer's question is already among the saved messages. */}
+                    {messages[messages.length - 1]?.role !== "user" && <Question text={pending.question} />}
                     {pending.error ? (
                       <p className="text-sm text-danger">
                         {pending.budget ? t("budgetReached") : t("streamError")}
                       </p>
                     ) : (
-                      <AssistantAnswer
-                        raw={pending.raw}
-                        evidence={pending.evidence}
-                        checked={pending.checked}
-                        streaming
-                        status={pending.status}
-                        onOpenSource={(k) => openSource(pending.evidence, pending.raw, null, k)}
-                      />
+                      <StreamingAnswer pending={pending} onOpenSource={(k) => openPendingSource(k)} />
                     )}
                   </>
                 )}
@@ -249,7 +212,7 @@ export default function ChatApp() {
               }}
               busy={!!pending && !pending.error}
               onSubmit={(text) => (mode === "ask" ? ask(text) : runSearch(text))}
-              onStop={() => abort.current?.abort()}
+              onStop={() => chatId && runs.stop(chatId)}
             />
           </div>
         </div>
@@ -264,24 +227,6 @@ export default function ChatApp() {
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   );
-}
-
-function renderProgress(
-  plan: Array<{ label: string; asks: string[] }>,
-  atoms: Record<string, { found: boolean; segments: Array<{ text: string; keys: string[] }> }>,
-): string {
-  return plan.flatMap((branch, branchIndex) => {
-    const answers = branch.asks.flatMap((_, atomIndex) => {
-      const atom = atoms[`${branchIndex}:${atomIndex}`];
-      if (!atom) return [];
-      if (!atom.found) return ["kaynaklarda bulunamadı"];
-      const text = atom.segments.map((segment) =>
-        segment.text + segment.keys.map((key) => ` [[${key}]]`).join(""),
-      ).join("").trim();
-      return text ? [text] : [];
-    });
-    return answers.length ? [`- ${branch.label}: ${answers.join(" ")}`] : [];
-  }).join("\n");
 }
 
 function Question({ text }: { text: string }) {

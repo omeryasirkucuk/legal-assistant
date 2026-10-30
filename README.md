@@ -33,7 +33,7 @@ the model IDs shown by your instance. The key is encrypted in the database and n
 by the settings API. Open WebUI's API key must have chat-completions access enabled. Compatible
 answers are shown only when they cite a source ID and include an exact quote found in that source.
 For headless setup, the equivalent provider, endpoint, key, and model defaults can be set in
-`.env`. For paid compatible providers, set the optional input and output price-per-million-token
+`.env`. For metered compatible providers, set the optional input and output price-per-million-token
 variables so the per-user budget can account for their usage.
 
 See `NOTICE` for third-party data and code attributions.
