@@ -56,3 +56,8 @@ def tr_title(text: str, keep_lower: frozenset[str] = frozenset()) -> str:
         else:
             out.append(word[:1].translate(_TR_LOWER).upper() + word[1:])
     return " ".join(out)
+
+
+def tr_capitalize(text: str) -> str:
+    """First letter upper-cased with Turkish rules (dotted i keeps its dot), the rest unchanged."""
+    return text[:1].translate(_TR_LOWER).upper() + text[1:] if text else text

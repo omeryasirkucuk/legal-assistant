@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type ChatSummary, type HistoryHit, type User } from "@/lib/api";
+import { api, type ChatSummary, type HistoryHit, type TodayStats, type User } from "@/lib/api";
 import { t } from "@/lib/i18n";
 
 type Props = {
@@ -13,10 +13,11 @@ type Props = {
   onDelete: (id: string) => void;
   onLogout: () => void;
   onSettings: () => void;
+  today: TodayStats | null;
 };
 
 export function Sidebar({ user, chats, activeId, onSelect, onNew, onDelete, onLogout,
-  onSettings }: Props) {
+  onSettings, today }: Props) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<HistoryHit[] | null>(null);
 
@@ -98,6 +99,13 @@ export function Sidebar({ user, chats, activeId, onSelect, onNew, onDelete, onLo
 
       <div className="border-t border-rule px-4 py-3 text-sm">
         <span className="block truncate text-muted">{user.name}</span>
+        {today && (
+          <span className="mt-1 block text-xs text-faint">
+            {today.answers
+              ? t("todayStats", { answers: today.answers, average: Math.round(today.average_s) })
+              : t("todayNone")}
+          </span>
+        )}
         <div className="mt-2 flex items-center justify-between gap-3">
           {user.is_admin ? (
             <button onClick={onSettings} className="text-faint hover:text-ink">

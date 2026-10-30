@@ -2,21 +2,33 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from legal_api import llm
-from legal_api.agent.answer import answer_events
 from legal_api.agent.detail import detail_stream
+from legal_api.agent.turn import turn_events
 from legal_api.auth import DB, CurrentUser
-from legal_api.chat.service import history, save_answer, spent_today, title_from
+from legal_api.chat import runs
+from legal_api.chat.history_search import search_chats
+from legal_api.chat.service import (
+    history,
+    previous_turn,
+    save_answer,
+    spent_today,
+    title_from,
+    today_stats,
+)
+from legal_api.chat.titles import generate_title
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, LLMConnectionSettings, Message, MessageEvidence
 from legal_api.db.session import get_sessionmaker
@@ -91,20 +103,14 @@ async def delete_chat(chat_id: uuid.UUID, user: CurrentUser, db: DB) -> None:
 
 @router.get("/search")
 async def search_history(q: str, user: CurrentUser, db: DB) -> list[dict]:
-    """Full-text search over the user's past questions and answers."""
-    query = func.websearch_to_tsquery("turkish", q)
-    rows = await db.execute(
-        select(Chat.id, Chat.title,
-               func.ts_headline("turkish", Message.content, query,
-                                "MaxWords=24, MinWords=8, StartSel=<<, StopSel=>>"))
-        .join(Message, Message.chat_id == Chat.id)
-        .where(Chat.user_id == user.id, Message.tsv.op("@@")(query))
-        .order_by(func.ts_rank(Message.tsv, query).desc()).limit(30))
-    seen: dict[str, dict] = {}
-    for chat_id, title, snippet in rows:
-        seen.setdefault(str(chat_id), {"chat_id": str(chat_id), "title": title,
-                                       "snippet": snippet})
-    return list(seen.values())
+    """Search the user's chats by question, answer or title; partial words match."""
+    return await search_chats(db, user.id, q)
+
+
+@router.get("/stats/today")
+async def stats_today(user: CurrentUser, db: DB) -> dict:
+    """Answers given today and how long they took, for the sidebar."""
+    return await today_stats(db, user.id)
 
 
 @router.get("/{chat_id}/messages")
@@ -147,6 +153,18 @@ async def _guard_budget(db, user) -> None:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "daily budget reached")
 
 
+async def _finished_title(task: asyncio.Task | None) -> str | None:
+    """The generated title, or None when there is none or it failed (the chat keeps its
+    provisional title from the question)."""
+    if task is None:
+        return None
+    try:
+        return await task
+    except Exception:
+        logger.exception("title generation failed")
+        return None
+
+
 def _stream(events: AsyncIterator[str]) -> StreamingResponse:
     return StreamingResponse(events, media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -154,36 +172,73 @@ def _stream(events: AsyncIterator[str]) -> StreamingResponse:
 
 @router.post("/{chat_id}/messages")
 async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> StreamingResponse:
-    """Stores the question and streams the grounded answer as server-sent events."""
+    """Stores the question, starts the answer as a server-side run, and streams the run's
+    events. Closing the connection does not stop the answer; see GET /{chat_id}/run."""
     chat = await _owned_chat(db, user, chat_id)
+    if runs.active(chat.id):
+        raise HTTPException(status.HTTP_409_CONFLICT, "an answer is already running")
     await _guard_budget(db, user)
     turns = await history(db, chat)
-    question = Message(chat_id=chat.id, role="user", content=body.content.strip(), meta={})
+    previous = await previous_turn(db, chat)
+    text = body.content.strip()
+    question = Message(chat_id=chat.id, role="user", content=text, meta={})
     db.add(question)
     await db.commit()
     question_id = str(question.id)
     llm_config = runtime_config(await db.get(LLMConnectionSettings, 1))
+    chat_pk = chat.id
 
-    async def events() -> AsyncIterator[str]:
+    async def work(run: runs.Run) -> None:
         token = llm.set_runtime_config(llm_config)
         try:
-            yield _sse("question", {"id": question_id})
+            run.emit("question", {"id": question_id, "content": text,
+                                  "started_at": time.time() * 1000})
             holder: dict = {}
-            async for event in answer_events(body.content.strip(), turns, holder):
-                yield _sse(event.type, event.data)
-            # The request-scoped session is closed once streaming starts; use a fresh one.
+            title_usage = llm.Usage()
+            # The first question names the chat; written alongside the answer.
+            title_task = (asyncio.create_task(generate_title(text, title_usage))
+                          if previous is None else None)
+            async for event in turn_events(text, turns, previous, holder):
+                run.emit(event.type, event.data)
+            title = await _finished_title(title_task)
             async with get_sessionmaker()() as session:
-                stored_chat = await session.get(Chat, chat.id)
+                stored_chat = await session.get(Chat, chat_pk)
+                if stored_chat is None:      # deleted while answering
+                    return
+                if title:
+                    stored_chat.title = title
+                holder["result"].usage.calls.extend(title_usage.calls)
                 saved = await save_answer(session, stored_chat, holder["result"])
-            yield _sse("saved", {"id": str(saved.id)})
-        except Exception:
-            # Tell the client the answer failed instead of cutting the stream silently.
-            logger.exception("answer stream failed for chat %s", chat.id)
-            yield _sse("error", {})
+            if title:
+                run.emit("title", {"chat_id": str(chat_pk), "title": title})
+            run.emit("saved", {"id": str(saved.id)})
         finally:
             llm.reset_runtime_config(token)
 
-    return _stream(events())
+    return _stream(_follow(runs.start(chat.id, work)))
+
+
+async def _follow(run: runs.Run) -> AsyncIterator[str]:
+    async for event_type, data in run.follow():
+        yield _sse(event_type, data)
+
+
+@router.get("/{chat_id}/run")
+async def follow_run(chat_id: uuid.UUID, user: CurrentUser, db: DB) -> Response:
+    """Re-attaches to the chat's running answer (after switching chats or reloading):
+    replays its events from the start, then follows it. 204 when nothing is running."""
+    chat = await _owned_chat(db, user, chat_id)
+    run = runs.active(chat.id)
+    if run is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return _stream(_follow(run))
+
+
+@router.post("/{chat_id}/run/cancel", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_run(chat_id: uuid.UUID, user: CurrentUser, db: DB) -> None:
+    """Stops the chat's running answer (the stop button)."""
+    chat = await _owned_chat(db, user, chat_id)
+    runs.cancel(chat.id)
 
 
 @router.post("/{chat_id}/messages/{message_id}/detail")

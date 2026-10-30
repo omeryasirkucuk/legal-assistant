@@ -14,10 +14,11 @@ type Props = {
   status?: string;
   repaired?: boolean;
   refused?: boolean;
+  seconds?: number;
   onOpenSource: (key: string) => void;
 };
 
-function Chip({ n, onClick, label }: { n: number; onClick: () => void; label: string }) {
+export function Chip({ n, onClick, label }: { n: number; onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
@@ -31,7 +32,8 @@ function Chip({ n, onClick, label }: { n: number; onClick: () => void; label: st
 }
 
 export function AssistantAnswer(props: Props) {
-  const { raw, evidence, checked, streaming, status, repaired, refused, onOpenSource } = props;
+  const { raw, evidence, checked, streaming, status, repaired, refused, seconds, onOpenSource } =
+    props;
   const byKey = new Map(evidence.map((e) => [e.key, e]));
   const order = citationOrder(raw).filter((k) => byKey.has(k));
   const number = (key: string) => order.indexOf(key) + 1;
@@ -77,6 +79,10 @@ export function AssistantAnswer(props: Props) {
           </p>
         )}
 
+        {!streaming && seconds !== undefined && (
+          <p className="mt-4 text-xs text-faint">{t("answeredIn", { seconds: Math.round(seconds) })}</p>
+        )}
+
         {!streaming && !refused && checked && (
           <Verification checked={checked} repaired={repaired} number={number} />
         )}
@@ -105,7 +111,7 @@ export function AssistantAnswer(props: Props) {
   );
 }
 
-function SourceNote({ n, evidence, onOpen }: { n: number; evidence: Evidence; onOpen: (k: string) => void }) {
+export function SourceNote({ n, evidence, onOpen }: { n: number; evidence: Evidence; onOpen: (k: string) => void }) {
   return (
     <li>
       <button onClick={() => onOpen(evidence.key)} className="group flex gap-2 text-left">

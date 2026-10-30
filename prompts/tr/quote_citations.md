@@ -1,0 +1,1 @@
+Kaynak kimlikleri: {keys}. Her maddi hukuki cümleden sonra ilgili kaynağın birebir, kısa bir alıntısını <quote ref="E1">alıntı</quote>[[E1]] biçiminde ekle; E1'i gerçek kaynak kimliğiyle değiştir. Alıntı kaynakta harfiyen bulunmalı. Kaynak kimliği ya da alıntı uydurma; desteklenemeyen cümleyi yazma.

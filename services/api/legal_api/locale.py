@@ -41,3 +41,23 @@ def message(bundle: str, key: str, /, **values: object) -> str:
 
 def statute_term(key: str) -> str:
     return _bundle("statute_terms")[key]
+
+
+def reference_terms() -> dict:
+    """Words that make up a cross-reference to another article ("... Kanununun 62 nci maddesi")."""
+    return _bundle("references")
+
+
+def law_abbreviations() -> dict[str, str]:
+    """Customary abbreviation -> law number (the enforcement law's abbreviation -> "2004")."""
+    return _bundle("law_abbreviations")
+
+
+def number_words() -> dict[str, int]:
+    """Number words as they appear in statute text (the word for seven in "seven days") -> their value."""
+    return _bundle("numbers")["words"]
+
+
+def number_units() -> list[str]:
+    """Words that, following a number, show it is a quantity ("beş gün")."""
+    return _bundle("numbers")["units"]

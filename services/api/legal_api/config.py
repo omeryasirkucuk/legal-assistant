@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     model_draft: str = "claude-haiku-5-5"    # petition drafting
     model_cheap: str = "claude-haiku-5-5"   # routing, claim-support checks, style rewrites
     model_judge: str = "claude-haiku-5-5"  # sentence-by-sentence review and completeness
+    # Decision model (typed yes/no answers with probabilities) for screening candidate
+    # articles. Empty key disables screening; the planner then judges every candidate.
+    decision_api_key: str = ""
+    decision_base_url: str = "https://openrouter.ai/api"
+    decision_model: str = "typesafe/jev-1.13"
     answer_effort: str = "low"              # effort for writing the answer
     plan_effort: str = "medium"             # effort for research planning (coverage)
 
