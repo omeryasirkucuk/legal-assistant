@@ -29,6 +29,18 @@ class Source:
     document: str
 
 
+def article_document(hit: StatuteHit) -> str:
+    """What a model reads for an article: where it sits in the law and its marginal title,
+    then its text. The chapter decides the regime (the same "tenant's obligations" title
+    exists for ordinary and for usufructuary leases)."""
+    lines = []
+    if hit.section:
+        lines.append(f"Section: {hit.section}")
+    if hit.heading:
+        lines.append(f"Article title: {hit.heading}")
+    return "\n".join([*lines, hit.text])
+
+
 class SourceFinder:
     def __init__(self, ledger: EvidenceLedger, db: asyncpg.Pool, gateway: Gateway):
         self.ledger = ledger
@@ -36,20 +48,20 @@ class SourceFinder:
         self._live = BedestenStatutes(gateway)
         self._decisions = BedestenDecisions(gateway)
 
-    def _article(self, hit: StatuteHit) -> Source:
+    def article_source(self, hit: StatuteHit) -> Source:
         statute = StatuteRef(hit.statute_id, hit.law_number, hit.law_title, "KANUN", None,
                              hit.url)
         evidence = self.ledger.add_article(Article(statute, f"idx:{hit.id}", hit.label,
                                                    hit.text, hit.fetched_at.isoformat(),
                                                    hit.url))
-        return Source(evidence, hit.text)
+        return Source(evidence, article_document(hit))
 
     async def article(self, law: str, label: str) -> Source | None:
         """One named article: from the local index, else live from the official service."""
         async with self._db.acquire() as conn:
             hit = await get_article(conn, law, label)
         if hit is not None:
-            return self._article(hit)
+            return self.article_source(hit)
         try:
             if law.strip().isdigit():
                 _, refs = await self._live.search(number=law.strip(), size=5)
@@ -64,17 +76,19 @@ class SourceFinder:
     async def neighbours_of(self, law: str, label: str) -> list[Source]:
         async with self._db.acquire() as conn:
             hits = await neighbours(conn, law, label)
-        return [self._article(h) for h in hits]
+        return [self.article_source(h) for h in hits]
 
     async def articles_for(self, question: str, limit: int = SEARCHED_ARTICLES) -> list[Source]:
         async with self._db.acquire() as conn:
             hits = await search_statutes(conn, question, limit=limit)
-        return [self._article(h) for h in hits]
+        return [self.article_source(h) for h in hits]
 
-    async def decisions_for(self, query: str, ask: str, usage: llm.Usage) -> list[Source]:
+    async def decisions_for(self, query: str, ask: str, usage: llm.Usage, keep: int = 2,
+                            live_limit: int = 4, precedents: bool = False) -> list[Source]:
         """Decision passages that answer `ask`, from the local archive and live search."""
         async with self._db.acquire() as conn:
-            passages = await case_passages(conn, self._decisions, query, ask, usage)
+            passages = await case_passages(conn, self._decisions, query, ask, usage, keep,
+                                           live_limit, precedents)
         sources = []
         for p in passages:
             if p.live is not None:

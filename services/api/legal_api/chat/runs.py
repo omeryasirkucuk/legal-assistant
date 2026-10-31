@@ -98,9 +98,11 @@ def start(chat_id: uuid.UUID,
     return run
 
 
-def cancel(chat_id: uuid.UUID) -> bool:
+async def cancel(chat_id: uuid.UUID, wait_s: float = 5.0) -> bool:
+    """Cancel the chat's run and wait briefly for it to finish its cleanup."""
     run = active(chat_id)
     if run is None or run.task is None:
         return False
     run.task.cancel()
+    await asyncio.wait({run.task}, timeout=wait_s)
     return True

@@ -23,14 +23,16 @@ from pgvector.asyncpg import register_vector
 from legal_api.corpus.ingest import asyncpg_dsn
 from legal_api.embeddings import embed_passages
 from legal_api.grounding.normalize import tr_lower
-from legal_api.locale import statute_term
+from legal_api.locale import section_levels, statute_term
 from legal_api.sources import bedesten_statutes as bs
 from legal_api.sources.gateway import Gateway
 from legal_api.sources.text import html_to_text
 
 # Core codes a litigator needs daily; extend freely.
 CORE_LAWS = ["2004", "6098", "4721", "6100", "5237", "5271", "2577", "6102", "4857", "7036",
-             "6325", "634", "1136", "7201", "492", "6502", "2709"]
+             "6325", "634", "1136", "7201", "492", "6502", "2709",
+             # The 1971 labour law: its art. 14 (severance pay) is still in force.
+             "1475"]
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,30 @@ class ParsedArticle:
     label: str
     heading: str
     text: str
+    section: str = ""
+
+
+def _section_pattern() -> re.Pattern:
+    """A division heading ("DÖRDÜNCÜ BÖLÜM", the ordinal sometimes on its own line after
+    conversion) and its title: the lines that follow, up to the next blank line."""
+    levels = "|".join(re.escape(w) for w in section_levels())
+    upper = "A-ZÇĞİÖŞÜÂÎÛ"
+    return re.compile(rf"(?m)^[ \t]*(?:[{upper}]+\s+){{1,2}}?(?P<level>{levels})[ \t]*\n"
+                      rf"\s*(?P<title>(?:[^\n]*\S[^\n]*\n){{1,3}}?)[ \t]*\n")
+
+
+def sections_at(document_text: str) -> list[tuple[int, str]]:
+    """(position, section path) after every division heading, the path built from the
+    innermost heading of each level seen so far (a new chapter resets deeper levels)."""
+    levels = section_levels()
+    current: dict[int, str] = {}
+    out: list[tuple[int, str]] = []
+    for m in _section_pattern().finditer(document_text):
+        depth = levels.index(m.group("level"))
+        current = {d: t for d, t in current.items() if d < depth}
+        current[depth] = " ".join(m.group("title").split())
+        out.append((m.end(), " > ".join(current[d] for d in sorted(current))))
+    return out
 
 
 def _heading_pattern() -> re.Pattern:
@@ -72,7 +98,12 @@ def _marginal_title(before: str) -> str:
 def split_articles(document_text: str) -> list[ParsedArticle]:
     """Split a consolidated law into articles. Later duplicates (articles of amending laws
     appended after the code itself) are dropped: the first occurrence is the code's own."""
+    # The service's text uses CRLF line endings; patterns below work on lines. Zero-width
+    # characters inside words are dropped (they reached answers as "\u200b").
+    document_text = document_text.replace("\r\n", "\n").replace("\r", "\n")
+    document_text = re.sub("[\u200b\u200c\u200d\ufeff]", "", document_text)
     heads = list(_heading_pattern().finditer(document_text))
+    sections = sections_at(document_text)
     kinds = {tr_lower(statute_term("additional")): "additional",
              tr_lower(statute_term("temporary")): "temporary"}
     out: list[ParsedArticle] = []
@@ -94,7 +125,8 @@ def split_articles(document_text: str) -> list[ParsedArticle]:
             tail = _marginal_title(document_text[max(0, nxt.start() - 400):nxt.start()])
             if tail:
                 body = body.removesuffix(_clean(tail)).rstrip()
-        out.append(ParsedArticle(kind, label, heading, body))
+        section = next((path for pos, path in reversed(sections) if pos <= head.start()), "")
+        out.append(ParsedArticle(kind, label, heading, body, section))
     return out
 
 
@@ -118,16 +150,18 @@ async def sync(numbers: list[str]) -> None:
     try:
         for number in numbers:
             ref, articles = await fetch_law(statutes, number)
-            vectors = embed_passages([f"{a.heading}\n{a.text}"[:2000] for a in articles])
+            vectors = embed_passages([f"{a.section}\n{a.heading}\n{a.text}"[:2000]
+                                      for a in articles])
             now = datetime.now(UTC)
             async with conn.transaction():
                 await conn.execute("DELETE FROM statute_articles WHERE law_number = $1", number)
                 await conn.copy_records_to_table(
                     "statute_articles",
                     columns=["law_number", "law_title", "statute_id", "kind", "label",
-                             "position", "heading", "text", "url", "fetched_at", "embedding"],
+                             "position", "heading", "section", "text", "url", "fetched_at",
+                             "embedding"],
                     records=[(number, ref.title, ref.statute_id, a.kind, a.label, i, a.heading,
-                              a.text, ref.url, now, v)
+                              a.section, a.text, ref.url, now, v)
                              for i, (a, v) in enumerate(zip(articles, vectors, strict=True))])
             print(f"{number} {ref.title}: {len(articles)} articles", flush=True)
     finally:

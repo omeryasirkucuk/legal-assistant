@@ -7,7 +7,14 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from legal_api.config import get_settings
-from legal_api.db import app_models, corpus_models, statute_models  # noqa: F401
+from legal_api.db import (  # noqa: F401
+    app_models,
+    corpus_models,
+    drafting_models,
+    file_models,
+    matter_models,
+    statute_models,
+)
 from legal_api.db.base import Base
 
 # this is the Alembic Config object, which provides

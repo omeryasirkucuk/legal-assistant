@@ -1,0 +1,32 @@
+{
+  "_sources": [
+    "Civil: HMK m. 104 (a period ending in the recess is extended one week from the day it ends); https://barandogan.av.tr/blog/mevzuat/hmk-madde-104.html",
+    "Administrative: İYUK m. 8/3 (seven days from the end of the recess); https://imer.av.tr/adli-tatil",
+    "Criminal: CMK m. 331/4 (three days from the end of the recess; not for detention matters); https://hukukcularevi.com/adli-tatil-ceza-davalari-sureler-cmk-331/",
+    "Enforcement: periods under İİK are not extended by the recess; https://www.harbiyehukuk.com/adli-tatilde-gorulen-davalar/",
+    "Electronic service: Tebligat Kanunu m. 7/a(4), deemed served at the end of the fifth day after reaching the address; https://hukukcularevi.com/e-tebligat-uets-geldi-sure-ne-zaman-baslar-hak-kaybi-nasil-onlenir/"
+  ],
+  "branches": {
+    "civil": {
+      "recess_extension": 7,
+      "law": "HMK m. 104"
+    },
+    "administrative": {
+      "recess_extension": 7,
+      "law": "İYUK m. 8/3"
+    },
+    "criminal": {
+      "recess_extension": 3,
+      "law": "CMK m. 331/4"
+    },
+    "enforcement": {
+      "recess_extension": null,
+      "law": "İİK"
+    },
+    "arbitration": {
+      "recess_extension": null,
+      "law": ""
+    }
+  },
+  "electronic_service_days": 5
+}

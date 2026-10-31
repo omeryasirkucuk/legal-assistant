@@ -40,7 +40,7 @@ def message(bundle: str, key: str, /, **values: object) -> str:
 
 
 def statute_term(key: str) -> str:
-    return _bundle("statute_terms")[key]
+    return _bundle("statute_terms")[key]  # type: ignore[return-value]
 
 
 def reference_terms() -> dict:
@@ -59,5 +59,50 @@ def number_words() -> dict[str, int]:
 
 
 def number_units() -> list[str]:
-    """Words that, following a number, show it is a quantity ("beş gün")."""
+    """Words that, following a number, show it is a quantity (five days)."""
     return _bundle("numbers")["units"]
+
+
+def section_levels() -> list[str]:
+    """Words naming a law's divisions, outermost first (book, part, ...)."""
+    return _bundle("statute_terms")["section_levels"]
+
+
+def style_terms() -> dict:
+    """Petition style vocabulary: formal words, opening and closing formulas."""
+    return _bundle("style")
+
+
+def document_labels() -> dict:
+    """Weighted words that tell a document's kind and its area of law (files/labels.py)."""
+    return _bundle("document_labels")
+
+
+def calendar_data() -> dict:
+    """Holidays, half-day eves and the judicial recess, with their sources (calc/calendar.py)."""
+    return _bundle("calendar")
+
+
+def calculation_terms() -> dict:
+    """Wording of a calculation shown to the lawyer and the writer (calc/sources.py)."""
+    return _bundle("calculations")
+
+
+def severance_data() -> dict:
+    """Severance pay ceilings, stamp duty and notice periods, with sources (calc/severance.py)."""
+    return _bundle("severance")
+
+
+def matter_terms() -> dict:
+    """How a case file is described to the model in its chats (matters/service.py)."""
+    return _bundle("matters")
+
+
+def interest_data() -> dict:
+    """Statutory and advance interest rates by period, with sources (calc/interest.py)."""
+    return _bundle("interest")
+
+
+def deadline_rules() -> dict:
+    """How the judicial recess and the manner of service bear on a period, by branch."""
+    return _bundle("deadline_rules")

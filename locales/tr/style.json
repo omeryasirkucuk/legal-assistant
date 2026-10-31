@@ -1,0 +1,75 @@
+{
+  "formal_words": [
+    "işbu",
+    "mezkur",
+    "mezkûr",
+    "binaenaleyh",
+    "müvekkil",
+    "müvekkilimiz",
+    "müvekkilim",
+    "hasebiyle",
+    "mütevellit",
+    "itibariyle",
+    "itibarıyla",
+    "keza",
+    "zira",
+    "muhterem",
+    "tevdi",
+    "ikame",
+    "mucip",
+    "muhik",
+    "tanzim",
+    "ihtiva",
+    "mahiyet",
+    "akabinde",
+    "müteakiben",
+    "nezdinde",
+    "mütemadiyen",
+    "hilafına",
+    "telakki",
+    "vaki",
+    "izah"
+  ],
+  "closing_formulas": [
+    "arz ve talep ederiz",
+    "arz ve talep ederim",
+    "saygılarımızla arz ederiz",
+    "saygılarımla arz ederim",
+    "arz olunur",
+    "talep ve dava ederiz",
+    "talep olunur"
+  ],
+  "opening_formulas": [
+    "şöyle ki",
+    "izah edilecek nedenlerle",
+    "açıklanan nedenlerle",
+    "aşağıda açıklanan"
+  ],
+  "decision_marker": "Yargıtay",
+  "sentence_end": ".!?",
+  "registers": {
+    "plain": "sade ve günlük dile yakın; eski ve kalıp sözcüklerden kaçın (işbu, mezkûr, binaenaleyh gibi).",
+    "balanced": "resmî ama anlaşılır; kalıp sözcükleri ölçülü kullan.",
+    "formal": "ağır resmî ve klasik dilekçe dili; işbu, mezkûr, müvekkil, binaenaleyh gibi kalıp ifadeleri yerinde kullan."
+  },
+  "default_headings": [],
+  "self_reference": [
+    "hangi vakıanın ispat",
+    "hangi delilin hangi",
+    "vakıalar\\w* somutlaştırıl",
+    "delil\\w* \\S+ (?:\\S+ )?(?:karşısında|yanında) gösteril",
+    "her delil\\w* .{0,60}(?:gösteril|belirtil|açıklan)",
+    "bilinmeyen (?:olgu|husus|bilgi)\\w* köşeli",
+    "(?:bu|işbu) dilekçe\\w* .{0,40}(?:hazırlanmıştır|düzenlenmiştir|yazılmıştır)",
+    "dilekçe\\w* (?:zorunlu )?unsur\\w* .{0,40}(?:yer almaktadır|karşılanmıştır|bulunmaktadır)",
+    "somutlaştırılması gerek",
+    "delil olarak gösterilmiştir"
+  ],
+  "interim_measure": {
+    "request": "ihtiyati tedbir",
+    "requests_heading": "sonuç ve (?:istem|talep|istek)",
+    "header": "**İHTİYATİ TEDBİR TALEPLİDİR**",
+    "header_text": "ihtiyati tedbir talepli"
+  },
+  "request_flag": "talepli"
+}

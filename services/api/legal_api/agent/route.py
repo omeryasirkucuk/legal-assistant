@@ -22,12 +22,12 @@ INSTRUCTIONS = ("A lawyer is chatting with a legal research assistant. Decide wh
                 "message asks for, given the previous question and the previous answer.")
 CRITERIA = {
     "new": "A new legal question that can be answered without the previous answer.",
-    "reformat": "A request to present the previous answer differently (shorter, as a list or "
-                "table, simpler words, only some part of it) without asking anything new "
-                "about the law.",
-    "followup": "A legal question that continues the previous one: asks about a further "
-                "case, condition, exception or consequence, or refers to it with words like "
-                "'this', 'that case', 'and for ...'.",
+    "reformat": "Only a change to how the previous answer is presented (shorter, as a list or "
+                "table, simpler words, only part of it). Nothing is asked that the previous "
+                "answer does not already contain.",
+    "followup": "Asks something the previous answer did not cover, about the same matter: "
+                "what to do next, the steps or stages, the procedure, a further case, "
+                "condition, exception or consequence, or a document to draft.",
 }
 
 

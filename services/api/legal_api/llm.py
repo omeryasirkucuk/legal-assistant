@@ -17,9 +17,10 @@ import httpx
 
 from legal_api.config import get_settings
 
-Role = Literal["main", "draft", "cheap", "judge"]
+Role = Literal["main", "draft", "cheap", "judge", "write"]
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
+REQUEST_TIMEOUT_S = 120.0
 CACHE_WRITE_MULTIPLIER = 1.25  # 5-minute cache writes cost 1.25x base input
 
 # USD per million tokens (input, output, cache read). Source: Anthropic pricing, 2026-10.
@@ -62,12 +63,14 @@ def model_for(role: Role) -> str:
     configured = _runtime_config.get()
     if configured:
         return {"main": configured.model_main, "draft": configured.model_draft,
-                "cheap": configured.model_cheap, "judge": configured.model_judge}[role]
+                "cheap": configured.model_cheap, "judge": configured.model_judge,
+                "write": configured.model_main}[role]
     if uses_openai_compatible(s):
         return {"main": s.openai_model_main, "draft": s.openai_model_draft,
-                "cheap": s.openai_model_cheap, "judge": s.openai_model_judge}[role]
+                "cheap": s.openai_model_cheap, "judge": s.openai_model_judge,
+                "write": s.openai_model_main}[role]
     return {"main": s.model_main, "draft": s.model_draft, "cheap": s.model_cheap,
-            "judge": s.model_judge}[role]
+            "judge": s.model_judge, "write": s.model_write}[role]
 
 
 def uses_openai_compatible(settings=None) -> bool:
@@ -77,21 +80,43 @@ def uses_openai_compatible(settings=None) -> bool:
     return provider in {"openai", "openai_compatible", "openwebui", "open_webui"}
 
 
+def routed(role: Role) -> str | None:
+    """The OpenRouter model a role is sent to instead of the configured provider, if any:
+    the answer writer ("write") and the petition writer ("draft")."""
+    s = get_settings()
+    if _runtime_config.get() or not s.decision_api_key:
+        return None
+    return {"write": s.write_route, "draft": s.draft_route}.get(role) or None
+
+
+def openai_for(role: Role) -> bool:
+    """Whether this role is served by an OpenAI-compatible endpoint (no document citations)."""
+    return uses_openai_compatible() or routed(role) is not None
+
+
 @cache
 def client() -> anthropic.AsyncAnthropic:
     settings = get_settings()
     if settings.llm_provider != "anthropic":
         raise NotImplementedError(f"provider {settings.llm_provider!r} is not wired yet")
-    return anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key or None)
+    # The SDK default (10 minutes, retried twice) let a stalled request hold an answer for
+    # half an hour; no call here needs more than two minutes between bytes.
+    return anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key or None,
+                                    timeout=REQUEST_TIMEOUT_S,
+                                    max_retries=1)
 
 
-def openai_client() -> httpx.AsyncClient:
-    """HTTP client for OpenAI-compatible services, including Open WebUI's /api endpoint."""
+def openai_client(route: bool = False) -> httpx.AsyncClient:
+    """HTTP client for OpenAI-compatible services, including Open WebUI's /api endpoint;
+    `route`: OpenRouter, for a role routed there (see `routed`)."""
     settings = get_settings()
     configured = _runtime_config.get()
     headers = {"content-type": "application/json"}
-    api_key = configured.api_key if configured else settings.openai_api_key
-    base_url = configured.base_url if configured else settings.openai_base_url
+    if route:
+        api_key, base_url = settings.decision_api_key, settings.decision_base_url + "/v1"
+    else:
+        api_key = configured.api_key if configured else settings.openai_api_key
+        base_url = configured.base_url if configured else settings.openai_base_url
     if api_key:
         headers["authorization"] = f"Bearer {api_key}"
     return httpx.AsyncClient(base_url=base_url.rstrip("/"),
@@ -140,7 +165,8 @@ def _content_text(content: Any) -> str:
     return "\n".join(parts)
 
 
-def _openai_payload(model: str, params: dict, *, stream: bool = False) -> dict:
+def _openai_payload(model: str, params: dict, *, stream: bool = False,
+                    route: bool = False) -> dict:
     params = dict(params)
     system = params.pop("system", None)
     params.pop("cache_control", None)
@@ -158,6 +184,14 @@ def _openai_payload(model: str, params: dict, *, stream: bool = False) -> dict:
             "json_schema": {"name": "legal_assistant_response", "strict": True,
                              "schema": output_config["format"]["schema"]},
         }
+    if route:
+        # No host that may keep or train on the lawyer's text; the cost comes back per call.
+        payload["provider"] = {"data_collection": "deny"}
+        payload["usage"] = {"include": True}
+        # Reasoning models count their thinking in max_tokens: left at their default, one
+        # spent all 16,000 tokens thinking and wrote no petition. The answer's effort is used.
+        if output_config and output_config.get("effort"):
+            payload["reasoning"] = {"effort": output_config["effort"]}
     if stream:
         payload["stream"] = True
         payload["stream_options"] = {"include_usage": True}
@@ -180,21 +214,25 @@ def _openai_completion(data: dict) -> Completion:
 
 
 async def _openai_create(role: Role, params: dict) -> Completion:
-    model = model_for(role)
-    async with openai_client() as client:
-        response = await client.post("chat/completions", json=_openai_payload(model, params))
+    route = routed(role)
+    model = route or model_for(role)
+    async with openai_client(bool(route)) as client:
+        response = await client.post("chat/completions",
+                                     json=_openai_payload(model, params, route=bool(route)))
         response.raise_for_status()
         return _openai_completion(response.json())
 
 
 async def _openai_stream(role: Role, params: dict):
-    model = model_for(role)
+    route = routed(role)
+    model = route or model_for(role)
     text = []
     response_model = model
     usage = CompletionUsage()
     finish_reason = None
-    async with openai_client() as client, client.stream(
-        "POST", "chat/completions", json=_openai_payload(model, params, stream=True)) as r:
+    async with openai_client(bool(route)) as client, client.stream(
+        "POST", "chat/completions",
+        json=_openai_payload(model, params, stream=True, route=bool(route))) as r:
         r.raise_for_status()
         async for line in r.aiter_lines():
             if not line.startswith("data:"):
@@ -277,8 +315,8 @@ async def create(role: Role, usage: Usage, purpose: str, **params: Any):
     """messages.create with role-based model, refusal fallback, automatic prompt caching and
     usage recording. Caching matters in the tool loop, where every round resends the whole
     conversation including all fetched source texts."""
-    model = model_for(role)
-    if uses_openai_compatible():
+    model = routed(role) or model_for(role)
+    if openai_for(role):
         response = await _openai_create(role, params)
         usage.record(response.model or model, response.usage, purpose)
         return response
@@ -291,8 +329,8 @@ async def create(role: Role, usage: Usage, purpose: str, **params: Any):
 
 async def stream(role: Role, usage: Usage, purpose: str, **params: Any):
     """Streaming variant of `create`: yields text deltas (str), then the final message."""
-    model = model_for(role)
-    if uses_openai_compatible():
+    model = routed(role) or model_for(role)
+    if openai_for(role):
         async for item in _openai_stream(role, params):
             if isinstance(item, str):
                 yield item

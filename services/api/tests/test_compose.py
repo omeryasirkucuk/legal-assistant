@@ -57,3 +57,10 @@ def test_without_a_decision_model_a_message_after_an_answer_is_a_followup(monkey
 def test_no_cited_line_says_nothing_was_found():
     from legal_api.locale import message
     assert compose_module.short_text([]) == message("status", "no_answer")
+
+
+def test_layout_and_citation_numbers_are_not_quantities():
+    from legal_api.agent.write import without_citations
+    from legal_api.grounding.numbers import numbers_in
+    text = "### 2. Heading\n1. **Route (TBK m. 352/2):** E. 2019/1483, 25.06.2019: 7 days"
+    assert numbers_in(without_citations(text)) == {7}

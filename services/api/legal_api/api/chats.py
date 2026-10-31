@@ -16,11 +16,14 @@ from sqlalchemy import select
 
 from legal_api import llm
 from legal_api.agent.detail import detail_stream
+from legal_api.agent.power import power_of
 from legal_api.agent.turn import turn_events
 from legal_api.auth import DB, CurrentUser
 from legal_api.chat import runs
 from legal_api.chat.history_search import search_chats
 from legal_api.chat.service import (
+    chat_costs,
+    drop_unanswered,
     history,
     previous_turn,
     save_answer,
@@ -32,6 +35,16 @@ from legal_api.chat.titles import generate_title
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, LLMConnectionSettings, Message, MessageEvidence
 from legal_api.db.session import get_sessionmaker
+from legal_api.drafting.files import refresh_draft_file
+from legal_api.drafting.store import file_format, record_reply, save_draft, style_book
+from legal_api.files.context import Attachment
+from legal_api.files.store import owned as owned_files
+from legal_api.files.store import read as read_file
+from legal_api.matters.documents import Document
+from legal_api.matters.documents import material as matter_material
+from legal_api.matters.service import context as matter_context
+from legal_api.matters.service import files_of as matter_files
+from legal_api.matters.service import owned as owned_matter
 from legal_api.privacy.llm_settings import runtime_config
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -42,6 +55,8 @@ class ChatOut(BaseModel):
     id: str
     title: str
     updated_at: str
+    cost_usd: float = 0.0     # LLM spend of all answers in the chat
+    matter_id: str | None = None   # the case file it belongs to
 
 
 class MessageOut(BaseModel):
@@ -55,14 +70,18 @@ class MessageOut(BaseModel):
 
 class Ask(BaseModel):
     content: str = Field(min_length=1, max_length=20000)
+    file_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
+    power: str | None = None        # fast | balanced | deep
+    matter_id: uuid.UUID | None = None   # on creating a chat: the case file it is opened in
 
 
 class Rename(BaseModel):
     title: str = Field(min_length=1, max_length=200)
 
 
-def _chat_out(chat: Chat) -> ChatOut:
-    return ChatOut(id=str(chat.id), title=chat.title, updated_at=chat.updated_at.isoformat())
+def _chat_out(chat: Chat, cost: float = 0.0) -> ChatOut:
+    return ChatOut(id=str(chat.id), title=chat.title, updated_at=chat.updated_at.isoformat(),
+                   cost_usd=cost, matter_id=str(chat.matter_id) if chat.matter_id else None)
 
 
 async def _owned_chat(db, user, chat_id: uuid.UUID) -> Chat:
@@ -74,14 +93,17 @@ async def _owned_chat(db, user, chat_id: uuid.UUID) -> Chat:
 
 @router.get("")
 async def list_chats(user: CurrentUser, db: DB) -> list[ChatOut]:
-    chats = await db.scalars(select(Chat).where(Chat.user_id == user.id)
-                             .order_by(Chat.updated_at.desc()).limit(200))
-    return [_chat_out(c) for c in chats]
+    chats = (await db.scalars(select(Chat).where(Chat.user_id == user.id)
+                              .order_by(Chat.updated_at.desc()).limit(200))).all()
+    costs = await chat_costs(db, [c.id for c in chats])
+    return [_chat_out(c, costs.get(c.id, 0.0)) for c in chats]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_chat(body: Ask, user: CurrentUser, db: DB) -> ChatOut:
-    chat = Chat(user_id=user.id, title=title_from(body.content))
+    matter = await owned_matter(db, user.id, body.matter_id) if body.matter_id else None
+    chat = Chat(user_id=user.id, title=title_from(body.content),
+                matter_id=matter.id if matter else None)
     db.add(chat)
     await db.commit()
     return _chat_out(chat)
@@ -178,42 +200,88 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
     if runs.active(chat.id):
         raise HTTPException(status.HTTP_409_CONFLICT, "an answer is already running")
     await _guard_budget(db, user)
+    await drop_unanswered(db, chat)   # no run is active, so it will never be answered
     turns = await history(db, chat)
     previous = await previous_turn(db, chat)
     text = body.content.strip()
-    question = Message(chat_id=chat.id, role="user", content=text, meta={})
+    files = await owned_files(db, user.id, body.file_ids)
+    question = Message(chat_id=chat.id, role="user", content=text, meta={
+        "attachments": [{"id": str(f.id), "name": f.name, "media_type": f.media_type,
+                         "size": f.size} for f in files]} if files else {})
     db.add(question)
+    await db.flush()
+    for f in files:
+        f.chat_id, f.message_id = chat.id, question.id
     await db.commit()
+    attachments = [Attachment(f.name, f.media_type, f.text,
+                              read_file(f) if f.media_type.startswith("image/") else None)
+                   for f in files]
+    # In a case file, its parties, court, notes and documents come with every question.
+    matter = await owned_matter(db, user.id, chat.matter_id) if chat.matter_id else None
+    if matter is not None:
+        in_file = await matter_files(db, matter.id)
+        attached = {f.id for f in files}
+        docs = [Document(f.id, f.name, f.text or "") for f in in_file
+                if f.id not in attached and not f.media_type.startswith("image/")]
+        attachments[:0] = [matter_context(matter, in_file),
+                           *await asyncio.to_thread(matter_material, text, docs)]
+    power = power_of(body.power)
     question_id = str(question.id)
     llm_config = runtime_config(await db.get(LLMConnectionSettings, 1))
-    chat_pk = chat.id
+    style = await style_book(db, user.id, text)   # used if the message asks for a petition
+    chat_pk, user_pk = chat.id, user.id
 
     async def work(run: runs.Run) -> None:
         token = llm.set_runtime_config(llm_config)
         try:
-            run.emit("question", {"id": question_id, "content": text,
-                                  "started_at": time.time() * 1000})
-            holder: dict = {}
-            title_usage = llm.Usage()
-            # The first question names the chat; written alongside the answer.
-            title_task = (asyncio.create_task(generate_title(text, title_usage))
-                          if previous is None else None)
-            async for event in turn_events(text, turns, previous, holder):
-                run.emit(event.type, event.data)
-            title = await _finished_title(title_task)
+            await answer_and_save(run)
+        except asyncio.CancelledError:
+            # Stopped by the lawyer: the question has no answer, so it leaves the chat too.
             async with get_sessionmaker()() as session:
-                stored_chat = await session.get(Chat, chat_pk)
-                if stored_chat is None:      # deleted while answering
-                    return
-                if title:
-                    stored_chat.title = title
-                holder["result"].usage.calls.extend(title_usage.calls)
-                saved = await save_answer(session, stored_chat, holder["result"])
-            if title:
-                run.emit("title", {"chat_id": str(chat_pk), "title": title})
-            run.emit("saved", {"id": str(saved.id)})
+                stored = await session.get(Message, uuid.UUID(question_id))
+                if stored is not None:
+                    await session.delete(stored)
+                    await session.commit()
+            raise
         finally:
             llm.reset_runtime_config(token)
+
+    async def answer_and_save(run: runs.Run) -> None:
+        run.emit("question", {"id": question_id, "content": text,
+                              "started_at": time.time() * 1000})
+        holder: dict = {}
+        title_usage = llm.Usage()
+        # The first question names the chat; written alongside the answer.
+        title_task = (asyncio.create_task(generate_title(text, title_usage))
+                      if previous is None else None)
+        async for event in turn_events(text, turns, previous, holder, style, power,
+                                       attachments):
+            run.emit(event.type, event.data)
+        title = await _finished_title(title_task)
+        async with get_sessionmaker()() as session:
+            stored_chat = await session.get(Chat, chat_pk)
+            if stored_chat is None:      # deleted while answering
+                return
+            if title:
+                stored_chat.title = title
+            holder["result"].usage.calls.extend(title_usage.calls)
+            result = holder["result"]
+            saved = await save_answer(session, stored_chat, result)
+            draft = None
+            u = getattr(result, "understanding", None)
+            asked = getattr(result, "asked", False)
+            if u is not None and previous is not None and (previous.answer or {}).get("asked"):
+                await record_reply(session, user_pk, skipped=u.write_now)
+            fmt = await file_format(session, user_pk, u.output_format) if u and not asked else None
+            if u is not None and u.task == "drafting" and not asked:
+                draft = await save_draft(session, user_pk, chat_pk, saved.id, u.petition_type,
+                                         title or stored_chat.title, result.full_text, fmt)
+                await refresh_draft_file(session, draft)
+        if draft is not None:
+            run.emit("draft", {"id": str(draft.id), "format": fmt})
+        if title:
+            run.emit("title", {"chat_id": str(chat_pk), "title": title})
+        run.emit("saved", {"id": str(saved.id)})
 
     return _stream(_follow(runs.start(chat.id, work)))
 
@@ -238,7 +306,7 @@ async def follow_run(chat_id: uuid.UUID, user: CurrentUser, db: DB) -> Response:
 async def cancel_run(chat_id: uuid.UUID, user: CurrentUser, db: DB) -> None:
     """Stops the chat's running answer (the stop button)."""
     chat = await _owned_chat(db, user, chat_id)
-    runs.cancel(chat.id)
+    await runs.cancel(chat.id)
 
 
 @router.post("/{chat_id}/messages/{message_id}/detail")

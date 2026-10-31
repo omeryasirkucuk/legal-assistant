@@ -21,17 +21,17 @@ from legal_api.grounding.normalize import tr_fold
 MAX_RESULTS = 30
 MAX_TERMS = 6
 SNIPPET_CHARS = 70
-# Citation markers and section tags are not text the lawyer sees.
-_MARKUP = re.compile(r"\[\[E\d+\]\]|</?(?:short|detail|quote[^>]*)>")
+# Citation markers, section tags and Markdown bold/heading marks are not text the lawyer sees.
+_MARKUP = re.compile(r"\[\[E\d+\]\]|</?(?:short|detail|quote[^>]*)>|\*\*|^#+\s", re.MULTILINE)
 _BULLET = re.compile(r"(?m)^\s*- ")
 
 
-def _terms(q: str) -> list[str]:
+def search_terms(q: str) -> list[str]:
     words = [w for w in re.findall(r"\w+", tr_fold(q)) if len(w) >= 2]
     return list(dict.fromkeys(words))[:MAX_TERMS]
 
 
-def _folded(column):
+def folded(column):
     """Turkish casefold in SQL: dotted capital I to i and plain I to dotless i, then lower."""
     return func.lower(func.translate(column, "İI", "iı"))
 
@@ -40,8 +40,8 @@ def _term_matches(term: str):
     pattern = f"%{term}%"
     prefix = func.to_tsquery("turkish", literal(f"{term}:*", Text))
     return or_(Message.tsv.op("@@")(prefix),
-               _folded(Message.content).like(pattern),
-               _folded(Chat.title).like(pattern))
+               folded(Message.content).like(pattern),
+               folded(Chat.title).like(pattern))
 
 
 def snippet(content: str, terms: list[str]) -> str:
@@ -69,7 +69,7 @@ def snippet(content: str, terms: list[str]) -> str:
 
 
 async def search_chats(db: AsyncSession, user_id: uuid.UUID, q: str) -> list[dict]:
-    terms = _terms(q)
+    terms = search_terms(q)
     if not terms:
         return []
     rows = await db.execute(

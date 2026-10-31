@@ -1,9 +1,9 @@
 import { API_URL, ApiError, type Checked, type Evidence } from "./api";
 
-export type StepName = "understand" | "search" | "screen" | "references" | "plan" | "answer"
-  | "compose";
+export type StepName = "understand" | "analyse" | "search" | "screen" | "references"
+  | "caselaw" | "plan" | "answer" | "write" | "compose" | "calculate";
 export type Step = { name: StepName; state: "active" | "done"; count?: number; done?: number;
-  branches?: number };
+  branches?: number; issues?: number };
 // One line of the short answer: a branch's gists joined, with the sources they cite.
 export type AnswerLine = { branch: number; text: string; keys: string[] };
 
@@ -19,7 +19,8 @@ export type StreamEvent =
   | { type: "delta"; data: { text: string } }
   | { type: "reset"; data: Record<string, never> }
   | { type: "checked"; data: Checked }
-  | { type: "final"; data: { text: string; cost_usd: number; timings: Record<string, number> } }
+  | { type: "final"; data: { text: string; checked?: Checked; cost_usd: number;
+      timings: Record<string, number> } }
   | { type: "saved"; data: { id: string } }
   | { type: "route"; data: { kind: "new" | "reformat" | "followup" } }
   | { type: "step"; data: Step }
@@ -47,17 +48,20 @@ async function readEvents(res: Response, onEvent: (event: StreamEvent) => void):
 }
 
 // Asks a question. The answer runs on the server; closing this stream does not stop it.
+export type AskOptions = { fileIds?: string[]; power?: string };
+
 export async function askStream(
   chatId: string,
   content: string,
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
+  options: AskOptions = {},
 ): Promise<void> {
   const res = await fetch(`${API_URL}/chats/${chatId}/messages`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, file_ids: options.fileIds ?? [], power: options.power }),
     signal,
   });
   if (!res.ok) throw new ApiError(res.status);

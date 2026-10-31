@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 from sqlalchemy import Float, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from legal_api.agent.answer import AnswerResult
 from legal_api.agent.turn import EvidenceCopy, Previous
+from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, Message, MessageEvidence
 
 HISTORY_TURNS = 6
@@ -44,6 +44,17 @@ async def history(db: AsyncSession, chat: Chat) -> list[dict]:
     return turns
 
 
+async def drop_unanswered(db: AsyncSession, chat: Chat) -> None:
+    """Remove a last question that has no answer. It is left behind when an answer failed or
+    the API restarted while answering (runs live in process memory); kept, it would reach the
+    model as a second user turn in a row and stay in the chat with no answer under it."""
+    last = await db.scalar(select(Message).where(Message.chat_id == chat.id)
+                           .order_by(Message.created_at.desc()).limit(1))
+    if last is not None and last.role == "user":
+        await db.delete(last)
+        await db.commit()
+
+
 async def previous_turn(db: AsyncSession, chat: Chat) -> Previous | None:
     """The chat's last answer, the question it answered and its sources."""
     answer = await db.scalar(select(Message).where(Message.chat_id == chat.id,
@@ -62,12 +73,15 @@ async def previous_turn(db: AsyncSession, chat: Chat) -> Previous | None:
                      for e in evidence])
 
 
-async def save_answer(db: AsyncSession, chat: Chat, result: AnswerResult) -> Message:
+async def save_answer(db: AsyncSession, chat: Chat, result) -> Message:
+    """`result`: a pipeline WrittenResult (or the legacy AnswerResult): text, structure(),
+    usage, timings, trace, ledger of sources, optionally checked."""
     msg = Message(chat_id=chat.id, role="assistant", content=result.text, meta={
         "answer": result.structure(),
         "cost_usd": round(result.usage.cost_usd, 4),
         "timings": result.timings,
         "trace": result.trace,
+        **({"checked": result.checked} if getattr(result, "checked", None) else {}),
     })
     db.add(msg)
     await db.flush()
@@ -92,14 +106,29 @@ async def spent_today(db: AsyncSession, user_id: uuid.UUID) -> float:
     return float(total or 0.0)
 
 
+def message_cost():
+    """An assistant message's LLM spend: the answer and, if opened, its detail section."""
+    return (func.coalesce(cast(Message.meta["cost_usd"].astext, Float), 0.0)
+            + func.coalesce(cast(Message.meta["detail_cost_usd"].astext, Float), 0.0))
+
+
+async def chat_costs(db: AsyncSession, chat_ids: list[uuid.UUID]) -> dict[uuid.UUID, float]:
+    rows = await db.execute(
+        select(Message.chat_id, func.sum(message_cost()))
+        .where(Message.chat_id.in_(chat_ids), Message.role == "assistant")
+        .group_by(Message.chat_id))
+    return {chat_id: round(float(total or 0), 4) for chat_id, total in rows}
+
+
 async def today_stats(db: AsyncSession, user_id: uuid.UUID) -> dict:
-    """The user's answers since 00:00 UTC: how many, and how long they took."""
+    """The user's answers since 00:00 UTC: how many, how long they took, what they cost."""
     start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     seconds = cast(Message.meta["timings"]["total_s"].astext, Float)
-    count, average, longest = (await db.execute(
-        select(func.count(), func.avg(seconds), func.max(seconds))
+    count, average, longest, cost = (await db.execute(
+        select(func.count(), func.avg(seconds), func.max(seconds), func.sum(message_cost()))
         .join(Chat, Chat.id == Message.chat_id)
         .where(Chat.user_id == user_id, Message.role == "assistant",
                Message.created_at >= start))).one()
     return {"answers": int(count or 0), "average_s": round(float(average or 0), 1),
-            "longest_s": round(float(longest or 0), 1)}
+            "longest_s": round(float(longest or 0), 1), "cost_usd": round(float(cost or 0), 4),
+            "budget_usd": get_settings().daily_user_budget_usd}
