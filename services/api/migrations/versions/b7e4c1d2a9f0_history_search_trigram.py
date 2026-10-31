@@ -14,7 +14,7 @@ down_revision = "8fa129cb3b10"
 branch_labels = None
 depends_on = None
 
-_FOLD = "lower(translate({col}, 'İI', 'iı'))"
+_FOLD = "lower(translate({col}, '\u0130I', 'i\u0131'))"
 
 
 def upgrade() -> None:

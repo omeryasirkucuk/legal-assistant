@@ -16,6 +16,8 @@ from sqlalchemy import select
 
 from legal_api import llm
 from legal_api.auth import DB, CurrentUser
+from legal_api.chat.service import spent_today
+from legal_api.config import get_settings
 from legal_api.db.drafting_models import Draft, StyleMemory, StyleSample
 from legal_api.db.file_models import StoredFile
 from legal_api.drafting import memory, store
@@ -25,7 +27,7 @@ from legal_api.drafting.export_pdf import NoFont
 from legal_api.drafting.feedback import ACTIONS, apply_action, learn_from_edit
 from legal_api.drafting.files import draft_file, file_name, refresh_draft_file
 from legal_api.drafting.locate import locate
-from legal_api.drafting.rich import BadDocument, apply_doc, editor_doc, fingerprint
+from legal_api.drafting.rich import BadDocument, apply_doc, carry_over, editor_doc, fingerprint
 from legal_api.drafting.sample_profile import SampleProfile, analyze
 from legal_api.drafting.style import petition_span
 from legal_api.drafting.tidy import tidy
@@ -34,6 +36,7 @@ from legal_api.files.extract import UnsupportedFile, text_of
 from legal_api.files.labels import file_format
 from legal_api.files.store import QuotaExceeded
 from legal_api.files.store import read as read_file
+from legal_api.spend import record_spend
 
 router = APIRouter(tags=["drafting"])
 _background: set[asyncio.Task] = set()
@@ -45,7 +48,7 @@ class SampleOut(BaseModel):
     title: str
     petition_type: str | None
     area: str           # area of law as the model read it, "other" if unclear
-    matter: str         # the matter in a few words ("anlaşmalı boşanma")
+    matter: str         # the matter in a few words ("uncontested divorce")
     format: str         # word, udf, pdf, text, ... from the file name
     words: int
     created_at: datetime
@@ -154,7 +157,10 @@ async def _add(db, user, title: str, text: str, petition_type: str | None,
         if similar:
             raise HTTPException(status.HTTP_409_CONFLICT, {
                 "code": "similar", "id": str(similar[0].id), "title": similar[0].title})
-    profile = await analyze(title, text, llm.Usage())
+    read_usage = llm.Usage()
+    profile = await analyze(title, text, read_usage)
+    await record_spend(db, user.id, "sample_read", read_usage)
+    await db.commit()
     if not profile.is_petition and not petition_type:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "not_petition")
     sample = await store.add_sample(db, user.id, title, text,
@@ -335,17 +341,22 @@ async def adjust_draft(draft_id: uuid.UUID, body: Adjust, user: CurrentUser, db:
         start, end = found
     if not 0 <= start < end <= len(draft.text):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "bad selection")
+    if await spent_today(db, user.id) >= get_settings().daily_user_budget_usd:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "daily budget reached")
     book = await store.style_book(db, user.id)
     usage = llm.Usage()
     try:
         part = await rewrite(draft.text[start:end], body.action, book.rules, usage)
     except RewriteRejected as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from e
+    before = editor_doc(draft)
     draft.text = tidy(draft.text[:start] + part + draft.text[end:])
     draft.updated_at = datetime.now(UTC)
     draft.meta = {**draft.meta,
+                  "doc": carry_over(before, draft.text), "doc_for": fingerprint(draft.text),
                   "adjust_cost_usd": round(draft.meta.get("adjust_cost_usd", 0)
                                            + usage.cost_usd, 4)}
+    await record_spend(db, user.id, "draft_adjust", usage)
     await store.set_preferences(db, user.id, apply_action(book.preferences, body.action))
     await db.commit()
     await refresh_draft_file(db, draft)

@@ -77,7 +77,7 @@ async def test_folders_hold_files_and_give_them_back_when_deleted(client):
     cycle = await client.patch(f"/folders/{top['id']}", json={"parent_id": inner["id"]})
     assert cycle.status_code == 422
     assert (await client.delete(f"/folders/{inner['id']}")).status_code == 204
-    moved = [x for x in (await client.get("/files")).json() if x["id"] == f["id"]][0]
+    moved = next(x for x in (await client.get("/files")).json() if x["id"] == f["id"])
     assert moved["folder_id"] == top["id"]
     out = (await client.patch(f"/files/{f['id']}", json={"to_top": True})).json()
     assert out["folder_id"] is None

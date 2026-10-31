@@ -51,7 +51,7 @@ class StatuteHit:
     url: str
     fetched_at: datetime
     score: float = 0.0
-    section: str = ""     # the parts and chapters the article sits in ("Kira > Ürün Kirası")
+    section: str = ""     # the parts and chapters the article sits in ("Lease > Crop lease")
 
 
 def _hit(row: asyncpg.Record, score: float = 0.0) -> StatuteHit:

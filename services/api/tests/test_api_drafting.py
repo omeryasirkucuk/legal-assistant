@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from legal_api.drafting import store as drafting_store
 from legal_api.drafting.sample_profile import SampleProfile
 from legal_api.main import create_app
 
+TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
+
 get_settings().invite_code = "test-invite"
 FORMAL = (Path(__file__).parent / "fixtures" / "tr" / "petition_formal.txt").read_text(
     encoding="utf-8")
@@ -22,7 +25,7 @@ FORMAL = (Path(__file__).parent / "fixtures" / "tr" / "petition_formal.txt").rea
 # so tests make no model call.
 READINGS = {"karar.txt": SampleProfile(is_petition=False),
             "emir.txt": SampleProfile(is_petition=False),
-            "is.txt": SampleProfile(True, "dava", "labour", "iscilik", "kıdem ve ihbar tazminatı")}
+            "is.txt": SampleProfile(True, "dava", "labour", "iscilik", TR["api_drafting_1"])}
 
 
 async def _read(title, text, usage):
@@ -58,14 +61,14 @@ async def test_a_sample_shapes_the_profile(client):
     after = (await client.get("/drafting/profile")).json()
     assert after["types"]["dava"]["learnt_from"] == 1
     assert after["types"]["dava"]["register"] == "formal"
-    rules = await client.put("/drafting/profile/rules", json={"rules": ["Kısa yaz.", " "]})
-    assert rules.json() == {"rules": ["Kısa yaz."]}
+    rules = await client.put("/drafting/profile/rules", json={"rules": [TR["api_drafting_2"], " "]})
+    assert rules.json() == {"rules": [TR["api_drafting_3"]]}
     sid = r.json()["id"]
     assert (await client.delete(f"/drafting/samples/{sid}")).status_code == 204
 
 
 async def test_short_or_unknown_files_are_refused(client):
-    r = await client.post("/drafting/samples/text", json={"title": "x", "text": "çok kısa"})
+    r = await client.post("/drafting/samples/text", json={"title": "x", "text": TR["api_drafting_4"]})
     assert r.status_code == 422
     r = await client.post("/drafting/samples", files={"file": ("a.exe", b"x")})
     assert r.status_code == 415
@@ -89,7 +92,7 @@ async def test_samples_are_sorted_out_one_by_one(client):
     assert r.status_code == 201, r.text
     sample = r.json()
     assert sample["petition_type"] == "dava" and sample["area"] == "labour"
-    assert sample["matter"] == "kıdem ve ihbar tazminatı"
+    assert sample["matter"] == TR["api_drafting_5"]
     assert sample["format"] == "text"
     # The same petition again, and a court decision, are not added.
     again = await client.post("/drafting/samples", files={"file": ("kopya.txt", labour)})
@@ -109,8 +112,8 @@ async def test_samples_are_sorted_out_one_by_one(client):
 
 async def test_an_edited_copy_is_asked_about_and_can_replace_the_old_one(client):
     first = (await client.post("/drafting/samples", files={"file": ("a.txt", FORMAL.encode())})).json()
-    edited = FORMAL.replace("Binaenaleyh işbu davanın ikamesi zarureti hâsıl olmuştur.",
-                            "Bu nedenle dava açılması gerekmiştir.")
+    edited = FORMAL.replace(TR["api_drafting_6"],
+                            TR["api_drafting_7"])
     r = await client.post("/drafting/samples", files={"file": ("a2.txt", edited.encode())})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "similar"
     assert r.json()["detail"]["id"] == first["id"]
@@ -119,7 +122,7 @@ async def test_an_edited_copy_is_asked_about_and_can_replace_the_old_one(client)
     assert r.status_code == 201
     titles = [s["title"] for s in (await client.get("/drafting/samples")).json()]
     assert titles == ["a2.txt"]
-    other = edited.replace("kira", "işçilik").replace("Kira", "Ücret")
+    other = edited.replace("kira", TR["api_drafting_8"]).replace("Kira", TR["api_drafting_9"])
     r = await client.post("/drafting/samples", data={"keep": "true"},
                           files={"file": ("b.txt", other.encode())})
     assert r.status_code == 201
@@ -137,9 +140,9 @@ async def test_autosaves_keep_the_text_and_the_style_is_learnt_once(client, monk
     async with get_sessionmaker()() as db:
         draft = await drafting_store.save_draft(db, uuid.UUID(me["id"]), None, uuid.uuid4(),
                                                 "other", "Test", "First text.", "docx")
-    for text in ("First text, edited.", "First text, edited twice."):
-        r = await client.put(f"/drafts/{draft.id}", json={"text": text, "learn": False})
-        assert r.status_code == 200 and r.json()["text"] == text
+    for edited in ("First text, edited.", "First text, edited twice."):
+        r = await client.put(f"/drafts/{draft.id}", json={"text": edited, "learn": False})
+        assert r.status_code == 200 and r.json()["text"] == edited
     assert learnt == []
     assert (await client.post(f"/drafts/{draft.id}/learn")).status_code == 204
     await asyncio.sleep(0)

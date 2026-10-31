@@ -83,6 +83,11 @@ def calendar_data() -> dict:
     return _bundle("calendar")
 
 
+def attachment_terms() -> dict:
+    """How the lawyer's attachments are introduced to the model (files/context.py)."""
+    return _bundle("attachments")
+
+
 def court_costs() -> dict:
     """Court fees of the current tariff, the yearly appeal limits and the wording of a fee
     and appeal calculation (calc/court_costs.py)."""

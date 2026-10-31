@@ -1,7 +1,8 @@
 "use client";
 
 // A case file's deadlines: the next one set large, as days left (the one figure that must
-// not be missed), then the rest in date order with a tick for done, and a line to add one.
+// not be missed) with its own done and delete, then the rest in date order with a tick for
+// done, and a line to add one.
 import { useState } from "react";
 import { Check, Plus, Trash2 } from "lucide-react";
 import { DeadlineActions } from "@/components/DeadlineActions";
@@ -18,7 +19,9 @@ export function daysLeftText(days: number): string {
   return days < 0 ? t("daysOverdue", { n: -days }) : days === 0 ? t("dueToday") : t("daysLeft", { n: days });
 }
 
-function NextDeadline({ d }: { d: Deadline }) {
+function NextDeadline({ d, asking, onAsk, onDone, onDelete }: {
+  d: Deadline; asking: boolean; onAsk: (open: boolean) => void; onDone: () => void; onDelete: () => void;
+}) {
   const days = daysUntil(d.due);
   const tone = TONE[urgency(days)];
   return (
@@ -34,6 +37,20 @@ function NextDeadline({ d }: { d: Deadline }) {
       )}
       <p className="mt-3 text-[15px] font-medium leading-snug text-ink">{d.label}</p>
       <p className="text-sm text-muted">{formatDay(d.due, "long")}{d.branch && ` · ${branchName(d.branch)}`}</p>
+      {asking ? (
+        <DeadlineActions onDone={onDone} onDelete={onDelete} onCancel={() => onAsk(false)} />
+      ) : (
+        <div className="mt-3 flex items-center gap-1.5">
+          <button onClick={onDone}
+            className="flex items-center gap-1 rounded-md border border-rule bg-sheet px-2 py-1 text-xs text-ink hover:border-verified hover:text-verified pointer-coarse:py-1.5">
+            <Check size={12} strokeWidth={3} /> {t("deadlineMarkDone")}
+          </button>
+          <button onClick={() => onAsk(true)} aria-label={t("deadlineDelete")} title={t("deadlineDelete")}
+            className="rounded-md p-1.5 text-faint hover:bg-sheet hover:text-danger">
+            <Trash2 size={13} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -81,7 +98,7 @@ export function DeadlinePanel({ matterId, deadlines, onChanged }: {
           )}
         </span>
         <button onClick={() => remove(d)} aria-label={t("deadlineDelete")} hidden={asking === d.id}
-          className="rounded p-1 text-faint opacity-0 hover:text-danger group-hover:opacity-100 focus-visible:opacity-100">
+          className="rounded p-1 text-faint opacity-0 hover:text-danger group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100">
           <Trash2 size={13} />
         </button>
       </li>
@@ -90,7 +107,10 @@ export function DeadlinePanel({ matterId, deadlines, onChanged }: {
 
   return (
     <div>
-      {next ? <NextDeadline d={next} /> : <p className="text-sm leading-relaxed text-muted">{t("noDeadlines")}</p>}
+      {next ? (
+        <NextDeadline d={next} asking={asking === next.id} onAsk={(o) => setAsking(o ? next.id : null)}
+          onDone={() => toggle(next)} onDelete={() => remove(next)} />
+      ) : <p className="text-sm leading-relaxed text-muted">{t("noDeadlines")}</p>}
 
       {open.length > 1 && (
         <ul className="mt-5 divide-y divide-rule border-t border-rule">

@@ -8,6 +8,7 @@
 // selected (moved, copied, given to a case, deleted).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, FolderPlus, LayoutGrid, List, Upload } from "lucide-react";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { FileFilters, matches, NO_PICKS, valueName, type Picks } from "@/components/FileFilters";
 import { FilePreview } from "@/components/files/FilePreview";
 import { FileRow, FileTile, FolderRow, FolderTile, dropTarget, type Item } from "@/components/files/FileItems";
@@ -55,6 +56,7 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
   const [picking, setPicking] = useState<Picking>(null);
   const [uploading, setUploading] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmDialog, confirm] = useConfirm();
   const [dropping, setDropping] = useState(false);
   const [working, setWorking] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -124,7 +126,7 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
 
   async function deleteSelected() {
     const items = selection.items();
-    if (!window.confirm(t("selectionDeleteAsk", { n: items.length }))) return;
+    if (!(await confirm(t("selectionDeleteAsk", { n: items.length })))) return;
     await bulk(async () => {
       for (const it of items) {
         if (it.kind === "file") await api.deleteFile(it.id).catch(() => {});
@@ -191,14 +193,14 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
     { label: t("fileMove"), onSelect: () => setPicking({ kind: "moveFile", id: f.id }) },
     { label: f.matter_id ? t("fileChangeMatter") : t("fileGiveMatter"), onSelect: () => setPicking({ kind: "matter", id: f.id }) },
     { label: t("fileDelete"), danger: true, onSelect: async () => {
-      if (window.confirm(t("fileDeleteAsk", { name: f.name }))) { await api.deleteFile(f.id); await reload(); }
+      if (await confirm(t("fileDeleteAsk", { name: f.name }))) { await api.deleteFile(f.id); await reload(); }
     } },
   ];
   const folderMenu = (d: Folder): MenuItem[] => [
     { label: t("folderRename"), onSelect: () => setRenaming(d.id) },
     { label: t("fileMove"), onSelect: () => setPicking({ kind: "moveFolder", id: d.id }) },
     { label: t("folderDelete"), danger: true, onSelect: async () => {
-      if (window.confirm(t("folderDeleteAsk", { name: d.name }))) { await api.deleteFolder(d.id); await reload(); }
+      if (await confirm(t("folderDeleteAsk", { name: d.name }))) { await api.deleteFolder(d.id); await reload(); }
     } },
   ];
 
@@ -246,6 +248,7 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDropping(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false); }}
       onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDropping(false); add(e.dataTransfer.files); } }}>
+      {confirmDialog}
       {dropping && (
         <div className="pointer-events-none absolute -inset-4 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-cite bg-cite-soft/80">
           <p className="font-serif text-xl text-cite">{t("filesDropHere", { place: path.at(-1)?.name ?? t("myFiles") })}</p>

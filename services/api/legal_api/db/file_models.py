@@ -32,7 +32,7 @@ class StoredFile(Base):
     # added straight to a case file's documents (files from its chats are found by chat)
     matter_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("matters.id", ondelete="SET NULL"), index=True)
-    # the lawyer's own folder in "Dosyalarım" (none: the top level)
+    # the lawyer's own folder in My files (none: the top level)
     folder_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("file_folders.id", ondelete="SET NULL"), index=True)
     origin: Mapped[str] = mapped_column(String(16))         # "upload" | "generated"
@@ -49,7 +49,7 @@ class StoredFile(Base):
 
 
 class FileFolder(Base):
-    """A folder the lawyer made in "Dosyalarım"; folders can hold folders."""
+    """A folder the lawyer made in My files; folders can hold folders."""
     __tablename__ = "file_folders"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True,

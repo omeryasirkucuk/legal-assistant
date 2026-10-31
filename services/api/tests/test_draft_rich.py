@@ -7,6 +7,7 @@ from legal_api.drafting.export import render
 from legal_api.drafting.locate import locate
 from legal_api.drafting.rich import (
     apply_doc,
+    carry_over,
     editor_doc,
     file_blocks,
     fingerprint,
@@ -72,3 +73,14 @@ def test_files_carry_the_petition_title():
     assert b"Divorce petition" in pdf and b"anonymous" not in pdf
     word = Word(io.BytesIO(render("Body.", "docx", "Divorce petition")))
     assert word.core_properties.title == "Divorce petition"
+
+
+def test_a_rewrite_keeps_the_formatting_of_what_it_did_not_change():
+    doc = editor_doc(_draft(DRAFT))
+    doc["content"][1]["content"][0]["marks"] = [{"type": "italic"}]       # "Plaintiff: "
+    doc["content"][2]["attrs"]["textAlign"] = "right"
+    rewritten = DRAFT.replace("The rent was overdue", "Rent was late")
+    new = carry_over(doc, rewritten)
+    assert new["content"][1] is doc["content"][1]                          # untouched: kept whole
+    assert new["content"][2]["attrs"]["textAlign"] == "right"              # rewritten: same place
+    assert "Rent was late" in text_of(from_doc(new))

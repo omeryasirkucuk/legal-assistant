@@ -51,7 +51,7 @@ def content_xml(blocks: list[Block]) -> str:
             'paperOrientation="1" headerFOffset="20.0" footerFOffset="20.0" /></properties>\n'
             f'<elements resolver="hvl-default">{"".join(paragraphs)}</elements>\n'
             '<styles><style name="hvl-default" family="Times New Roman" size="12" '
-            'description="Gövde" /></styles>\n</template>')
+            'description="G\u00f6vde" /></styles>\n</template>')  # UYAP's name for the body style
 
 
 def to_udf(blocks: list[Block]) -> bytes:
