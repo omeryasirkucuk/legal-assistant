@@ -80,6 +80,11 @@ def _clean(segment: str) -> str:
     return re.sub(r" (\(\d+\)) ", r"\n\1 ", text)
 
 
+# Footnote marks at a line's end: "[41]", "[44][45]", or a bare number after the sentence's
+# last character ("belirlenir.13").
+_FOOTNOTES = re.compile(r"(?:(?:\s*\[\d+\])+|(?<=[.;)])\d{1,3})$")
+
+
 def _marginal_title(before: str) -> str:
     """The article's marginal title: the short lines directly above its heading, which may
     wrap over a few lines. Stops at the previous article's sentence end."""
@@ -89,7 +94,10 @@ def _marginal_title(before: str) -> str:
             if lines:
                 continue
             continue
-        if len(line) > 150 or line.endswith((".", ")", ";")) or len(lines) == 3:
+        # A sentence that ends in footnote marks ("...[41]", or a bare "...13") still
+        # ends the previous article: the marks are dropped before looking at its last character.
+        bare = _FOOTNOTES.sub("", line)
+        if len(line) > 150 or bare.endswith((".", ")", ";")) or len(lines) == 3:
             break
         lines.insert(0, line)
     return " ".join(lines)

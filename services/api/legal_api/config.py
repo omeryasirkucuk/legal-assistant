@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     # case it wrote a usable petition for a tenth of Sonnet's cost). Empty, or without an
     # OpenRouter key, they are written like answers.
     draft_route: str = "openai/gpt-6-luna"
+    # Every Anthropic model is reached through OpenRouter (same models, same prices) with the
+    # decision service's key: for when the Anthropic account itself cannot be used.
+    anthropic_via_openrouter: bool = False
     decision_api_key: str = ""
     decision_base_url: str = "https://openrouter.ai/api"
     decision_model: str = "typesafe/jev-1.13"

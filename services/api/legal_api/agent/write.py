@@ -37,6 +37,7 @@ MAX_TOKENS = 8000
 SUPPORTED = 0.5
 CHECK_SOURCE_CHARS = 6000
 MAX_PARAGRAPH_CHARS = 2000
+MIN_JUDGED_WORDS = 4    # words a piece needs to be judged on its own
 SUPPORT_CHECK = ("The sentence is part of the paragraph given. Answer yes only if what the "
                  "sentence states, read in its paragraph, is supported by the source texts, "
                  "including every number and the cases or persons it applies to. A number "
@@ -155,10 +156,13 @@ async def check(segments: list[Segment], sources: list[Source], message: str,
     flagged: list[dict] = []
     for seg in segments:
         body = without_citations(seg.text)
+        # A piece cut off by citation marks ("315).**", "the fastest route.") cannot be judged
+        # on its own; its numbers are still checked below.
+        judged = len(re.findall(r"[^\W\d_]{2,}", body)) >= MIN_JUDGED_WORDS
         if not numbers_in(body):
             # A citation with no quote matched to its source (a writer without document
             # citations) is judged against its sources like a sentence with numbers.
-            if seg.keys and not seg.quotes:
+            if seg.keys and not seg.quotes and judged:
                 to_judge.append((seg, _referenced_sources(seg, sources)))
             continue
         relied = _referenced_sources(seg, sources)
@@ -172,7 +176,7 @@ async def check(segments: list[Segment], sources: list[Source], message: str,
                 flagged.append(_flag(seg, ", ".join(f"{n:g}" for n in sorted(missing))))
                 continue
             relied = []
-        if relied:
+        if relied and judged:
             to_judge.append((seg, relied))
     if to_judge and decisions.enabled():
         context = _paragraphs(segments)

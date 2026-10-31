@@ -29,6 +29,9 @@ class Source:
     document: str
 
 
+TITLE_PREFIX = "Article title: "
+
+
 def article_document(hit: StatuteHit) -> str:
     """What a model reads for an article: where it sits in the law and its marginal title,
     then its text. The chapter decides the regime (the same "tenant's obligations" title
@@ -37,7 +40,7 @@ def article_document(hit: StatuteHit) -> str:
     if hit.section:
         lines.append(f"Section: {hit.section}")
     if hit.heading:
-        lines.append(f"Article title: {hit.heading}")
+        lines.append(f"{TITLE_PREFIX}{hit.heading}")
     return "\n".join([*lines, hit.text])
 
 
@@ -48,13 +51,22 @@ class SourceFinder:
         self._live = BedestenStatutes(gateway)
         self._decisions = BedestenDecisions(gateway)
 
-    def article_source(self, hit: StatuteHit) -> Source:
+    def article_source(self, hit: StatuteHit, referred: tuple[str, str] | None = None) -> Source:
+        """`referred`: (citation, sentence) of the article whose reference brought this one,
+        so the writer knows which of that article's words this one fills in (a payment period
+        an enforcement article leaves to "the legal period" of a repealed code was left out
+        while the article stating it was among the sources)."""
         statute = StatuteRef(hit.statute_id, hit.law_number, hit.law_title, "KANUN", None,
                              hit.url)
         evidence = self.ledger.add_article(Article(statute, f"idx:{hit.id}", hit.label,
                                                    hit.text, hit.fetched_at.isoformat(),
                                                    hit.url))
-        return Source(evidence, article_document(hit))
+        document = article_document(hit)
+        if referred:
+            document = (f"Referred to by {referred[0]}, in the sentence \"{referred[1]}\": this "
+                        f"article states the rule that sentence points to (the current one where "
+                        f"the law it names was repealed).\n{document}")
+        return Source(evidence, document)
 
     async def article(self, law: str, label: str) -> Source | None:
         """One named article: from the local index, else live from the official service."""

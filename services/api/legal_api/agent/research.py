@@ -172,7 +172,8 @@ async def research(db: asyncpg.Pool, finder: SourceFinder, question: str, u: Und
     followed = await follow_references(db, ask, answering, usage)
     progress("references", "done", count=len(followed))
     sources = [finder.article_source(h) for h in kept]
-    sources += [finder.article_source(f.hit) for f in followed]
+    sources += [finder.article_source(
+        f.hit, (finder.article_source(f.by).evidence.citation, f.sentence.strip())) for f in followed]
     decisions: list[Source] = []
     # Decisions are searched whenever practice matters, and always when the lawyer asks for
     # decisions themselves (a request for precedents once got none: nothing was searched).

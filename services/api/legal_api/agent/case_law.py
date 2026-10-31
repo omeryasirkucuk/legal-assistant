@@ -24,8 +24,8 @@ from legal_api.sources.gateway import SourceError
 from legal_api.sources.types import Decision
 
 LOCAL_CANDIDATES = 4
-LIVE_DECISIONS = 4
-LIVE_BUDGET_S = 15
+LIVE_DECISIONS = 3     # with a search, about 8 s at the decision service's pace
+LIVE_BUDGET_S = 20
 MIN_QUERY_WORDS = 2
 KEEP = 2
 RELEVANT = 0.7      # passages are judged more loosely than statute candidates

@@ -449,5 +449,6 @@
   "selectionDeleteAsk": "{n} öğe silinsin mi? Silinen klasörlerin içindekiler bir üst klasöre taşınır; dosyalar geri alınamaz.",
   "fileCopy": "Kopyala",
   "fileCopyTo": "Nereye kopyalansın?",
-  "openMenu": "Menüyü aç"
+  "openMenu": "Menüyü aç",
+  "serviceUnavailable": "Yapay zekâ hizmeti şu an cevap vermiyor: hesabın kredisi bitmiş ya da anahtarı geçersiz olabilir. Yöneticiye haber ver; düzelince soruyu yeniden sorabilirsin."
 }

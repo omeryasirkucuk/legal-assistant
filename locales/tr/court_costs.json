@@ -1,0 +1,53 @@
+{
+  "_sources": [
+    "Fees: (1) sayılı Yargı Harçları Tarifesi as revalued by Harçlar Kanunu Genel Tebliği Seri No 98, Resmî Gazete 31.12.2025 (33124, 5. mükerrer), in force 1.1.2026; https://legalbank.net/belge/yargi-harclari-tarifesi-2026-2015/1505355/",
+    "Appeal limits 2020-2025: https://ayboga.av.tr/yargida-parasal-sinirlar-2025/ ; 2026: https://legalbank.net/belge/hmk-ve-iikda-yer-alan-parasal-sinirlar-2026-yili/3009245",
+    "2017-2019 derived from the 2016 amounts in HMK 341 (3,000 TL), 362 (40,000 TL), 369 (60,000 TL) and the VUK mükerrer 298 revaluation rates (2016 3.83%, 2017 14.47%, 2018 23.73%, 2019 22.58%), rounded down to 10 TL as practice did; the chain reproduces the published 2020 amounts. From 2025 amounts are rounded down to 1,000 TL (HMK ek 1/1). tests/test_court_costs.py checks every year against the rates.",
+    "Which year applies: HMK ek 1/2 (7550/20, 4.6.2025): the amount on the date the case was filed."
+  ],
+  "fees_year": 2026,
+  "fees": {
+    "application": {"sulh": "335.20", "asliye": "732.00", "upper": "1124.50"},
+    "decision_rate_per_mille": "68.31",
+    "decision_minimum": "732.00",
+    "decision_fixed": "732.00",
+    "appeal_istinaf": "2002.00",
+    "appeal_temyiz": "3608.50"
+  },
+  "revaluation": {"2016": "3.83", "2017": "14.47", "2018": "23.73", "2019": "22.58", "2020": "9.11",
+                  "2021": "36.20", "2022": "122.93", "2023": "58.46", "2024": "43.93", "2025": "25.49"},
+  "limits": {
+    "istinaf": {"2016": 3000, "2017": 3110, "2018": 3560, "2019": 4400, "2020": 5390, "2021": 5880,
+                "2022": 8000, "2023": 17830, "2024": 28250, "2025": 40000, "2026": 50000},
+    "temyiz": {"2016": 40000, "2017": 41530, "2018": 47530, "2019": 58800, "2020": 72070, "2021": 78630,
+               "2022": 107090, "2023": 238730, "2024": 378290, "2025": 544000, "2026": 682000},
+    "hearing": {"2016": 60000, "2017": 62290, "2018": 71300, "2019": 88210, "2020": 108120, "2021": 117960,
+                "2022": 160660, "2023": 358150, "2024": 567520, "2025": 816000, "2026": 1023000}
+  },
+  "first_year": 2016,
+  "known_until": 2026,
+  "words": {
+    "citation": "Harç ve kanun yolu hesabı",
+    "title": "Harç ve kanun yolu hesabı (sistem tarafından kodla yapılmıştır)",
+    "value": "Dava değeri: {value} TL.",
+    "application": "Başvurma harcı ({court}): {amount} TL (Yargı Harçları Tarifesi, {year}).",
+    "courts": {"sulh": "sulh hukuk mahkemesi", "asliye": "asliye hukuk, aile, iş, tüketici ve ticaret mahkemeleri"},
+    "proportional": "Nispi karar ve ilam harcı: dava değerinin binde {rate}'i = {total} TL (en az {minimum} TL).",
+    "advance": "Peşin harç (Harçlar Kanunu m. 28/1-a, dörtte biri): {amount} TL; kalan {rest} TL kararın tebliğinden itibaren bir ay içinde ödenir.",
+    "advance_harm": "Peşin harç (Harçlar Kanunu m. 28/1-a, ölüm ve cismani zarar tazminatında yirmide biri): {amount} TL; kalan {rest} TL kararın tebliğinden itibaren bir ay içinde ödenir.",
+    "fixed": "Maktu karar ve ilam harcı: {amount} TL.",
+    "filing_total": "Dava açılırken ödenecek harç: {amount} TL (başvurma harcı ve peşin harç; gider avansı ve vekâlet harcı ayrıca alınır).",
+    "unknown_measure": "Dava nispi harca mı maktu harca mı tabi, belli değil: iki hâl de gösterildi.",
+    "appeal_year": "Kanun yolu sınırları davanın açıldığı {year} yılına göre (HMK ek madde 1/2):",
+    "istinaf_open": "İstinaf: değer {value} TL, {year} sınırı {limit} TL'yi geçtiği için karar istinaf edilebilir (HMK m. 341/2).",
+    "istinaf_closed": "İstinaf: değer {value} TL, {year} sınırı {limit} TL'yi geçmediği için karar kesindir (HMK m. 341/2); manevi tazminat davaları hariç.",
+    "temyiz_open": "Temyiz: değer {value} TL, {year} sınırı {limit} TL'yi geçtiği için bölge adliye mahkemesi kararı temyiz edilebilir (HMK m. 362/1-a).",
+    "temyiz_closed": "Temyiz: değer {value} TL, {year} sınırı {limit} TL'yi (bu tutar dâhil) geçmediği için temyiz yolu kapalıdır (HMK m. 362/1-a).",
+    "hearing_open": "Temyizde duruşma: değer {year} sınırı {limit} TL'yi geçtiği için taraflardan biri isterse duruşma yapılır (HMK m. 369/2).",
+    "partial": "Alacağın bir kısmı dava edilmişse sınırlar alacağın tamamına göre belirlenir (HMK m. 341/3, 362/2).",
+    "appeal_fees": "Kanun yolu başvuru harçları ({year}): istinaf {istinaf} TL, temyiz {temyiz} TL; ayrıca üst mahkeme başvurma harcı {upper} TL.",
+    "year_unknown": "UYARI: Davanın açıldığı tarih belli değil; sınırlar {year} yılına göre verildi. Dava daha önce açıldıysa o yılın sınırı uygulanır.",
+    "year_not_covered": "UYARI: {year} yılının parasal sınırları sistemde yok; sınırları kontrol edin.",
+    "fees_old": "UYARI: Harç tutarları {fees_year} tarifesine göredir; ödeme {year} yılında yapılacaksa o yılın tarifesine bakın."
+  }
+}
