@@ -30,7 +30,7 @@ export function useChatRuns({ onTitle, onFinished }: Callbacks) {
 
   const consume = useCallback((chatId: string) => (e: StreamEvent) => {
     if (e.type === "title") return onTitle(e.data.chat_id, e.data.title);
-    if (e.type === "error") return update(chatId, (p) => ({ ...p, error: true }));
+    if (e.type === "error") return update(chatId, (p) => ({ ...p, error: true, unavailable: !!e.data.unavailable }));
     if (e.type === "cancelled") return update(chatId, () => null);
     // A re-attached run starts with no local state; its first event creates it.
     setPending((all) => ({ ...all, [chatId]: applyEvent(all[chatId] ?? startPending(""), e) }));

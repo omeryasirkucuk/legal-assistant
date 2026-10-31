@@ -28,6 +28,7 @@ SHAPES = ("single", "answers", "routes", "plan", "draft", "list")
 MAX_ISSUES = 8
 MAX_HINTS = 10
 MAX_DEADLINES = 4
+MAX_PENALTIES = 6
 PETITION_TYPES = (*petition_types(), "other")
 CASE_KINDS = (*case_kinds(), "other")
 
@@ -75,6 +76,30 @@ _SCHEMA = {
                            "law": {"type": "string"}, "article": {"type": "string"}},
             "required": ["label", "start_date", "amount", "unit", "law", "article"],
             "additionalProperties": False}},
+        "court_costs": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"value": {"type": "number"},
+                           "court": {"type": "string", "enum": ["sulh", "asliye"]},
+                           "measure": {"type": "string",
+                                       "enum": ["proportional", "fixed", "unknown"]},
+                           "bodily_harm": {"type": "boolean"},
+                           "filed_on": {"type": "string"}},
+            "required": ["value", "court", "measure", "bodily_harm", "filed_on"],
+            "additionalProperties": False}},
+        "penalties": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"label": {"type": "string"}, "law": {"type": "string"},
+                           "article": {"type": "string"}, "paragraph": {"type": "string"},
+                           "modifiers": {"type": "array", "items": {
+                               "type": "object",
+                               "properties": {"law": {"type": "string"},
+                                              "article": {"type": "string"},
+                                              "paragraph": {"type": "string"},
+                                              "item": {"type": "string"}},
+                               "required": ["law", "article", "paragraph", "item"],
+                               "additionalProperties": False}}},
+            "required": ["label", "law", "article", "paragraph", "modifiers"],
+            "additionalProperties": False}},
         "missing_facts": {"type": "array", "items": {"type": "string"}},
         "clarify": {"type": "array", "items": {
             "type": "object",
@@ -84,7 +109,7 @@ _SCHEMA = {
     },
     "required": ["task", "questions", "shape", "characterisation", "issues", "statute_hints",
                  "case_law_query", "petition_type", "output_format", "case_kind", "area",
-                 "write_now", "calendar", "deadlines", "severance", "interest", "missing_facts",
+                 "write_now", "calendar", "deadlines", "penalties", "court_costs", "severance", "interest", "missing_facts",
                  "clarify"],
     "additionalProperties": False,
 }
@@ -112,6 +137,8 @@ class Understanding:
     deadlines: list[dict] = field(default_factory=list)  # periods to compute (calc/sources.py)
     severance: dict | None = None                        # dates and pay for severance pay
     interest: list[dict] = field(default_factory=list)   # principal and span for interest
+    penalties: list[dict] = field(default_factory=list)  # offences whose range is computed
+    court_costs: dict | None = None     # value, court and filing date for fees and appeal limits
 
     def trace(self) -> dict:
         return {"task": self.task, "shape": self.shape, "characterisation": self.characterisation,
@@ -162,6 +189,9 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
         write_now=bool(data.get("write_now")),
         calendar=bool(data.get("calendar")),
         deadlines=[d for d in data.get("deadlines", []) if d.get("start_date")][:MAX_DEADLINES],
+        court_costs=next(iter(data.get("court_costs") or []), None),
+        penalties=[p for p in data.get("penalties", []) if p.get("law") and p.get("article")]
+        [:MAX_PENALTIES],
         interest=[i for i in data.get("interest", []) if i.get("principal") and i.get("start_date")][:3],
         severance=next((s for s in data.get("severance", [])
                         if s.get("start_date") and s.get("end_date") and s.get("gross_monthly")),

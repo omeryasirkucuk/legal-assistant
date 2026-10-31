@@ -405,8 +405,8 @@ export default function ChatApp() {
                     {messages[messages.length - 1]?.role !== "user" && <Question text={pending.question} />}
                     {pending.error ? (
                       <Unanswered
-                        text={pending.budget ? t("budgetReached") : t("streamError")}
-                        onRetry={pending.budget ? undefined : () => ask(pending.question)}
+                        text={pending.budget ? t("budgetReached") : pending.unavailable ? t("serviceUnavailable") : t("streamError")}
+                        onRetry={pending.budget || pending.unavailable ? undefined : () => ask(pending.question)}
                       />
                     ) : (
                       <StreamingAnswer pending={pending} onOpenSource={(k) => openPendingSource(k)} />

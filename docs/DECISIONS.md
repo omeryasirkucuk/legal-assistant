@@ -2,6 +2,48 @@
 
 Each entry: what was decided, why, and what it replaced. Newest first.
 
+## D74 — Penalty, court fee and appeal limit calculators; provider refusals shown as such (2026-10-31)
+
+Penalties (`calc/penalty.py`, `calc/penalty_sources.py`, words in `locales/tr/penalty.json`):
+the understanding step names each offence or variant as a base provision and the provisions
+that raise or lower it (`penalties`); code reads the prison range and the ratio ("by half",
+"twofold", "from a quarter to three quarters", "up to a sixth", an item's own ratio) from
+the article text and applies them to both bounds (a year 12 months, a month 30 days). A
+qualified form with its own range (threat with a weapon, 106/2) named as a modifier replaces
+the base; a ratio paragraph named as the base (86/3) is applied to each earlier paragraph
+with a range (86/1 and the lighter 86/2), which is the comparison the weapon question needed.
+A provision whose words cannot be read gives a warning, never a guess. Two live runs showed
+both mistakes in the model's naming, which is why the code absorbs them.
+
+Court costs (`calc/court_costs.py`, `calc/court_costs_sources.py`, `locales/tr/court_costs.json`):
+filing fee, proportional decision fee with the quarter due in advance (a twentieth for death
+and bodily harm, Fees Law 492 art. 28/1-a), fixed fee, appeal fees (2026 tariff), and whether
+the decision can go to istinaf, temyiz and a hearing. HMK ek 1/2 (Law 7550) makes the limit
+of the filing year apply, so every year since 2016 is kept: 2020-2026 from published tables,
+2017-2019 derived from the 2016 amounts and the revaluation rates; a test rebuilds every year
+from the rates (rounded down to 10 TL, to 1,000 TL from 2025). Without a filing date the
+current year is used and said.
+
+When the model provider refuses every call (no credit, bad key), the run's error says so and
+the chat shows that the service is unavailable instead of offering a retry. The writer is told
+to name a period or amount easily confused with the one asked (icra-0: the payment period
+next to the objection period). A word-overlap check for numbers stated for the wrong case was
+tried and dropped: on the 216 stored sentences with cited numbers it flagged 63, nearly all
+correct. Both calculators and the writer rule are unit-tested only: the Anthropic balance ran
+out during the second live run (golden questions ceza-3 and harc-1 added for the check).
+
+## D73 — Article text no longer loses a closing line that ends in footnote marks (2026-10-31)
+
+An answer on weapon injury and weapon threat said the increase for a weapon "was cut from the
+source": the index held TCK art. 86 without its closing line (the increase by half, ending
+in the footnote mark [41]). The splitter (`corpus/statutes.py`) takes the short lines above an article
+heading as its marginal title and stops at a line that ends a sentence; a sentence followed by
+footnote marks ("[41]", "[44][45]", or a bare "13") was not seen as ended, so it became the
+next article's title and was removed from its own article. Footnote marks are now dropped
+before that check. All core laws were synced again; no title holds a sentence end any more.
+The same question then gave both ranges (2 years 3 months to 4 years 6 months for injury with
+a weapon, 2 to 7 years for threat with a weapon) from the full text, for $0.03.
+
 ## D72 — Phone and tablet layouts; every screen checked at 360, 390, 1024 and 1440 (2026-10-31)
 
 The user asked that nothing be cramped, crooked, overlapping, misplaced or broken on a phone,

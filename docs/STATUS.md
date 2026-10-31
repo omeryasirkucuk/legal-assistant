@@ -27,6 +27,8 @@ State as of 2026-10-31 (after PR #3). Update this page whenever the state change
 - Calendar (D63): month grid with holidays and the recess, month/year picker, list view.
 - Editor (D69): A4 word-processor editor with autosave; formatting reaches Word, PDF and UDF;
   files carry the petition title.
+- Penalty, court fee and appeal limit calculators (D74); provider refusals shown as such.
+- Statute splitter keeps closing lines that end in footnote marks (D73); core laws re-synced.
 - Phone and tablet layouts (D72): sidebar as a drawer with a top bar, touch-visible controls,
   phone calendar with dots and a list, stacked dialogs; checked at 360/390/1024/1440.
 - Calendar in chats (D71): "what is due this week?" and "the next deadline in this case" are
@@ -107,6 +109,7 @@ article with its full text ("does this article state a rule that answers the que
     - wrong-case errors ("10 days for workplaces" where the code says 30 for roofed
       workplaces) are not caught: the decision model scores them about 0.67, correct
       sentences about 0.9, and a threshold between them flagged correct long paragraphs too;
+      a clause word-overlap check (D74) flagged 63 of 216 stored sentences, nearly all correct;
     - retrieval still varies between runs (enforcement law art. 269 missing in one run);
     - drafting, search and review tasks have structures in the prompt but were not evaluated.
     Detailed history of both problems: DECISIONS D20-D26 and the eval questions.
@@ -149,8 +152,9 @@ article with its full text ("does this article state a rule that answers the que
     development database; the tests now delete what they create (D34).
 19. One-click rewrites (shorter, longer, plainer, formal) rebuild the editor document from the
     text: bold survives, italics, sizes and alignment of the rewritten part do not (D69).
-20. Court fees and the yearly revalued appeal thresholds have no calculator yet; yearly table
-    upkeep is manual (religious holidays, severance ceilings, TCMB advance rates).
+20. Yearly table upkeep is manual: religious holidays, severance ceilings, TCMB advance rates,
+    the court fee tariff and the appeal limits (locales/tr/court_costs.json, each January).
+    The penalty and court cost calculators (D74) are not yet checked live (golden ceza-3, harc-1).
 21. UDF output has not been opened in UYAP's own editor yet.
 22. Deleting in My files uses the browser's confirm dialog; the files filters (D45) are still
     word-list based.

@@ -311,6 +311,13 @@ class Usage:
                 f"{tokens_out} out tokens, ${self.cost_usd:.4f}")
 
 
+def unavailable(exc: BaseException) -> bool:
+    """The model provider refuses every call until someone acts: no credit left, a key that
+    is wrong or revoked. Shown to the lawyer as such, not as a failed answer to retry."""
+    status = getattr(exc, "status_code", None)
+    return status in (401, 402, 403) or (status == 400 and "credit balance" in str(exc))
+
+
 async def create(role: Role, usage: Usage, purpose: str, **params: Any):
     """messages.create with role-based model, refusal fallback, automatic prompt caching and
     usage recording. Caching matters in the tool loop, where every round resends the whole

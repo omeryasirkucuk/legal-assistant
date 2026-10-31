@@ -83,6 +83,18 @@ def calendar_data() -> dict:
     return _bundle("calendar")
 
 
+def court_costs() -> dict:
+    """Court fees of the current tariff, the yearly appeal limits and the wording of a fee
+    and appeal calculation (calc/court_costs.py)."""
+    return _bundle("court_costs")
+
+
+def penalty_terms() -> dict:
+    """Words of penal provisions (ranges, increase and decrease ratios) and the wording of a
+    penalty calculation (calc/penalty.py)."""
+    return _bundle("penalty")
+
+
 def calculation_terms() -> dict:
     """Wording of a calculation shown to the lawyer and the writer (calc/sources.py)."""
     return _bundle("calculations")

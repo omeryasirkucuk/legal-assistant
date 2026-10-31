@@ -18,6 +18,8 @@ from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any
 
+from legal_api import llm
+
 logger = logging.getLogger(__name__)
 
 KEEP_FINISHED_S = 600       # a finished run can still be replayed for this long
@@ -88,9 +90,9 @@ def start(chat_id: uuid.UUID,
             await work(run)
         except asyncio.CancelledError:
             run.emit("cancelled", {})
-        except Exception:
+        except Exception as exc:
             logger.exception("answer run failed for chat %s", chat_id)
-            run.emit("error", {})
+            run.emit("error", {"unavailable": True} if llm.unavailable(exc) else {})
         finally:
             run.finish()
 

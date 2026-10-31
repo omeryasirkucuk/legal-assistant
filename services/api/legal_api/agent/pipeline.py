@@ -26,6 +26,8 @@ from legal_api.agent.research import Research, research
 from legal_api.agent.sources import Source, SourceFinder
 from legal_api.agent.understand import Understanding, understand
 from legal_api.agent.write import MAX_TOKENS, Written, write
+from legal_api.calc.court_costs_sources import court_cost_sources
+from legal_api.calc.penalty_sources import penalty_sources
 from legal_api.calc.sources import deadline_sources, interest_sources, severance_sources
 from legal_api.corpus.ingest import asyncpg_dsn
 from legal_api.drafting.asking import find_gaps, kind_of, question_text, should_ask
@@ -159,7 +161,7 @@ async def answer_events(question: str, history: list[dict] | None = None,
             if power.name != "deep" and llm.routed("draft"):
                 power = replace(power, write_role="draft")
                 found.trace["writer"] = llm.routed("draft")
-        if u.deadlines or u.severance or u.interest:
+        if u.deadlines or u.severance or u.interest or u.penalties or u.court_costs:
             # Periods and amounts are computed in code and given as sources (calc/).
             yield step_event("calculate")
             computed: list[dict] = []
@@ -169,7 +171,12 @@ async def answer_events(question: str, history: list[dict] | None = None,
                 found.sources += await severance_sources(u.severance, finder, ledger)
             for spec in u.interest:
                 found.sources += await interest_sources(spec, ledger)
-            count = len(u.deadlines) + (1 if u.severance else 0) + len(u.interest)
+            found.sources += _new(found.sources, await penalty_sources(u.penalties, finder, ledger))
+            if u.court_costs:
+                found.sources += _new(found.sources,
+                                      await court_cost_sources(u.court_costs, finder, ledger))
+            count = (len(u.deadlines) + (1 if u.severance else 0) + len(u.interest)
+                     + len(u.penalties) + (1 if u.court_costs else 0))
             found.trace["calculations"] = count
             yield step_event("calculate", "done", count=count)
         mark("research_s")
@@ -201,6 +208,12 @@ async def answer_events(question: str, history: list[dict] | None = None,
     finally:
         await gateway.aclose()
         await db.close()
+
+
+def _new(have: list[Source], more: list[Source]) -> list[Source]:
+    """`more` without the sources already among `have` (an article found by research too)."""
+    keys = {s.evidence.key for s in have}
+    return [s for s in more if s.evidence.key not in keys]
 
 
 def _calendar_only(u: Understanding, agenda: Agenda | None) -> bool:
