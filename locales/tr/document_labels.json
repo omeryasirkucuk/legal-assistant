@@ -1,0 +1,277 @@
+{
+  "kinds": {
+    "petition": {
+      "head": {
+        "dilekçesi": 6,
+        "dilekçe": 6,
+        "mahkemesi'ne": 4,
+        "mahkemesine": 4,
+        "başkanlığı'na": 4,
+        "başkanlığına": 4,
+        "hakimliği'ne": 4,
+        "hakimliğine": 4,
+        "hâkimliğine": 4,
+        "müdürlüğü'ne": 3,
+        "müdürlüğüne": 3
+      },
+      "body": {
+        "sonuç ve istem": 4,
+        "sonuç ve talep": 4,
+        "netice-i talep": 4,
+        "arz ve talep": 4,
+        "arz ederiz": 2,
+        "hukuki sebepler": 2,
+        "hukuki nedenler": 2,
+        "açıklamalar": 1,
+        "deliller": 1,
+        "davacı vekili": 1
+      }
+    },
+    "notice": {
+      "head": {
+        "ihtarname": 6,
+        "ihbarname": 6,
+        "noterliği": 2
+      },
+      "body": {
+        "keşideci": 3,
+        "muhatap": 2,
+        "ihtar olunur": 3,
+        "ihtar ederiz": 3,
+        "ihtar ederim": 3
+      }
+    },
+    "decision": {
+      "head": {
+        "gerekçeli karar": 5,
+        "karar no": 2,
+        "hakim": 1,
+        "hâkim": 1
+      },
+      "body": {
+        "gereği düşünüldü": 4,
+        "oy birliği": 2,
+        "oybirliği": 2,
+        "oy çokluğu": 2,
+        "oyçokluğu": 2,
+        "karar verildi": 2,
+        "hüküm :": 2,
+        "hüküm:": 2,
+        "katip": 1,
+        "kâtip": 1
+      }
+    },
+    "contract": {
+      "head": {
+        "sözleşmesi": 4,
+        "protokol": 3
+      },
+      "body": {
+        "işbu sözleşme": 4,
+        "işbu protokol": 4,
+        "taraflar": 1,
+        "yürürlüğe girer": 2,
+        "imza": 1
+      }
+    },
+    "expert_report": {
+      "head": {
+        "bilirkişi raporu": 6,
+        "bilirkişi kurulu raporu": 6,
+        "ek rapor": 3
+      },
+      "body": {
+        "bilirkişi": 2,
+        "sonuç ve kanaat": 4,
+        "takdiri sayın mahkemeye": 4,
+        "takdiri mahkemeye": 3
+      }
+    },
+    "enforcement": {
+      "head": {
+        "ödeme emri": 5,
+        "takip talebi": 5,
+        "icra emri": 5,
+        "haciz tutanağı": 5
+      },
+      "body": {
+        "icra müdürlüğü": 2,
+        "örnek no": 3,
+        "borçlu": 1,
+        "alacaklı": 1,
+        "takip": 1
+      }
+    },
+    "power_of_attorney": {
+      "head": {
+        "vekaletname": 6,
+        "vekâletname": 6
+      },
+      "body": {
+        "vekil tayin": 4,
+        "ahzu kabz": 3,
+        "ahz ü kabz": 3,
+        "azil": 1
+      }
+    },
+    "minutes": {
+      "head": {
+        "tutanağı": 4,
+        "tutanak": 4
+      },
+      "body": {
+        "duruşma açıldı": 3,
+        "hazır bulundu": 2,
+        "tespit edildi": 1
+      }
+    }
+  },
+  "areas": {
+    "labour": {
+      "4857": 4,
+      "7036": 4,
+      "iş kanunu": 3,
+      "iş mahkemesi": 3,
+      "kıdem tazminatı": 3,
+      "ihbar tazminatı": 3,
+      "işe iade": 3,
+      "fazla mesai": 2,
+      "fazla çalışma": 2,
+      "iş sözleşmesi": 2,
+      "iş akdi": 2,
+      "yıllık izin": 1,
+      "işveren": 1,
+      "işçi": 1,
+      "arabulucu": 1
+    },
+    "tenancy": {
+      "kira sözleşmesi": 3,
+      "kira bedeli": 3,
+      "kira tespit": 3,
+      "kira alacağı": 3,
+      "kiracı": 2,
+      "kiraya veren": 2,
+      "kiralanan": 2,
+      "tahliye": 2,
+      "kira": 1
+    },
+    "family": {
+      "4787": 4,
+      "6284": 4,
+      "aile mahkemesi": 3,
+      "boşanma": 3,
+      "nafaka": 3,
+      "velayet": 3,
+      "evlilik birliği": 3,
+      "mal rejimi": 3,
+      "katılma alacağı": 3,
+      "kişisel ilişki": 2,
+      "müşterek çocuk": 2,
+      "ziynet": 2
+    },
+    "enforcement": {
+      "2004 sayılı": 4,
+      "icra ve iflas": 3,
+      "ödeme emri": 3,
+      "icra müdürlüğü": 3,
+      "itirazın iptali": 3,
+      "icra inkar tazminatı": 3,
+      "menfi tespit": 2,
+      "istirdat": 2,
+      "haciz": 2,
+      "iflas": 2,
+      "takip": 1,
+      "borçlu": 1
+    },
+    "criminal": {
+      "5237": 4,
+      "5271": 4,
+      "türk ceza kanunu": 3,
+      "ceza muhakemesi": 3,
+      "cumhuriyet başsavcılığı": 3,
+      "ağır ceza": 3,
+      "asliye ceza": 3,
+      "sulh ceza": 3,
+      "sanık": 3,
+      "müşteki": 3,
+      "beraat": 3,
+      "hapis cezası": 3,
+      "şüpheli": 2,
+      "kovuşturma": 2,
+      "soruşturma": 2,
+      "suç": 1
+    },
+    "commercial": {
+      "6102": 4,
+      "türk ticaret kanunu": 3,
+      "ticaret mahkemesi": 3,
+      "kambiyo": 3,
+      "haksız rekabet": 3,
+      "konkordato": 3,
+      "anonim şirket": 2,
+      "limited şirket": 2,
+      "genel kurul": 2,
+      "bono": 2,
+      "çek": 1
+    },
+    "consumer": {
+      "6502": 4,
+      "tüketici hakem heyeti": 4,
+      "tüketici mahkemesi": 3,
+      "tüketici": 3,
+      "ayıplı mal": 3,
+      "ayıplı hizmet": 3,
+      "cayma hakkı": 3,
+      "satıcı": 1
+    },
+    "administrative": {
+      "2577": 4,
+      "idare mahkemesi": 4,
+      "vergi mahkemesi": 4,
+      "idari yargılama": 3,
+      "idari işlem": 3,
+      "tam yargı": 3,
+      "yürütmenin durdurulması": 3,
+      "danıştay": 2,
+      "disiplin cezası": 2,
+      "vergi": 1
+    },
+    "inheritance": {
+      "mirasçı": 3,
+      "veraset": 3,
+      "mirasçılık belgesi": 3,
+      "tereke": 3,
+      "vasiyet": 3,
+      "tenkis": 3,
+      "muris": 3,
+      "mirasın reddi": 3,
+      "saklı pay": 3,
+      "miras": 2
+    },
+    "property": {
+      "634 sayılı": 4,
+      "tapu iptali": 3,
+      "ecrimisil": 3,
+      "ortaklığın giderilmesi": 3,
+      "izale-i şuyu": 3,
+      "elatmanın önlenmesi": 3,
+      "el atmanın önlenmesi": 3,
+      "kat mülkiyeti": 3,
+      "kamulaştırma": 3,
+      "taşınmaz": 2,
+      "tapu": 2
+    },
+    "compensation": {
+      "trafik kazası": 3,
+      "haksız fiil": 3,
+      "destekten yoksun": 3,
+      "zorunlu mali sorumluluk": 3,
+      "manevi tazminat": 2,
+      "maddi tazminat": 2,
+      "sigorta şirketi": 2,
+      "kasko": 2,
+      "iş kazası": 2,
+      "tazminat": 1
+    }
+  }
+}

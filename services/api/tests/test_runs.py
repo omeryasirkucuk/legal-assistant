@@ -38,8 +38,7 @@ def test_cancel_stops_the_run():
         chat_id = uuid.uuid4()
         run = runs.start(chat_id, work)
         await asyncio.sleep(0)
-        assert runs.cancel(chat_id)
-        await run.task
+        assert await runs.cancel(chat_id)
         return [e for e, _ in run.events], runs.active(chat_id)
 
     events, active = asyncio.run(scenario())

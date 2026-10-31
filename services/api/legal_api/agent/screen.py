@@ -44,14 +44,23 @@ class Screened:
 def state_of(question: str, hit: StatuteHit) -> dict:
     return {"question": question,
             "article": f"Law {hit.law_number} ({hit.law_title}) art. {hit.label} ({hit.heading})",
+            "section": hit.section,
             "article_text": hit.text[:MAX_TEXT_CHARS]}
 
 
-async def screen(question: str, hits: list[StatuteHit], usage: llm.Usage) -> list[Screened]:
+# For writing a whole answer: is the article needed, not only does it answer the question.
+NEEDED = ("A lawyer asked the question; its legal characterisation is given. Answer yes if the "
+          "article states a rule that a complete answer needs: the rule asked about, a route "
+          "or remedy that is available, a mandatory prior step or precondition, a time limit, "
+          "or the competent court or authority. Topical similarity without such a rule is no.")
+
+
+async def screen(question: str, hits: list[StatuteHit], usage: llm.Usage,
+                 instructions: str = INSTRUCTIONS) -> list[Screened]:
     if not decisions.enabled():
         return [Screened(h, None) for h in hits]
     async with decisions.client() as client:
         answers = await asyncio.gather(*(
-            decisions.yes_probabilities(client, state_of(question, h), {"answers": INSTRUCTIONS},
+            decisions.yes_probabilities(client, state_of(question, h), {"answers": instructions},
                                         usage, "screen") for h in hits))
     return [Screened(h, a["answers"]) for h, a in zip(hits, answers, strict=True)]

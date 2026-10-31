@@ -1,0 +1,107 @@
+{
+  "_sources": [
+    "Fixed holidays: 2429 sayılı Ulusal Bayram ve Genel Tatiller Hakkında Kanun",
+    "2026 religious holidays: https://www.ntv.com.tr/turkiye/galeri-2026-resmi-tatil-takvimi-belli-oldu-yeni-yilda-calisanlar-kac-gun-tatil-yapacak-1702725 ; https://www.isbank.com.tr/blog/2026-resmi-tatiller-takvimi",
+    "2027 religious holidays: https://www.cnnturk.com/turkiye/2027-resmi-tatiller-takvimi-dini-bayramlar-resmi-tatil-gunler-ne-zaman-2027-ramazan-ve-kurban-bayrami-tarihleri-3447415 ; https://www.dunya.com/gundem/2027-bayram-tarihleri-kurban-bayrami-ramazan-bayrami-ne-zaman-haberi-842648",
+    "Judicial recess: 6100 sayılı HMK m. 102 (20 Temmuz - 31 Ağustos)"
+  ],
+  "covered_years": [
+    2026,
+    2027
+  ],
+  "fixed": [
+    {
+      "month": 1,
+      "day": 1,
+      "name": "Yılbaşı"
+    },
+    {
+      "month": 4,
+      "day": 23,
+      "name": "Ulusal Egemenlik ve Çocuk Bayramı"
+    },
+    {
+      "month": 5,
+      "day": 1,
+      "name": "Emek ve Dayanışma Günü"
+    },
+    {
+      "month": 5,
+      "day": 19,
+      "name": "Atatürk'ü Anma, Gençlik ve Spor Bayramı"
+    },
+    {
+      "month": 7,
+      "day": 15,
+      "name": "Demokrasi ve Millî Birlik Günü"
+    },
+    {
+      "month": 8,
+      "day": 30,
+      "name": "Zafer Bayramı"
+    },
+    {
+      "month": 10,
+      "day": 29,
+      "name": "Cumhuriyet Bayramı"
+    }
+  ],
+  "fixed_half_days": [
+    {
+      "month": 10,
+      "day": 28,
+      "name": "Cumhuriyet Bayramı arifesi"
+    }
+  ],
+  "religious": [
+    {
+      "name": "Ramazan Bayramı",
+      "eve": "2026-03-19",
+      "days": [
+        "2026-03-20",
+        "2026-03-21",
+        "2026-03-22"
+      ]
+    },
+    {
+      "name": "Kurban Bayramı",
+      "eve": "2026-05-26",
+      "days": [
+        "2026-05-27",
+        "2026-05-28",
+        "2026-05-29",
+        "2026-05-30"
+      ]
+    },
+    {
+      "name": "Ramazan Bayramı",
+      "eve": "2027-03-08",
+      "days": [
+        "2027-03-09",
+        "2027-03-10",
+        "2027-03-11"
+      ]
+    },
+    {
+      "name": "Kurban Bayramı",
+      "eve": "2027-05-15",
+      "days": [
+        "2027-05-16",
+        "2027-05-17",
+        "2027-05-18",
+        "2027-05-19"
+      ]
+    }
+  ],
+  "judicial_recess": {
+    "start": {
+      "month": 7,
+      "day": 20
+    },
+    "end": {
+      "month": 8,
+      "day": 31
+    },
+    "extension_days": 7
+  }
+}

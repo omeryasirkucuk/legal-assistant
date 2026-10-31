@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Checked, Evidence } from "@/lib/api";
+import { formatUsd } from "@/lib/format";
 import { t } from "@/lib/i18n";
-import { citationOrder, splitSections, toMarkdown } from "@/lib/markers";
+import { citationOrder, groupCitations, splitSections, toMarkdown } from "@/lib/markers";
 
 type Props = {
   raw: string;
@@ -15,7 +17,10 @@ type Props = {
   repaired?: boolean;
   refused?: boolean;
   seconds?: number;
+  cost?: number;
+  asked?: boolean;                 // asked for facts before drafting a petition
   onOpenSource: (key: string) => void;
+  draftAction?: React.ReactNode;   // shown under a petition answer: opens its draft
 };
 
 export function Chip({ n, onClick, label }: { n: number; onClick: () => void; label: string }) {
@@ -32,8 +37,9 @@ export function Chip({ n, onClick, label }: { n: number; onClick: () => void; la
 }
 
 export function AssistantAnswer(props: Props) {
-  const { raw, evidence, checked, streaming, status, repaired, refused, seconds, onOpenSource } =
-    props;
+  const { evidence, checked, streaming, status, repaired, refused, seconds, cost,
+    asked, onOpenSource, draftAction } = props;
+  const raw = streaming ? props.raw : groupCitations(props.raw);
   const byKey = new Map(evidence.map((e) => [e.key, e]));
   const order = citationOrder(raw).filter((k) => byKey.has(k));
   const number = (key: string) => order.indexOf(key) + 1;
@@ -41,6 +47,7 @@ export function AssistantAnswer(props: Props) {
   const renderText = (text: string, className: string) => (
     <div className={className}>
       <Markdown
+        remarkPlugins={[remarkGfm]}
         components={{
           a: ({ href, children }) => {
             const key = href?.startsWith("#cite-") ? href.slice(6) : null;
@@ -64,7 +71,7 @@ export function AssistantAnswer(props: Props) {
   );
 
   return (
-    <div className="grid gap-x-10 xl:grid-cols-[minmax(0,42rem)_15rem]">
+    <div className="grid gap-x-10 @4xl:grid-cols-[minmax(0,42rem)_15rem]">
       <div className="min-w-0">
         {refused ? (
           <p className="text-muted">{t("refused")}</p>
@@ -79,17 +86,23 @@ export function AssistantAnswer(props: Props) {
           </p>
         )}
 
+        {!streaming && draftAction && <div className="mt-4">{draftAction}</div>}
+
         {!streaming && seconds !== undefined && (
-          <p className="mt-4 text-xs text-faint">{t("answeredIn", { seconds: Math.round(seconds) })}</p>
+          <p className="mt-4 text-xs text-faint">
+            {cost !== undefined
+              ? t("answeredInCost", { seconds: Math.round(seconds), cost: formatUsd(cost) })
+              : t("answeredIn", { seconds: Math.round(seconds) })}
+          </p>
         )}
 
-        {!streaming && !refused && checked && (
+        {!streaming && !refused && !asked && checked && (
           <Verification checked={checked} repaired={repaired} number={number} />
         )}
 
         {/* Narrow screens: sources follow the answer instead of sitting in the margin. */}
         {order.length > 0 && (
-          <ol className="mt-6 space-y-2 border-t border-rule pt-4 xl:hidden">
+          <ol className="mt-6 space-y-2 border-t border-rule pt-4 @4xl:hidden">
             {order.map((key) => (
               <SourceNote key={key} n={number(key)} evidence={byKey.get(key)!} onOpen={onOpenSource} />
             ))}
@@ -97,7 +110,7 @@ export function AssistantAnswer(props: Props) {
         )}
       </div>
 
-      <aside className="hidden xl:block" aria-label={t("sources")}>
+      <aside className="hidden @4xl:block" aria-label={t("sources")}>
         <ol className="sticky top-6 space-y-3 border-l border-rule pl-5">
           {order.map((key) => (
             <SourceNote key={key} n={number(key)} evidence={byKey.get(key)!} onOpen={onOpenSource} />

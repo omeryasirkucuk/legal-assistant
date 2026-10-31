@@ -18,6 +18,11 @@ dependencies = [
     "itsdangerous>=2.2.0",
     "email-validator>=2.3.0",
     "cryptography>=44",
+    "python-docx>=1.2.0",
+    "pypdf>=6.21.4",
+    "python-multipart>=0.0.32",
+    "reportlab>=5.1.0",
+    "openpyxl>=3.1.5",
 ]
 
 [dependency-groups]

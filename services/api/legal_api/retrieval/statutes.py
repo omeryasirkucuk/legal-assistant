@@ -33,7 +33,8 @@ SELECT id FROM statute_articles WHERE ($3::text[] IS NULL OR law_number = ANY($3
 ORDER BY embedding <=> $1 LIMIT $2
 """
 _ROWS_SQL = """
-SELECT id, law_number, law_title, statute_id, kind, label, heading, text, url, fetched_at
+SELECT id, law_number, law_title, statute_id, kind, label, heading, text, url, fetched_at,
+       section
 FROM statute_articles WHERE id = ANY($1::int[])
 """
 
@@ -50,12 +51,13 @@ class StatuteHit:
     url: str
     fetched_at: datetime
     score: float = 0.0
+    section: str = ""     # the parts and chapters the article sits in ("Kira > Ürün Kirası")
 
 
 def _hit(row: asyncpg.Record, score: float = 0.0) -> StatuteHit:
     return StatuteHit(row["id"], row["law_number"], row["law_title"], row["statute_id"],
                       row["label"], row["heading"], row["text"], row["url"], row["fetched_at"],
-                      score)
+                      score, row["section"])
 
 
 async def search_statutes(conn: asyncpg.Connection, query: str, limit: int = 10,
@@ -130,3 +132,19 @@ async def neighbours(conn: asyncpg.Connection, law: str, label: str, span: int =
                           "WHERE law_number = $1 AND kind = 'main' AND label = ANY($2::text[])"),
         number, [str(ref[1] + d) for d in range(-span, span + 1) if d])
     return sorted((_hit(r) for r in rows), key=lambda h: abs(int(h.label) - ref[1]))
+
+
+async def procedure_siblings(conn: asyncpg.Connection, hit: StatuteHit, limit: int = 4
+                             ) -> list[StatuteHit]:
+    """The lettered articles that continue a procedure (269 -> 269/a, 269/b ...), or the base
+    article of a lettered one (269/a -> 269), in label order."""
+    base = hit.label.split("/")[0]
+    if not base.isdigit():
+        return []
+    rows = await conn.fetch(
+        _ROWS_SQL.replace("WHERE id = ANY($1::int[])",
+                          "WHERE law_number = $1 AND kind = 'main' "
+                          "AND (label = $2 OR label LIKE $2 || '/%') AND id <> $3 "
+                          "ORDER BY label LIMIT $4"),
+        hit.law_number, base, hit.id, limit)
+    return [_hit(r) for r in rows]

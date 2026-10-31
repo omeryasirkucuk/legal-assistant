@@ -1,0 +1,47 @@
+{
+  "_sources": [
+    "Ceilings: Çalışma ve Sosyal Güvenlik Bakanlığı, kıdem tazminatı tavanları 1980-2025, https://csgb.gov.tr/Media/4qxlkcli/kidem-tazminati-yillar-1980-2025.pdf ; Hazine ve Maliye Bakanlığı genelgeleri 06.01.2025, 07.2025, 06.01.2026, 02.07.2026 (as reported by https://www.pwc.com.tr/tr/hizmetlerimiz/vergi/bultenler/2025/kidem-tazminati-tavani-2025.html , https://www.alomaliye.com/2025/07/07/temmuz-aralik-2025-kidem-tazminati-tavani/ , https://www.pwc.com.tr/tr/hizmetlerimiz/vergi/bultenler/2026/kidem-tazminati-tavani.html , https://musavirlerkulubu.com.tr/makale/2026-kidem-tazminati-tavani-ve-hesaplama-yontemleri-guncel-rehber )",
+    "Severance pay: 1475 sayılı İş Kanunu m. 14 (in force under 4857 geçici m. 6); notice periods: 4857 sayılı İş Kanunu m. 17; stamp duty on wages binde 7,59: 488 sayılı Damga Vergisi Kanunu (1) sayılı tablo IV-1-b"
+  ],
+  "ceilings": [
+    {
+      "from": "2025-01-01",
+      "to": "2025-06-30",
+      "amount": "46655.43"
+    },
+    {
+      "from": "2025-07-01",
+      "to": "2025-12-31",
+      "amount": "53919.68"
+    },
+    {
+      "from": "2026-01-01",
+      "to": "2026-06-30",
+      "amount": "64948.77"
+    },
+    {
+      "from": "2026-07-01",
+      "to": "2026-12-31",
+      "amount": "73729.87"
+    }
+  ],
+  "stamp_duty": "0.00759",
+  "notice_weeks": [
+    {
+      "under_months": 6,
+      "weeks": 2
+    },
+    {
+      "under_months": 18,
+      "weeks": 4
+    },
+    {
+      "under_months": 36,
+      "weeks": 6
+    },
+    {
+      "under_months": null,
+      "weeks": 8
+    }
+  ]
+}

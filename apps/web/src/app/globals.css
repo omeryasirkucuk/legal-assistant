@@ -4,6 +4,7 @@
    product promise; green and amber only ever mean "verified" and "check this". */
 @theme {
   --color-paper: #f4f5f2;
+  --color-desk: #eaece7;   /* the sidebar: the desk the papers lie on */
   --color-sheet: #ffffff;
   --color-ink: #1b2433;
   --color-muted: #5a6474;
@@ -78,9 +79,85 @@ body {
   color: var(--color-ink);
 }
 
+/* A step that is still running beats like a pulse: two quick beats, then a rest. */
+@keyframes heartbeat {
+  0%, 100% { opacity: 0.3; transform: scale(0.75); }
+  14% { opacity: 1; transform: scale(1.2); }
+  28% { opacity: 0.5; transform: scale(0.9); }
+  42% { opacity: 1; transform: scale(1.1); }
+  70% { opacity: 0.3; transform: scale(0.75); }
+}
+.heartbeat {
+  animation: heartbeat 1.3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;
     transition: none !important;
   }
+}
+.answer > div > :first-child,
+.answer h3:first-child {
+  margin-top: 0;
+}
+.answer li + li {
+  margin-top: 0.35em;
+}
+.answer table {
+  margin-top: 0.9em;
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+}
+.answer th,
+.answer td {
+  border: 1px solid var(--color-rule);
+  padding: 0.4em 0.6em;
+  text-align: left;
+  vertical-align: top;
+}
+.answer th {
+  font-weight: 600;
+  background: var(--color-sheet);
+}
+
+/* The petition editor's page: an A4 sheet with Word's margins and Times New Roman 12. */
+.petition-sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 21cm;
+  min-height: 29.7cm;
+  margin: 0 auto;
+  padding: 2.5cm;
+  background: var(--color-sheet);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.06);
+  font-family: "Times New Roman", Times, "Liberation Serif", serif;
+  font-size: 12pt;
+  line-height: 1.5;
+  color: var(--color-ink);
+  outline: none;
+}
+@media (max-width: 720px) {
+  .petition-sheet { padding: 1.25cm; min-height: 0; }
+}
+.petition-sheet p { margin: 0 0 6pt; }
+.petition-sheet ul, .petition-sheet ol { margin: 0 0 6pt; padding-left: 1.5em; }
+.petition-sheet ul { list-style: disc; }
+.petition-sheet ol { list-style: decimal; }
+.petition-sheet li p { margin: 0; }
+.petition-sheet[contenteditable="false"] { opacity: 0.6; }
+.citation-chip {
+  display: inline-block;
+  margin: 0 1px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--color-cite-soft);
+  color: var(--color-cite);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.7em;
+  line-height: 1.5;
+  vertical-align: 0.15em;
+  user-select: none;
 }

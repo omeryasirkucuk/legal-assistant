@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://legal:legal@localhost:5433/legal"
     storage_dir: Path = REPO_ROOT / "var" / "storage"
+    user_storage_bytes: int = 5 * 1024**3   # each user's space for attachments and made files
 
     # LLM provider: Anthropic directly, or any OpenAI-compatible chat completions endpoint
     # (including Open WebUI). For Open WebUI, set OPENAI_BASE_URL to http://host:port/api.
@@ -48,8 +49,19 @@ class Settings(BaseSettings):
     model_draft: str = "claude-haiku-5-5"    # petition drafting
     model_cheap: str = "claude-haiku-5-5"   # routing, claim-support checks, style rewrites
     model_judge: str = "claude-haiku-5-5"  # sentence-by-sentence review and completeness
+    # Writing the answer from its sources is where reasoning over facts happens; with the
+    # cheapest model answers contradicted their own routes (D28, user-approved exception).
+    model_write: str = "claude-sonnet-5-5"
     # Decision model (typed yes/no answers with probabilities) for screening candidate
     # articles. Empty key disables screening; the planner then judges every candidate.
+    # When set, the writer (role "write") is this model on OpenRouter, reached with the
+    # decision service's key and URL; every other role stays as configured. Hosts that may
+    # train on prompts are excluded.
+    write_route: str = ""
+    # Petitions (except at "deep") are written by this OpenRouter model (D47-D48: on the same
+    # case it wrote a usable petition for a tenth of Sonnet's cost). Empty, or without an
+    # OpenRouter key, they are written like answers.
+    draft_route: str = "openai/gpt-6-luna"
     decision_api_key: str = ""
     decision_base_url: str = "https://openrouter.ai/api"
     decision_model: str = "typesafe/jev-1.13"

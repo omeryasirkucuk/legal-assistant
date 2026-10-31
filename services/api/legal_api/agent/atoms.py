@@ -69,36 +69,59 @@ def _documents(sources: list[Source]) -> list[dict]:
              "citations": {"enabled": True}} for s in sources]
 
 
-def openai_segments_from(content, sources: list) -> list[Segment]:
-    """OpenAI-compatible endpoints do not expose Anthropic's document citation objects.
+_SENTENCE_START = re.compile(r"(?:[.!?:]\s+|\n)(?=\S)")
 
-    Require explicit evidence keys and exact quotes from the supplied sources, rejecting
-    fabricated or unclickable citations.
+
+def _last_sentence(piece: str) -> tuple[str, str]:
+    """(what comes before the last sentence, the last sentence) of a piece of text."""
+    starts = [m.end() for m in _SENTENCE_START.finditer(piece.rstrip())]
+    cut = starts[-1] if starts else 0
+    return piece[:cut], piece[cut:]
+
+
+def openai_segments_from(content, sources: list) -> list[Segment]:
+    """OpenAI-compatible endpoints do not expose Anthropic's document citation objects, so
+    the writer puts each sentence's source keys after it ([[E3]]), as Anthropic's citations
+    are rendered; the text is cut into segments at those markers.
+
+    A marker for a source that was not given is dropped. A cited sentence has no quote to
+    match, so `check` judges it against its sources. The older form, an exact quote in
+    <quote ref="E3">...</quote>[[E3]], is still read: a quote found in its source is kept as
+    the segment's quote, and its words are not left in the prose (appended after sentences
+    they broke the petition's text), nor is a quote the source does not contain.
     """
     text = "\n".join(block.text for block in content if block.type == "text").strip()
-    matches = list(re.finditer(
-        r'<quote\s+ref="(E\d+)">([\s\S]*?)</quote>\s*\[\[\1\]\]', text))
-    cited_keys = re.findall(r"\[\[(E\d+)\]\]", text)
-    allowed = {source.evidence.key if hasattr(source, "evidence") else source[0]
-               for source in sources}
     documents = {
         (source.evidence.key if hasattr(source, "evidence") else source[0]):
             (source.document if hasattr(source, "evidence") else source[2])
         for source in sources
     }
-    if not matches or len(matches) != len(cited_keys):
-        return []
-    keys, quotes = [], []
-    for match in matches:
-        key, quote = match.groups()
-        if key not in allowed or not contains_quote(documents[key], quote):
-            return []
-        if key not in keys:
-            keys.append(key)
-        quotes.append(quote)
-    if set(cited_keys) != set(keys):
-        return []
-    return [Segment(text, tuple(keys), tuple(quotes))]
+    verified: dict[int, str] = {}   # position of the marker a quote belongs to -> quote
+
+    def quoted(match: re.Match) -> str:
+        key, quote = match.group(1), match.group(2)
+        if key not in documents or not contains_quote(documents[key], quote):
+            return ""
+        verified[match.start()] = quote
+        return f"\x00{match.start()}\x00[[{key}]]"
+
+    text = re.sub(r'\s*<quote\s+ref="(E\d+)">([\s\S]*?)</quote>\s*(?:\[\[\1\]\])?', quoted, text)
+    segments, cursor = [], 0
+    for run in re.finditer(r"(?:\s*(?:\x00\d+\x00)?\[\[E\d+\]\])+", text):
+        keys = [k for k in re.findall(r"\[\[(E\d+)\]\]", run.group(0)) if k in documents]
+        quotes = [verified[int(p)] for p in re.findall(r"\x00(\d+)\x00", run.group(0))]
+        piece = text[cursor:run.start()]
+        # The marker belongs to the sentence before it: what precedes that sentence (a
+        # heading, the parties) is kept uncited, so it is not judged against the source.
+        lead, cited = _last_sentence(piece)
+        if lead:
+            segments.append(Segment(lead))
+        if cited or keys:
+            segments.append(Segment(cited, tuple(dict.fromkeys(keys)), tuple(quotes)))
+        cursor = run.end()
+    if text[cursor:]:
+        segments.append(Segment(text[cursor:]))
+    return [s for s in segments if s.text.strip() or s.keys]
 
 
 def segments_from(content, sources: list[Source]) -> list[Segment]:

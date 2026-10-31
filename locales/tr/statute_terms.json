@@ -1,5 +1,12 @@
 {
   "additional": "ek",
   "temporary": "geçici",
-  "article": "madde"
+  "article": "madde",
+  "section_levels": [
+    "KİTAP",
+    "KISIM",
+    "BAP",
+    "BÖLÜM",
+    "AYIRIM"
+  ]
 }

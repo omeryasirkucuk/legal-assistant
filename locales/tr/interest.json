@@ -1,0 +1,95 @@
+{
+  "_sources": [
+    "Statutory (kanuni) interest: 3095 sayılı Kanun m. 1; 9% from 2006-06-01 (Bakanlar Kurulu kararı), 24% from 2024-06-01 (Cumhurbaşkanı Kararı 8485, RG 21.05.2024, https://www.tbb.gov.tr/tr/mevzuat-duyurulari/3095-sayili-kanunun-1-inci-maddesinde-duzenlenen-kanuni-faiz-oranina-iliskin-karar), 31% from 2026-07-31 (7589 sayılı Kanun m. 10, 80% of the TCMB discount rate of 31.12.2025, 38.75%; https://www.ybshukuk.com.tr/yasal-faiz-orani-guncellendi-12-yargi-paketi/ , https://handansayanozgul.av.tr/yasal-faiz-orani/ , https://halilbakirci.av.tr/2026-kanuni-faiz-orani-3095-madde-1/)",
+    "Advance (avans) rates: TCMB, Reeskont ve Avans Faiz Oranları, https://www.tcmb.gov.tr/wps/wcm/connect/TR/TCMB+TR/Main+Menu/Temel+Faaliyetler/Para+Politikasi/Reeskont+ve+Avans+Faiz+Oranlari (read 2026-10-31); applies to commercial matters under 3095 m. 2/2"
+  ],
+  "statutory": [
+    {
+      "from": "2006-06-01",
+      "rate": "9"
+    },
+    {
+      "from": "2024-06-01",
+      "rate": "24"
+    },
+    {
+      "from": "2026-07-31",
+      "rate": "31"
+    }
+  ],
+  "advance": [
+    {
+      "from": "2018-06-29",
+      "rate": "19.50"
+    },
+    {
+      "from": "2019-10-11",
+      "rate": "18.25"
+    },
+    {
+      "from": "2019-12-21",
+      "rate": "13.75"
+    },
+    {
+      "from": "2020-06-13",
+      "rate": "10.00"
+    },
+    {
+      "from": "2020-12-19",
+      "rate": "16.75"
+    },
+    {
+      "from": "2021-12-31",
+      "rate": "15.75"
+    },
+    {
+      "from": "2022-12-31",
+      "rate": "10.75"
+    },
+    {
+      "from": "2023-06-24",
+      "rate": "16.75"
+    },
+    {
+      "from": "2023-09-01",
+      "rate": "26.75"
+    },
+    {
+      "from": "2023-09-28",
+      "rate": "31.75"
+    },
+    {
+      "from": "2023-11-01",
+      "rate": "36.75"
+    },
+    {
+      "from": "2023-12-01",
+      "rate": "41.75"
+    },
+    {
+      "from": "2023-12-23",
+      "rate": "44.25"
+    },
+    {
+      "from": "2024-04-01",
+      "rate": "51.75"
+    },
+    {
+      "from": "2024-12-28",
+      "rate": "49.25"
+    },
+    {
+      "from": "2025-03-08",
+      "rate": "44.25"
+    },
+    {
+      "from": "2025-09-17",
+      "rate": "42.25"
+    },
+    {
+      "from": "2025-12-20",
+      "rate": "39.75"
+    }
+  ],
+  "known_until": "2026-10-31"
+}

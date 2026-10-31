@@ -11,13 +11,14 @@ export type Pending = {
   lines: Record<number, AnswerLine>;
   evidence: Evidence[];
   checked?: Checked;
+  text: string;          // the answer as it is written (delta events)
   finalText?: string;
   error?: boolean;
   budget?: boolean;
 };
 
 export function startPending(question: string, startedAt = Date.now()): Pending {
-  return { question, startedAt, steps: [], plan: [], lines: {}, evidence: [] };
+  return { question, startedAt, steps: [], plan: [], lines: {}, evidence: [], text: "" };
 }
 
 function withStep(steps: Step[], step: Step): Step[] {
@@ -42,8 +43,10 @@ export function applyEvent(p: Pending, e: StreamEvent): Pending {
       return { ...p, lines: { ...p.lines, [e.data.branch]: e.data } };
     case "checked":
       return { ...p, checked: e.data };
+    case "delta":
+      return { ...p, text: p.text + e.data.text };
     case "final":
-      return { ...p, finalText: e.data.text };
+      return { ...p, finalText: e.data.text, checked: e.data.checked ?? p.checked };
     default:
       return p;
   }
