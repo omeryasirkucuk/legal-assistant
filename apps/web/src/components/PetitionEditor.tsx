@@ -47,7 +47,7 @@ function Tool({ label, active, disabled, onClick, children }: {
   return (
     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} disabled={disabled}
       aria-label={t(label)} title={t(label)} aria-pressed={active}
-      className={`flex h-8 w-8 items-center justify-center rounded-md disabled:opacity-30 ${
+      className={`flex h-8 w-8 items-center justify-center rounded-md pointer-coarse:h-10 pointer-coarse:w-10 disabled:opacity-30 ${
         active ? "bg-ink text-white" : "text-ink hover:bg-paper"}`}>
       {children}
     </button>
@@ -111,7 +111,7 @@ export function PetitionEditor({ doc, disabled = false, onChange, onReady }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Toolbar editor={editor} disabled={disabled} />
-      <div className="min-h-0 flex-1 overflow-y-auto bg-desk px-4 py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-desk px-2 py-3 sm:px-4 sm:py-6">
         <EditorContent editor={editor} />
       </div>
     </div>

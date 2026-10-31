@@ -2,6 +2,38 @@
 
 Each entry: what was decided, why, and what it replaced. Newest first.
 
+## D72 — Phone and tablet layouts; every screen checked at 360, 390, 1024 and 1440 (2026-10-31)
+
+The user asked that nothing be cramped, crooked, overlapping, misplaced or broken on a phone,
+and that every design change from now on be judged on phone and desktop alike. Below md
+(768px, `lib/useWide.ts`) the sidebar is a drawer over the page, opened from a top bar
+(`components/MobileBar.tsx`: menu, where the lawyer is, new chat) and closed by any choice
+made in it; the collapsed rail exists only on wide screens. Hover-only controls show on touch
+screens (`pointer-coarse:`): delete in the chat list, tick boxes and menus in My files. File
+rows on a phone keep only their menu; edit, open and download move into it (`phoneOnly` menu
+items). The month calendar on a phone shows a dot per deadline and lists the month's deadlines
+and holidays under the grid; the list view puts days-left under the label instead of beside
+it. The deadline dialog stacks the date and the way of service; dialogs fit short screens and
+scroll. The draft panel beside a chat overlays it below xl instead of squeezing it to nothing
+(it did at 1024px); on a phone its title has a row of its own. Text fields are 16px on phones
+so focusing them does not zoom the page. Pages other than a chat open at their top (the
+calendar used to scroll under the bar). A script screenshots every screen at the four widths
+and reports anything wider than the viewport; all passed.
+
+## D71 — Chats read the lawyer's calendar (2026-10-31)
+
+The user found that no chat could answer "what is due this week?" or "what is the next
+deadline in this case?": deadlines were stored but never reached an answer. The
+understanding step now has a `calendar` flag (the question is about deadlines the lawyer
+recorded, not about computing a period), so the decision is a model read, not a word list.
+Every question loads the calendar (`matters/agenda.py`, one query); only when the flag is
+set does it become a cited source, kind "calculation", citation naming the lawyer's calendar, so dates
+and case names in the answer pass the number check and the lawyer can open the list. In a
+case's chat only that case's deadlines are given, done ones too: a first version also listed
+other cases' open deadlines and the answer brought them in unasked. Outside a case, open
+deadlines of open cases are given with their client and case number. A question that is only
+about the calendar skips the statute search. Two live questions cost $0.03 in all.
+
 ## D70 — My files: adding files, folders, list or icons, in-app preview (2026-10-31)
 
 At the user's request. "Open in the browser" downloaded Word and UDF files, which browsers

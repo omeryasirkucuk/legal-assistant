@@ -27,7 +27,7 @@ function Choice<T extends string>({ label, value, options, name, onPick }: {
   return (
     <div>
       <p className="mb-2 text-sm font-medium text-ink">{label}</p>
-      <div role="radiogroup" aria-label={label} className="grid grid-cols-4 gap-1 rounded-lg bg-desk p-1">
+      <div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-1 rounded-lg bg-desk p-1 sm:grid-cols-4">
         {all.map((o) => {
           const on = (o === "auto" && value === null) || o === value;
           return (

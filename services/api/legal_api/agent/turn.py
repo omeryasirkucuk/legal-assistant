@@ -14,6 +14,7 @@ from legal_api.agent.route import route
 from legal_api.agent.sources import Source
 from legal_api.drafting.brief import StyleBook
 from legal_api.files.context import Attachment
+from legal_api.matters.agenda import Agenda
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,8 @@ class Previous:
 
 async def turn_events(message: str, history: list[dict], previous: Previous | None,
                       result: dict, style: StyleBook | None = None, power: Power = POWERS["balanced"],
-                      attachments: list[Attachment] | None = None) -> AsyncIterator[Event]:
+                      attachments: list[Attachment] | None = None,
+                      agenda: Agenda | None = None) -> AsyncIterator[Event]:
     usage = llm.Usage()
     just_asked = bool(previous and (previous.answer or {}).get("asked"))
     yield step_event("understand")
@@ -60,15 +62,16 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
         # from (the writer sees only the message; a date given in the request was lost).
         events = answer_events(f"{previous.question}\n\n{message}", history, result,
                                usage=usage, style=style, power=power, attachments=attachments,
-                               just_asked=True)
+                               just_asked=True, agenda=agenda)
     elif kind == "followup" and previous:
         events = answer_events(message, history, result,
                                search_text=f"{previous.question}\n{message}", usage=usage,
                                style=style, power=power, attachments=attachments,
-                               just_asked=just_asked)
+                               just_asked=just_asked, agenda=agenda)
     else:
         events = answer_events(message, history, result, usage=usage, style=style,
-                               power=power, attachments=attachments, just_asked=just_asked)
+                               power=power, attachments=attachments, just_asked=just_asked,
+                               agenda=agenda)
     yield Event("route", {"kind": kind})
     yield step_event("understand", "done")
     async for event in events:

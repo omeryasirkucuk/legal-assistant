@@ -11,5 +11,29 @@
   "documents": "Dosyadaki belgeler",
   "document_name": "{name} (dosyadaki belge)",
   "document_parts": "{name} (dosyadaki belge, soruyla ilgili kısımlar)",
-  "gap": "[…]"
+  "gap": "[…]",
+  "agenda": {
+    "citation": "Takviminiz: kaydettiğiniz süreler",
+    "citation_matter": "Takviminiz: {client} davasının süreleri",
+    "title": "Avukatın uygulamaya kaydettiği süreler (bugün {today} {weekday}).",
+    "this_matter": "Bu davanın süreleri ({client}):",
+    "open": "Açık süreler:",
+    "none": "Kayıtlı açık süre yok.",
+    "none_matter": "Bu davada kayıtlı süre yok.",
+    "line": "{due} {weekday}: {label} ({matter}) - {state}",
+    "line_matter": "{due} {weekday}: {label} - {state}",
+    "today": "son gün bugün",
+    "left": "{days} gün kaldı",
+    "passed": "son gün {days} gün önce geçti, tamamlandı olarak işaretlenmemiş",
+    "done": "tamamlandı",
+    "branch": "{branch} süresi",
+    "branches": {
+      "civil": "hukuk",
+      "criminal": "ceza",
+      "enforcement": "icra",
+      "administrative": "idari yargı",
+      "arbitration": "tahkim"
+    },
+    "more": "... ve {count} süre daha."
+  }
 }

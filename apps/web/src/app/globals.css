@@ -142,6 +142,14 @@ body {
 @media (max-width: 720px) {
   .petition-sheet { padding: 1.25cm; min-height: 0; }
 }
+@media (max-width: 480px) {
+  .petition-sheet { padding: 0.6cm 0.5cm; }
+}
+/* Phones zoom into any text field set below 16px when it is focused; fields stay at 16px
+   there so the page does not jump. */
+@media (pointer: coarse) and (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px; }
+}
 .petition-sheet p { margin: 0 0 6pt; }
 .petition-sheet ul, .petition-sheet ol { margin: 0 0 6pt; padding-left: 1.5em; }
 .petition-sheet ul { list-style: disc; }

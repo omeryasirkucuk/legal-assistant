@@ -1,6 +1,6 @@
 # Status
 
-State as of 2026-10-30 (evening). Update this page whenever the state changes.
+State as of 2026-10-31 (after PR #3). Update this page whenever the state changes.
 
 ## Working
 
@@ -16,6 +16,24 @@ State as of 2026-10-30 (evening). Update this page whenever the state changes.
 - Decision search mode without an LLM.
 - Statute index (17 laws, 5,973 articles) and a 6,693-decision local archive with embeddings.
 - Live official sources: Bedesten decisions and legislation, Constitutional Court.
+- Petition drafting (D45-D60): case kinds and guides, asking only when key facts are missing,
+  a sample library (Word, PDF, UDF) with duplicate detection, style learning, requests settled
+  before writing; fast/balanced petitions written through OpenRouter, deep by Claude.
+- Calculators in code with sourced tables (D61, D62, D64, D65): procedural periods (holidays,
+  judicial recess by branch, electronic service), severance and notice pay, statutory and
+  advance interest; cited in answers as calculations.
+- Cases ("Davalar", D63, D66-D67): details, notes, documents and deadlines; a case's documents
+  go with its questions; a chat outside a case asks first when a case is named exactly.
+- Calendar (D63): month grid with holidays and the recess, month/year picker, list view.
+- Editor (D69): A4 word-processor editor with autosave; formatting reaches Word, PDF and UDF;
+  files carry the petition title.
+- Phone and tablet layouts (D72): sidebar as a drawer with a top bar, touch-visible controls,
+  phone calendar with dots and a list, stacked dialogs; checked at 360/390/1024/1440.
+- Calendar in chats (D71): "what is due this week?" and "the next deadline in this case" are
+  answered from the recorded deadlines, cited as the lawyer's calendar; a case chat sees only its own.
+- My files (D70): a page with nested folders, list/icon views, upload, in-app preview, rename,
+  multi-select move/copy/delete, "add to case".
+- Sidebar search (D68) covers cases and their documents as well as chats.
 
 ## Measurements
 
@@ -120,7 +138,7 @@ article with its full text ("does this article state a rule that answers the que
     a thin request is answered with a few questions first, adapting to the lawyer's habit,
     and each ground gets its own precedent (D46). Not yet: more case kinds, a model-written
     description of the lawyer's voice, suggestions mode, lawyer review of the outlines and
-    case kinds; the editor shows citation markers as text. Drafts stay shorter than the
+    case kinds. (Citation markers now show as chips in the editor, D69.) Drafts stay shorter than the
     lawyer's own (about 1,000 words against 1,800) where the facts given are fewer.
 17. **Finding earlier work is hard** (user, 2026-10-30, deferred). The sidebar search now
     matches partial words, but a lawyer also needs to find past work by meaning from inside a
@@ -129,6 +147,15 @@ article with its full text ("does this article state a rule that answers the que
     search within the open chat.
 18. 260 test users and their empty chats titled "x" from earlier test runs are still in the
     development database; the tests now delete what they create (D34).
+19. One-click rewrites (shorter, longer, plainer, formal) rebuild the editor document from the
+    text: bold survives, italics, sizes and alignment of the rewritten part do not (D69).
+20. Court fees and the yearly revalued appeal thresholds have no calculator yet; yearly table
+    upkeep is manual (religious holidays, severance ceilings, TCMB advance rates).
+21. UDF output has not been opened in UYAP's own editor yet.
+22. Deleting in My files uses the browser's confirm dialog; the files filters (D45) are still
+    word-list based.
+23. Some older tracked files still contain Turkish text outside the allowed folders
+    (DECISIONS.md quotes UI strings; some tests and code comments).
 
 ## Deployment
 

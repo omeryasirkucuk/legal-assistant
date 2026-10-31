@@ -448,5 +448,6 @@
   "selectionCount": "{n} öğe seçildi",
   "selectionDeleteAsk": "{n} öğe silinsin mi? Silinen klasörlerin içindekiler bir üst klasöre taşınır; dosyalar geri alınamaz.",
   "fileCopy": "Kopyala",
-  "fileCopyTo": "Nereye kopyalansın?"
+  "fileCopyTo": "Nereye kopyalansın?",
+  "openMenu": "Menüyü aç"
 }

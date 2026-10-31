@@ -105,8 +105,8 @@ export function CalendarView({ onOpenMatter }: { onOpenMatter: (id: string) => v
       </div>
 
       {mode === "month" && (
-        <div className="mt-8">
-          <div className="mb-3 flex items-center gap-2">
+        <div className="mt-6 sm:mt-8">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <h2 className="sr-only">{title}</h2>
             <PeriodPicker year={shown.year} month={shown.month} onPick={(year, month) => setShown({ year, month })} />
             <button onClick={() => step(-1)} aria-label={t("calendarPrev")}
@@ -118,7 +118,7 @@ export function CalendarView({ onOpenMatter }: { onOpenMatter: (id: string) => v
                 className="ml-1 rounded-md border border-rule px-2.5 py-1 text-sm text-ink hover:bg-sheet">{t("calendarToday")}</button>
             )}
             {calendars[shown.year] && !calendars[shown.year].covered && (
-              <span className="ml-auto text-xs text-caution">{t("calendarNotCovered", { year: shown.year })}</span>
+              <span className="text-xs text-caution sm:ml-auto">{t("calendarNotCovered", { year: shown.year })}</span>
             )}
           </div>
           <MonthGrid year={shown.year} month={shown.month} items={items ?? []} calendars={calendars}
@@ -144,7 +144,7 @@ export function CalendarView({ onOpenMatter }: { onOpenMatter: (id: string) => v
                 const left = daysUntil(d.due);
                 const tone = { overdue: "text-danger", today: "text-caution", soon: "text-caution", later: "text-muted" }[urgency(left)];
                 return (
-                  <li key={d.id} className="group flex items-center gap-5 py-3">
+                  <li key={d.id} className="group flex items-center gap-3 py-3 sm:gap-5">
                     <div className="w-12 shrink-0 text-center">
                       <p className="font-serif text-2xl leading-none text-ink tabular-nums">{day.getDate()}</p>
                       <p className="mt-1 text-[11px] text-faint">
@@ -153,20 +153,25 @@ export function CalendarView({ onOpenMatter }: { onOpenMatter: (id: string) => v
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[15px] text-ink">{d.label}</p>
-                      <button onClick={() => onOpenMatter(d.matter_id)} className="truncate text-sm text-muted hover:text-cite hover:underline">
+                      <button onClick={() => onOpenMatter(d.matter_id)} className="block max-w-full truncate text-left text-sm text-muted hover:text-cite hover:underline">
                         {d.client}{d.subject && `, ${d.subject}`}
                       </button>
-                      {d.branch && <span className="ml-2 text-xs text-faint">{branchName(d.branch)}</span>}
+                      <p className="text-xs">
+                        <span className={`tabular-nums sm:hidden ${tone}`}>{daysLeftText(left)}</span>
+                        {d.branch && <span className="text-faint max-sm:ml-2">{branchName(d.branch)}</span>}
+                      </p>
                       {asking === d.id && (
                         <DeadlineActions onDone={() => toggle(d)} onDelete={() => remove(d)} onCancel={() => setAsking(null)} />
                       )}
                     </div>
-                    <span className={`shrink-0 text-sm tabular-nums ${tone}`}>{daysLeftText(left)}</span>
+                    <span className={`hidden shrink-0 text-sm tabular-nums sm:inline ${tone}`}>{daysLeftText(left)}</span>
                     <button onClick={() => setAsking(asking === d.id ? null : d.id)} aria-label={t("deadlineDone")}
                       aria-expanded={asking === d.id}
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-transparent hover:border-verified hover:text-verified ${
+                      className="group/tick -m-2 shrink-0 p-2">
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-full border text-transparent group-hover/tick:border-verified group-hover/tick:text-verified ${
                         asking === d.id ? "border-ink ring-2 ring-ink/10" : "border-faint"}`}>
-                      <Check size={11} strokeWidth={3} />
+                        <Check size={11} strokeWidth={3} />
+                      </span>
                     </button>
                   </li>
                 );
@@ -181,10 +186,10 @@ export function CalendarView({ onOpenMatter }: { onOpenMatter: (id: string) => v
           <summary className="cursor-pointer text-sm text-muted hover:text-ink">{t("deadlinesDone", { n: done.length })}</summary>
           <ul className="mt-2 divide-y divide-rule">
             {done.map((d) => (
-              <li key={d.id} className="flex items-center gap-4 py-2 text-sm text-faint">
-                <span className="w-24 shrink-0 tabular-nums">{parseDay(d.due).toLocaleDateString("tr-TR")}</span>
+              <li key={d.id} className="flex items-center gap-3 py-2 text-sm text-faint sm:gap-4">
+                <span className="w-20 shrink-0 tabular-nums sm:w-24">{parseDay(d.due).toLocaleDateString("tr-TR")}</span>
                 <span className="min-w-0 flex-1 truncate line-through">{d.label}</span>
-                <span className="truncate">{d.client}</span>
+                <span className="hidden truncate sm:inline">{d.client}</span>
                 <button onClick={() => toggle(d)} className="text-xs text-muted hover:text-ink">{t("deadlineUndo")}</button>
               </li>
             ))}

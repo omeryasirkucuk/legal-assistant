@@ -52,6 +52,7 @@ _SCHEMA = {
         "case_kind": {"type": "string", "enum": list(CASE_KINDS)},
         "area": {"type": "string", "enum": list(AREAS)},
         "write_now": {"type": "boolean"},
+        "calendar": {"type": "boolean"},
         "interest": {"type": "array", "items": {
             "type": "object",
             "properties": {"principal": {"type": "number"}, "start_date": {"type": "string"},
@@ -83,7 +84,7 @@ _SCHEMA = {
     },
     "required": ["task", "questions", "shape", "characterisation", "issues", "statute_hints",
                  "case_law_query", "petition_type", "output_format", "case_kind", "area",
-                 "write_now", "deadlines", "severance", "interest", "missing_facts",
+                 "write_now", "calendar", "deadlines", "severance", "interest", "missing_facts",
                  "clarify"],
     "additionalProperties": False,
 }
@@ -105,6 +106,7 @@ class Understanding:
     case_kind: str = "other"                              # for drafting: drafting.cases id
     area: str = "other"                                   # area of law (sample_profile.AREAS)
     write_now: bool = False             # the lawyer asked for the petition without questions
+    calendar: bool = False              # about the deadlines the lawyer recorded (matters/agenda.py)
     gap_trace: dict = field(default_factory=dict)   # how the ask-or-write decision was made
     requests: list[str] = field(default_factory=list)   # a petition's requests, settled first
     deadlines: list[dict] = field(default_factory=list)  # periods to compute (calc/sources.py)
@@ -158,6 +160,7 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
         case_kind=data.get("case_kind") if data.get("case_kind") in CASE_KINDS else "other",
         area=data.get("area") if data.get("area") in AREAS else "other",
         write_now=bool(data.get("write_now")),
+        calendar=bool(data.get("calendar")),
         deadlines=[d for d in data.get("deadlines", []) if d.get("start_date")][:MAX_DEADLINES],
         interest=[i for i in data.get("interest", []) if i.get("principal") and i.get("start_date")][:3],
         severance=next((s for s in data.get("severance", [])

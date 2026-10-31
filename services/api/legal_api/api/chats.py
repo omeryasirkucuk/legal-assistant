@@ -40,6 +40,7 @@ from legal_api.drafting.store import file_format, record_reply, save_draft, styl
 from legal_api.files.context import Attachment
 from legal_api.files.store import owned as owned_files
 from legal_api.files.store import read as read_file
+from legal_api.matters.agenda import agenda as load_agenda
 from legal_api.matters.documents import Document
 from legal_api.matters.documents import material as matter_material
 from legal_api.matters.service import context as matter_context
@@ -225,6 +226,8 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
                 if f.id not in attached and not f.media_type.startswith("image/")]
         attachments[:0] = [matter_context(matter, in_file),
                            *await asyncio.to_thread(matter_material, text, docs)]
+    # The recorded deadlines, cited only if the question turns out to be about them.
+    agenda = await load_agenda(db, user.id, matter)
     power = power_of(body.power)
     question_id = str(question.id)
     llm_config = runtime_config(await db.get(LLMConnectionSettings, 1))
@@ -255,7 +258,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
         title_task = (asyncio.create_task(generate_title(text, title_usage))
                       if previous is None else None)
         async for event in turn_events(text, turns, previous, holder, style, power,
-                                       attachments):
+                                       attachments, agenda):
             run.emit(event.type, event.data)
         title = await _finished_title(title_task)
         async with get_sessionmaker()() as session:
