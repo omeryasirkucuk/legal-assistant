@@ -131,7 +131,7 @@ def _citation_patterns() -> list[re.Pattern]:
 
 def without_citations(text: str) -> str:
     """Text with article, law, case and date references removed: their numbers identify a
-    source, they are not quantities to check ("m. 29/1", "6098 sayılı", "E. 2019/1483")."""
+    source, they are not quantities to check ("m. 29/1", "Law No. 6098", "E. 2019/1483")."""
     for pattern in _citation_patterns():
         text = pattern.sub(" ", text)
     return _MARKDOWN.sub(" ", text)

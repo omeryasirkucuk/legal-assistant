@@ -1,6 +1,6 @@
 # Petition drafting
 
-Design of the drafting feature: the assistant writes a petition (dava dilekçesi, cevap,
+Design of the drafting feature: the assistant writes a petition (statement of claim, reply,
 istinaf, itiraz, ihtarname ...) for a case the lawyer describes, in the lawyer's own style, and
 learns that style over time.
 
@@ -8,7 +8,7 @@ learns that style over time.
 
 Lawyers who tried other tools say drafts read "AI-like" and the length is wrong: some want
 short petitions, some long; some write plain sentences, some a formal, ornate register
-("ağdalı"). A lawyer should not have to write instructions to fix either. The system must be
+(heavy, archaic register). A lawyer should not have to write instructions to fix either. The system must be
 capable from the first draft (correct structure, required contents, grounded legal reasons)
 and then move toward the direction each lawyer wants.
 
@@ -40,15 +40,15 @@ and then move toward the direction each lawyer wants.
 1. **Required contents from the law (grounded).** The articles that set what a petition must
    contain are in the statute index: HMK 119 (statement of claim), 121 (documents), 129
    (answer), 194 (facts and evidence), 342 (appeal to the regional court), 364 (appeal to the
-   Court of Cassation), İYUK 3 (administrative action), İİK 62 (objection to a payment
+   Court of Cassation), IYUK 3 (administrative action), IIK 62 (objection to a payment
    order), CMK 273 (criminal appeal), HUAK 18/B (mediation before suit). Each petition type
    lists its articles; the checklist is read from them and cited.
 2. **Petition-type outlines** (`playbooks/tr/petitions/*.md`): sections and their order,
    standard formulas, usual evidence and annexes, per type. Written in our own words from the
    law and common practice; to be reviewed by the lawyer.
 3. **Legal reasons** from the existing research pipeline (statutes, references, decisions).
-4. **The lawyer's own petitions** ("Örnek dilekçelerim"): the main source of style.
-5. Later: claim summaries in court decisions ("davacı vekili dava dilekçesinde özetle ..."),
+4. **The lawyer's own petitions** ("My sample petitions"): the main source of style.
+5. Later: claim summaries in court decisions ("counsel for the claimant summarised in the claim ..."),
    which show what was claimed in similar cases (decisions are free to reuse, FSEK art. 31;
    the local archive is CC0), and official forms published by the ministry.
 
@@ -69,11 +69,11 @@ Per user, overall and per petition type, built from their samples and updated by
 
 - **Measured** (code, no model): words and pages, words per sentence, paragraphs per page,
   headings used and their order, numbering style, opening and closing formulas, decision
-  citation pattern, rate of formal/archaic words ("işbu, mezkur, binaenaleyh, müvekkil")
+  citation pattern, rate of formal/archaic words (archaic formal words and "client")
   from a locale lexicon (`locales/tr/style_lexicon.json`) as a register score.
 - **Described** (cheap model, once per sample): a short description of the voice and the
   argument order, merged across samples.
-- **Rules** the lawyer states ("Yargıtay kararlarını tam künyeyle yaz"), kept as a list they
+- **Rules** the lawyer states ("cite Court of Cassation decisions in full"), kept as a list they
   can see and edit.
 - **Preferences** moved by feedback: a target length and a register target, each a running
   value that every action and accepted edit shifts.
@@ -84,15 +84,15 @@ structure, never their facts.
 
 ## Learning the direction
 
-- Buttons on a draft and on a selected paragraph: Kısalt, Genişlet, Sadeleştir,
-  Resmîleştir. Each rewrites only that part, keeps citations and placeholders, and moves the
+- Buttons on a draft and on a selected paragraph: Shorter, Longer, Plainer,
+  More formal. Each rewrites only that part, keeps citations and placeholders, and moves the
   matching preference.
 - The lawyer edits the draft in place; on save, the difference between the draft and the
   saved text (length, register) updates the preferences. A saved draft is not added as a
   sample by itself (that would count the same correction twice); the lawyer uploads the
   final petition when they want it learnt as a sample.
-- The profile is shown in plain Turkish ("Dilekçelerin genelde 4-5 sayfa, cümlelerin kısa,
-  kararları tam künyeyle veriyorsun") and can be corrected.
+- The profile is shown in plain Turkish ("your petitions are usually 4-5 pages, your sentences short,
+  you cite decisions in full") and can be corrected.
 
 ## Flow
 
@@ -137,14 +137,14 @@ and register, UDF export, suggestions mode.
 First run (kira eviction case, formal sample): $0.08; the draft took the sample's headings,
 closing formula and register (27 formal words per 1,000 against the sample's 40+), chose the
 civil court of peace by HMK art. 4 although the sample named the general civil court, left
-unknown facts in brackets and ended with a cited checklist. "Sadeleştir" on it: register
+unknown facts in brackets and ended with a cited checklist. "Plainer" on it: register
 27 -> 6.9, citations kept, $0.017.
 
 Practice notes (2026-10-30): 24 of 29 listed pages read (one site answers automated access
 with 403 and was skipped), $0.08. The same eviction case drafted with no own sample ($0.17):
 the claim now also asked for the overdue rent with interest and occupation compensation, gave
 the evidence after each fact paragraph and numbered annexes, all from the practice notes;
-register plain (2.3 formal words per 1,000), closing "saygıyla arz ve talep ederiz". The
+register plain (2.3 formal words per 1,000), the usual respectful closing formula. The
 "dava" notes lean to eviction suits (4 of 7 samples).
 
 Known limits: the editor shows the citation markers ([[E3]]) as text; adjustment costs are

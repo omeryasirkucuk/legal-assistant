@@ -450,5 +450,8 @@
   "fileCopy": "Kopyala",
   "fileCopyTo": "Nereye kopyalansın?",
   "openMenu": "Menüyü aç",
-  "serviceUnavailable": "Yapay zekâ hizmeti şu an cevap vermiyor: hesabın kredisi bitmiş ya da anahtarı geçersiz olabilir. Yöneticiye haber ver; düzelince soruyu yeniden sorabilirsin."
+  "serviceUnavailable": "Yapay zekâ hizmeti şu an cevap vermiyor: hesabın kredisi bitmiş ya da anahtarı geçersiz olabilir. Yöneticiye haber ver; düzelince soruyu yeniden sorabilirsin.",
+  "chatDeleteAsk": "\"{title}\" sohbeti silinsin mi? Cevapları ve kaynakları da silinir; geri alınamaz.",
+  "deadlinePresetPick": "Hazır süre seç (iş tipine göre)",
+  "deadlinePresetBasis": "Dayanak: {citation}. Süre maddenin metninden doğrulandı; somut olaya uyduğunu kontrol et."
 }

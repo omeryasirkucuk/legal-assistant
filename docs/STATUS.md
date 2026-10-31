@@ -27,6 +27,7 @@ State as of 2026-10-31 (after PR #3). Update this page whenever the state change
 - Calendar (D63): month grid with holidays and the recess, month/year picker, list view.
 - Editor (D69): A4 word-processor editor with autosave; formatting reaches Word, PDF and UDF;
   files carry the petition title.
+- Deadline controls and presets, in-app confirm, all spend in the budget, rewrites keep formatting (D76).
 - Models reachable through OpenRouter (D75, ANTHROPIC_VIA_OPENROUTER); decision service paced at 2 s.
 - Penalty, court fee and appeal limit calculators (D74); provider refusals shown as such.
 - Statute splitter keeps closing lines that end in footnote marks (D73); core laws re-synced.
@@ -154,16 +155,15 @@ article with its full text ("does this article state a rule that answers the que
     search within the open chat.
 18. 260 test users and their empty chats titled "x" from earlier test runs are still in the
     development database; the tests now delete what they create (D34).
-19. One-click rewrites (shorter, longer, plainer, formal) rebuild the editor document from the
-    text: bold survives, italics, sizes and alignment of the rewritten part do not (D69).
+19. One-click rewrites keep the formatting of unchanged paragraphs and the alignment of
+    rewritten ones (D76); italics and sizes inside a rewritten paragraph are not kept.
 20. Yearly table upkeep is manual: religious holidays, severance ceilings, TCMB advance rates,
     the court fee tariff and the appeal limits (locales/tr/court_costs.json, each January).
     Penalty and court cost calculators checked live (D75): harc-1, ceza-2, ceza-3 pass.
 21. UDF output has not been opened in UYAP's own editor yet.
-22. Deleting in My files uses the browser's confirm dialog; the files filters (D45) are still
-    word-list based.
-23. Some older tracked files still contain Turkish text outside the allowed folders
-    (DECISIONS.md quotes UI strings; some tests and code comments).
+22. The files filters (D45) are still word-list based.
+23. No Turkish text outside the allowed folders (D76), except authors' names in NOTICE; some
+    code still holds short Turkish words without special letters (number words, suffixes).
 
 ## Deployment
 

@@ -251,6 +251,7 @@ export const api = {
   calculateDeadline: (body: { received: string; service: Service; amount: number; unit: PeriodUnit; branch: Branch }) =>
     call<NoticeResult>("/deadlines/calculate", json(body)),
   holidays: (year: number) => call<CalendarYear>(`/holidays/${year}`),
+  deadlinePresets: () => call<DeadlinePreset[]>("/deadlines/presets"),
   renameChat: (id: string, title: string) =>
     call<ChatSummary>(`/chats/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }),
   deleteChat: (id: string) => call<void>(`/chats/${id}`, { method: "DELETE" }),
@@ -274,6 +275,9 @@ export const api = {
   llmModels: () => call<LLMModel[]>("/settings/llm/models"),
   testLLM: () => call<{ ok: boolean; model: string }>("/settings/llm/test", { method: "POST" }),
 };
+
+/** A ready period by kind of work, with the article that sets it. */
+export type DeadlinePreset = { label: string; amount: number; unit: PeriodUnit; branch: Branch; citation: string };
 
 export async function fetchHealth(): Promise<Health | null> {
   try {

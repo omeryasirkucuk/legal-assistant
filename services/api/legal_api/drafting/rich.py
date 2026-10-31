@@ -160,6 +160,35 @@ def file_blocks(draft: Draft) -> list[Block]:
     return blocks(draft.text)
 
 
+def _key(node: dict) -> str:
+    """A paragraph's words, to recognise it after a rewrite (formatting aside)."""
+    return " ".join("".join(n.get("text", "") or f"[[{(n.get('attrs') or {}).get('key', '')}]]"
+                            for n in node.get("content") or []).split())
+
+
+def carry_over(old_doc: dict, new_text: str) -> dict:
+    """The document for a rewritten petition, keeping what the lawyer set in the editor: a
+    paragraph the rewrite left as it was keeps its node (italics, sizes, alignment); a
+    rewritten one keeps the alignment of the paragraph in its place when the count is the
+    same. A one-click rewrite used to rebuild the document from the text and lose all of it."""
+    new = to_doc(blocks(new_text, keep_markers=True))
+    old_nodes = [n for n in old_doc.get("content") or [] if n.get("type") == "paragraph"]
+    by_key = {_key(n): n for n in old_nodes}
+    same_count = len(old_nodes) == len(new["content"])
+    out = []
+    for i, node in enumerate(new["content"]):
+        kept = by_key.get(_key(node))
+        if kept is not None:
+            out.append(kept)
+            continue
+        if same_count:
+            align = (old_nodes[i].get("attrs") or {}).get("textAlign")
+            if align:
+                node = {**node, "attrs": {**(node.get("attrs") or {}), "textAlign": align}}
+        out.append(node)
+    return {"type": "doc", "content": out}
+
+
 def apply_doc(draft_text: str, doc: dict) -> str:
     """The draft's text with its petition replaced by the document's, the note before it and
     the checklist after it kept."""

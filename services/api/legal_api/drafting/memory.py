@@ -35,6 +35,7 @@ from legal_api.db.session import get_sessionmaker
 from legal_api.drafting.style import petition_part
 from legal_api.embeddings import embed_passages, embed_query
 from legal_api.prompts import prompt
+from legal_api.spend import record_spend
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +108,10 @@ async def learn_from_edit(user_id: uuid.UUID, drafted: str, saved: str,
     if difflib.SequenceMatcher(None, before, after).quick_ratio() >= UNCHANGED:
         return
     try:
-        texts = await _extract(before, after, llm.Usage())
+        usage = llm.Usage()
+        texts = await _extract(before, after, usage)
         async with get_sessionmaker()() as db:
+            await record_spend(db, user_id, "style_learning", usage)
             await remember(db, user_id, texts, petition_type)
     except Exception:
         logger.exception("learning from an edit failed")

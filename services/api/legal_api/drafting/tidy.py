@@ -1,12 +1,12 @@
 """Rules a petition must keep that a writer cannot be trusted to keep, applied in code after
 every model-written draft or rewrite (never to the lawyer's own edits):
 
-- Brackets name a missing datum ("[Dava değeri]"). A writer with nowhere else to say a fact
-  is missing wrote notes inside them ("[Dava değeri; malvarlığı talebi bakımından ayrıca
-  değerlendirilecektir.]"); the note moves to the checklist and the bracket keeps its name.
+- Brackets name a missing datum ("[claim value]"). A writer with nowhere else to say a fact
+  is missing wrote notes inside them ("[claim value; to be assessed separately for the
+  property claim.]"); the note moves to the checklist and the bracket keeps its name.
 - A petition does not talk about itself. Told to meet the statutes on a petition's contents,
-  writers asserted they had ("her delilin hangi vakıanın ispatına yönelik olduğu
-  gösterilmiştir") even when told not to; such sentences are dropped (patterns in
+  writers asserted they had ("it has been shown which fact each piece of evidence
+  proves") even when told not to; such sentences are dropped (patterns in
   locales/tr/style.json, "self_reference").
 - A petition that asks for an interim measure says so above its heading; writers asked for
   the measure and left the line out, so it is added when the requests ask for one.

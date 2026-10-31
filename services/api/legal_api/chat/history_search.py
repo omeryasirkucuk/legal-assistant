@@ -1,7 +1,7 @@
 """Search over the user's chats as they type: partial words count.
 
-A lawyer types the start of a word ("ağırlaş") and expects the chat that says
-"ağırlaştırılmış". Full-text search alone only matches whole stemmed words, so every typed
+A lawyer types the start of a word ("aggrav") and expects the chat that says
+"aggravated". Full-text search alone only matches whole stemmed words, so every typed
 term is matched three ways: as a word prefix in the full-text index, as text inside a
 message (folded with Turkish casing rules, so it also finds the middle of a word), and in the
 chat title. A chat matches when every term matches somewhere in it.
@@ -33,7 +33,7 @@ def search_terms(q: str) -> list[str]:
 
 def folded(column):
     """Turkish casefold in SQL: dotted capital I to i and plain I to dotless i, then lower."""
-    return func.lower(func.translate(column, "İI", "iı"))
+    return func.lower(func.translate(column, "\u0130I", "i\u0131"))
 
 
 def _term_matches(term: str):

@@ -2,7 +2,7 @@
 
 fast: the cheaper model writes, fewer sources, decisions only when needed;
 balanced: the default;
-deep (Derin araştırma): more sources, decisions always searched with more read, and the
+deep (deep research): more sources, decisions always searched with more read, and the
 writer thinks longer.
 """
 

@@ -1,7 +1,10 @@
+import json
 from pathlib import Path
 
 from legal_api.drafting.feedback import apply_action, learn_from_edit
 from legal_api.drafting.profile import Preferences, sample_of, style_instruction, targets
+
+TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
 
 FORMAL = (Path(__file__).parent / "fixtures" / "tr" / "petition_formal.txt").read_text(
     encoding="utf-8")
@@ -13,12 +16,12 @@ def test_without_samples_the_house_defaults_apply():
 
 
 def test_targets_follow_the_samples_of_the_same_type():
-    samples = [sample_of("dava", FORMAL), sample_of("ihtarname", "Kısa bir metin. Bitti.")]
+    samples = [sample_of("dava", FORMAL), sample_of("ihtarname", TR["style_profile_1"])]
     t = targets(samples, Preferences(), "dava")
     assert t.learnt_from == 1
     assert t.register == "formal"
     assert t.closing == "arz ve talep ederiz"
-    assert "SONUÇ VE İSTEM" in t.headings
+    assert TR["style_profile_2"] in t.headings
 
 
 def test_buttons_move_length_and_register():
@@ -34,8 +37,8 @@ def test_a_shortened_edit_lowers_the_length_preference():
 
 
 def test_instruction_names_the_targets():
-    text = style_instruction(targets([], Preferences(), "dava"), ["Kararları tam künyeyle yaz."])
-    assert "900" in text and "Kararları tam künyeyle yaz." in text and "{" not in text
+    text = style_instruction(targets([], Preferences(), "dava"), [TR["style_profile_3"]])
+    assert "900" in text and TR["style_profile_4"] in text and "{" not in text
 
 
 def test_a_chosen_length_and_register_replace_the_samples():
@@ -58,7 +61,7 @@ def test_the_sample_to_imitate_is_of_the_case_area_first():
 
 def test_a_sample_of_the_same_kind_of_case_comes_before_one_of_the_same_area():
     from legal_api.drafting.profile import Sample, closest_sample
-    agreed = Sample("dava", {}, "x" * 90, closeness=0.9, area="family", matter="anlaşmalı boşanma")
+    agreed = Sample("dava", {}, "x" * 90, closeness=0.9, area="family", matter=TR["style_profile_5"])
     contested = Sample("dava", {}, "x" * 10, closeness=0.8, area="family", case_kind="bosanma")
     assert closest_sample([agreed, contested], "dava", "family", "bosanma") == (contested, True)
     assert closest_sample([agreed], "dava", "family", "bosanma") == (agreed, False)

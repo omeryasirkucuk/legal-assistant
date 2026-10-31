@@ -20,6 +20,7 @@ import { DeadlineSuggest } from "@/components/DeadlineSuggest";
 import { MatterForm } from "@/components/MatterForm";
 import { MatterView } from "@/components/MatterView";
 import { MobileBar } from "@/components/MobileBar";
+import { useConfirm } from "@/components/ConfirmDialog";
 import type { AskOptions } from "@/lib/stream";
 import {
   api,
@@ -60,6 +61,7 @@ export default function ChatApp() {
   const [collapsed, setCollapsed] = useState(false);
   const [navOpen, setNavOpen] = useState(false);                // phone: the sidebar drawer
   const closeNav = useCallback(() => setNavOpen(false), []);
+  const [confirmDialog, confirm] = useConfirm();
   const [matters, setMatters] = useState<Matter[]>([]);
   const [view, setView] = useState<View>("chat");
   const [matterId, setMatterId] = useState<string | null>(null);   // the file being worked in
@@ -228,6 +230,8 @@ export default function ChatApp() {
   }
 
   async function deleteChat(id: string) {
+    const title = chats.find((c) => c.id === id)?.title ?? "";
+    if (!(await confirm(t("chatDeleteAsk", { title })))) return;
     runs.stop(id);
     await api.deleteChat(id);
     setChats((cs) => cs.filter((c) => c.id !== id));
@@ -466,6 +470,7 @@ export default function ChatApp() {
       )}
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       {styleOpen && <StylePanel onClose={() => setStyleOpen(false)} />}
+      {confirmDialog}
       {newMatterOpen && <MatterForm onSave={createMatter} onClose={() => setNewMatterOpen(false)} />}
     </div>
   );

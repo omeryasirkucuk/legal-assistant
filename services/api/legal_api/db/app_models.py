@@ -10,6 +10,7 @@ from sqlalchemy import (
     CheckConstraint,
     Computed,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -108,6 +109,22 @@ class MessageEvidence(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (UniqueConstraint("message_id", "key"),)
+
+
+class LlmSpend(Base):
+    """Model spend outside chat answers (a petition rewritten with a button, a sample petition
+    read, a style learnt from edits), so the daily budget counts all of a lawyer's use."""
+
+    __tablename__ = "llm_spend"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True,
+                                          default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"),
+                                               index=True)
+    purpose: Mapped[str] = mapped_column(String(40))       # "draft_adjust", "sample_read", ...
+    cost_usd: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now,
+                                                 index=True)
 
 
 # Chats point to matters: their table must be known wherever chats are.

@@ -45,10 +45,10 @@ class ParsedArticle:
 
 
 def _section_pattern() -> re.Pattern:
-    """A division heading ("DÖRDÜNCÜ BÖLÜM", the ordinal sometimes on its own line after
+    """A division heading ("CHAPTER FOUR", the ordinal sometimes on its own line after
     conversion) and its title: the lines that follow, up to the next blank line."""
     levels = "|".join(re.escape(w) for w in section_levels())
-    upper = "A-ZÇĞİÖŞÜÂÎÛ"
+    upper = "A-Z\u00c7\u011e\u0130\u00d6\u015e\u00dc\u00c2\u00ce\u00db"
     return re.compile(rf"(?m)^[ \t]*(?:[{upper}]+\s+){{1,2}}?(?P<level>{levels})[ \t]*\n"
                       rf"\s*(?P<title>(?:[^\n]*\S[^\n]*\n){{1,3}}?)[ \t]*\n")
 

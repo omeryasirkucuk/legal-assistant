@@ -28,5 +28,125 @@
       "law": ""
     }
   },
-  "electronic_service_days": 5
+  "electronic_service_days": 5,
+  "presets": [
+    {
+      "label": "İstinaf süresi",
+      "amount": 2,
+      "unit": "week",
+      "branch": "civil",
+      "law": "6100",
+      "article": "345",
+      "citation": "HMK m. 345"
+    },
+    {
+      "label": "Temyiz süresi",
+      "amount": 2,
+      "unit": "week",
+      "branch": "civil",
+      "law": "6100",
+      "article": "361",
+      "citation": "HMK m. 361"
+    },
+    {
+      "label": "Cevap dilekçesi",
+      "amount": 2,
+      "unit": "week",
+      "branch": "civil",
+      "law": "6100",
+      "article": "127",
+      "citation": "HMK m. 127"
+    },
+    {
+      "label": "Cevaba cevap / ikinci cevap",
+      "amount": 2,
+      "unit": "week",
+      "branch": "civil",
+      "law": "6100",
+      "article": "136",
+      "citation": "HMK m. 136"
+    },
+    {
+      "label": "Ödeme emrine itiraz",
+      "amount": 7,
+      "unit": "day",
+      "branch": "enforcement",
+      "law": "2004",
+      "article": "62",
+      "citation": "İİK m. 62"
+    },
+    {
+      "label": "Kambiyo senedine dayalı takipte itiraz",
+      "amount": 5,
+      "unit": "day",
+      "branch": "enforcement",
+      "law": "2004",
+      "article": "168",
+      "citation": "İİK m. 168"
+    },
+    {
+      "label": "İcra memur işlemine şikâyet",
+      "amount": 7,
+      "unit": "day",
+      "branch": "enforcement",
+      "law": "2004",
+      "article": "16",
+      "citation": "İİK m. 16"
+    },
+    {
+      "label": "Ceza istinaf süresi",
+      "amount": 2,
+      "unit": "week",
+      "branch": "criminal",
+      "law": "5271",
+      "article": "273",
+      "citation": "CMK m. 273"
+    },
+    {
+      "label": "Ceza temyiz süresi",
+      "amount": 2,
+      "unit": "week",
+      "branch": "criminal",
+      "law": "5271",
+      "article": "291",
+      "citation": "CMK m. 291"
+    },
+    {
+      "label": "Ceza kararına itiraz",
+      "amount": 2,
+      "unit": "week",
+      "branch": "criminal",
+      "law": "5271",
+      "article": "268",
+      "citation": "CMK m. 268"
+    },
+    {
+      "label": "İdari yargıda istinaf",
+      "amount": 30,
+      "unit": "day",
+      "branch": "administrative",
+      "law": "2577",
+      "article": "45",
+      "citation": "İYUK m. 45"
+    },
+    {
+      "label": "İdari yargıda temyiz",
+      "amount": 30,
+      "unit": "day",
+      "branch": "administrative",
+      "law": "2577",
+      "article": "46",
+      "citation": "İYUK m. 46"
+    },
+    {
+      "label": "İşe iade için arabulucuya başvuru",
+      "amount": 1,
+      "unit": "month",
+      "branch": "civil",
+      "law": "4857",
+      "article": "20",
+      "citation": "İş Kanunu m. 20"
+    }
+  ],
+  "_presets_note": "Ready periods for adding a deadline. Each length is checked against its article's own text in tests/test_deadline_presets.py; a period the article does not state in so many words (dava açma, İYUK 7) is left out."
 }
