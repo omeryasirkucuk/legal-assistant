@@ -27,6 +27,7 @@ State as of 2026-10-31 (after PR #3). Update this page whenever the state change
 - Calendar (D63): month grid with holidays and the recess, month/year picker, list view.
 - Editor (D69): A4 word-processor editor with autosave; formatting reaches Word, PDF and UDF;
   files carry the petition title.
+- Models reachable through OpenRouter (D75, ANTHROPIC_VIA_OPENROUTER); decision service paced at 2 s.
 - Penalty, court fee and appeal limit calculators (D74); provider refusals shown as such.
 - Statute splitter keeps closing lines that end in footnote marks (D73); core laws re-synced.
 - Phone and tablet layouts (D72): sidebar as a drawer with a top bar, touch-visible controls,
@@ -120,7 +121,10 @@ article with its full text ("does this article state a rule that answers the que
     Not yet measured on more cases.
 13. The Sonnet writer costs about $0.044 per question (Haiku: $0.004); the daily per-user
     budget (DAILY_USER_BUDGET_USD, default 3) allows about 70 answers.
-14. Remaining misses on the golden set (run of 2026-10-30, D37: 8/17 passed, 52/60 points; 51 with the stricter grader):
+14. (D75, six questions twice: coverage 25/27 and 24/27; icra-0 still lacks the 30-day payment
+    period although TBK 315 is a source; aile-2 depends on whether a decision is found; kira-3
+    found decisions in one of three runs, the others were judged not relevant.)
+    Remaining misses on the golden set (run of 2026-10-30, D37: 8/17 passed, 52/60 points; 51 with the stricter grader):
     the payment period of the rent enforcement form (icra-0), proof by any evidence for
     cohabitation (aile-2, needs case law), (the partition article, tasinmaz-1, is found since D36), the judge's discretion (ceza-2), the two-notice point (kira-3, wording).
     In icra-0 the enforcement article with the 30-day payment period (art. 269) is among the
@@ -154,7 +158,7 @@ article with its full text ("does this article state a rule that answers the que
     text: bold survives, italics, sizes and alignment of the rewritten part do not (D69).
 20. Yearly table upkeep is manual: religious holidays, severance ceilings, TCMB advance rates,
     the court fee tariff and the appeal limits (locales/tr/court_costs.json, each January).
-    The penalty and court cost calculators (D74) are not yet checked live (golden ceza-3, harc-1).
+    Penalty and court cost calculators checked live (D75): harc-1, ceza-2, ceza-3 pass.
 21. UDF output has not been opened in UYAP's own editor yet.
 22. Deleting in My files uses the browser's confirm dialog; the files filters (D45) are still
     word-list based.

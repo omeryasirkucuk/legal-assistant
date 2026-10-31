@@ -2,6 +2,39 @@
 
 Each entry: what was decided, why, and what it replaced. Newest first.
 
+## D75 — Models through OpenRouter; label-driven penalty fitting; slower decision service pace (2026-10-31)
+
+The Anthropic account ran out of credit; at the user's request every Anthropic model is now
+reached through OpenRouter when ANTHROPIC_VIA_OPENROUTER is set (`llm.routed`,
+`llm.openrouter_id`: claude-sonnet-5-5 becomes anthropic/claude-sonnet-5.5; same prices,
+structured outputs and effort carried over, no host that keeps prompts). Images attached to a
+question are not sent on this path (text only).
+
+The understanding model named the penalty provisions differently and often wrongly in every
+run (the weapon increase twice, art. 87 or 35 as the increase, the plain threat paragraph,
+no increase at all). The calculator now lets the case's label decide (`calc/penalty_sources.py`):
+the label's words missing from the base provision and its article title must be found in a
+paragraph or item of that article; an item with a ratio is applied, a paragraph with its own
+range replaces the base, or joins it when a ratio applies (the weapon raises both the ordinary
+and the lighter injury); a named provision without those words is left out with a note; the
+same paragraph's ratio is applied once; a case whose words are found nowhere is not computed.
+Three understanding runs with three different namings all gave the right ranges.
+
+An article brought in by a reference now says which sentence of which article referred to it,
+so the writer knows what it fills in (icra-0: TBK 315 was a source but its 30-day period was
+not written; still not written after this, see STATUS 14). Pieces of fewer than four words cut
+off by citation marks are no longer judged on their own (their numbers still are).
+
+The decision service answered HTTP 429 to a search and four fetches at one per second; the
+gateway then rightly stops for 120 s, and answers in that time had no case law (aile-2 found
+two decisions in one run and none in the next). Requests to it are now two seconds apart and
+three decisions are read per search within 20 s. Consultation answers took about 40 s instead
+of 30-35 s in the runs after it. kira-3 still found no decision in two runs with no 429: the
+passages found were judged below the relevance threshold.
+
+Live runs (via OpenRouter): harc-1 and ceza-2 passed in both six-question runs; ceza-3 passed
+after the label fitting; coverage 25/27 and 24/27 on the six; about $1.1 spent on the day.
+
 ## D74 — Penalty, court fee and appeal limit calculators; provider refusals shown as such (2026-10-31)
 
 Penalties (`calc/penalty.py`, `calc/penalty_sources.py`, words in `locales/tr/penalty.json`):

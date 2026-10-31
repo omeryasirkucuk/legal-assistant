@@ -2,8 +2,14 @@ import json
 from fractions import Fraction
 from pathlib import Path
 
-from legal_api.agent.sources import Source
-from legal_api.calc.penalty import apply, duration_text, paragraph, read_range, read_ratio
+from legal_api.agent.sources import TITLE_PREFIX, Source
+from legal_api.calc.penalty import (
+    apply,
+    duration_text,
+    paragraph,
+    read_range,
+    read_ratio,
+)
 from legal_api.calc.penalty_sources import penalty_sources
 from legal_api.grounding.evidence import EvidenceLedger
 from legal_api.locale import penalty_terms
@@ -57,39 +63,64 @@ class _Finder:
         text = TCK.get(label)
         if text is None:
             return None
+        document = f"{TITLE_PREFIX}{TCK['_titles'][label]}\n{text}"
         return Source(self.ledger.add_calculation(source_id=f"a{label}", citation=f"TCK m. {label}",
-                                                  text=text), text)
+                                                  text=text), document)
 
 
-async def test_the_calculation_is_a_cited_source_with_its_phrases():
+LABELS = TCK["_labels"]
+
+
+async def _calc(*specs):
     ledger = EvidenceLedger()
-    sources = await penalty_sources([
-        {"label": "simple injury with a weapon", "law": "5237", "article": "86", "paragraph": "2",
-         "modifiers": [{"law": "5237", "article": "86", "paragraph": "3", "item": "e"}]},
-        {"label": "unknown", "law": "5237", "article": "999", "paragraph": "", "modifiers": []},
-    ], _Finder(ledger), ledger)
-    calc = [s for s in sources if s.evidence.citation.startswith(W["citation"].split("{")[0])]
-    assert len(calc) == 2
-    assert W["result"].format(low=dur(9, "month"), high=dur(2, "year", 3, "month")) in calc[0].document
-    assert "TCK m. 86/3-e" in calc[0].document
-    assert W["not_read"].split("{")[0] in calc[1].document
+    sources = await penalty_sources(list(specs), _Finder(ledger), ledger)
+    return [s.document for s in sources if s.evidence.citation.startswith(W["citation"].split("{")[0])]
 
 
-async def test_a_qualified_form_named_as_a_modifier_replaces_the_base():
-    ledger = EvidenceLedger()
-    sources = await penalty_sources([
-        {"label": "threat with a weapon", "law": "5237", "article": "106", "paragraph": "1",
-         "modifiers": [{"law": "5237", "article": "106", "paragraph": "2", "item": "a"}]},
-    ], _Finder(ledger), ledger)
-    assert W["result"].format(low=dur(2, "year"), high=dur(7, "year")) in sources[-1].document
+def _spec(label, article, paragraph, *mods):
+    return {"label": LABELS[label], "law": "5237", "article": article, "paragraph": paragraph,
+            "modifiers": [{"law": "5237", "article": a, "paragraph": p, "item": i} for a, p, i in mods]}
+
+
+def _result(low, high):
+    return W["result"].format(low=low, high=high)
+
+
+async def test_the_calculation_is_a_cited_source_and_unknown_articles_warn():
+    (simple,) = await _calc(_spec("weapon_simple_injury", "86", "2", ("86", "3", "e")))
+    assert _result(dur(9, "month"), dur(2, "year", 3, "month")) in simple
+    assert "TCK m. 86/3-e" in simple
+    (unknown,) = await _calc(_spec("weapon_injury", "999", ""))
+    assert W["not_read"].split("{")[0] in unknown
+
+
+async def test_the_label_finds_the_weapon_increase_the_model_left_out():
+    (injury,) = await _calc(_spec("weapon_injury", "86", "1"))
+    assert _result(dur(2, "year", 3, "month"), dur(4, "year", 6, "month")) in injury
+    (both,) = await _calc(_spec("weapon_simple_injury", "86", "1"))
+    assert _result(dur(9, "month"), dur(2, "year", 3, "month")) in both
+    assert _result(dur(2, "year", 3, "month"), dur(4, "year", 6, "month")) in both
+
+
+async def test_the_same_increase_named_twice_is_applied_once():
+    (text,) = await _calc(_spec("weapon_simple_injury", "86", "3", ("86", "3", "e")))
+    assert _result(dur(9, "month"), dur(2, "year", 3, "month")) in text
+
+
+async def test_an_unrelated_provision_is_left_out():
+    (text,) = await _calc(_spec("weapon_injury", "86", "1", ("87", "", ""), ("86", "3", "b")))
+    assert _result(dur(2, "year", 3, "month"), dur(4, "year", 6, "month")) in text
+    assert text.count(W["ignored"].split("{")[0]) == 2
+
+
+async def test_the_armed_threat_paragraph_replaces_the_plain_one():
+    (text,) = await _calc(_spec("weapon_threat", "106", "1"))
+    assert _result(dur(2, "year"), dur(7, "year")) in text
+    (named,) = await _calc(_spec("weapon_threat", "106", "1", ("106", "2", "a")))
+    assert _result(dur(2, "year"), dur(7, "year")) in named
 
 
 async def test_a_ratio_paragraph_named_as_the_base_applies_to_each_earlier_range():
-    ledger = EvidenceLedger()
-    sources = await penalty_sources([
-        {"label": "injury with a weapon", "law": "5237", "article": "86", "paragraph": "3",
-         "modifiers": []},
-    ], _Finder(ledger), ledger)
-    text = sources[-1].document
-    assert W["result"].format(low=dur(2, "year", 3, "month"), high=dur(4, "year", 6, "month")) in text
-    assert W["result"].format(low=dur(9, "month"), high=dur(2, "year", 3, "month")) in text
+    (text,) = await _calc(_spec("weapon_injury", "86", "3"))
+    assert _result(dur(2, "year", 3, "month"), dur(4, "year", 6, "month")) in text
+    assert _result(dur(9, "month"), dur(2, "year", 3, "month")) in text

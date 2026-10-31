@@ -21,6 +21,10 @@ import httpx
 
 USER_AGENT = "legal-assistant/0.1 (grounded legal research prototype)"
 MIN_INTERVAL_S = 1.0
+# Hosts that asked for more room: the decision service answered HTTP 429 to a search followed
+# by four fetches at one per second, which put it on cooldown and left answers without case
+# law for two minutes (the same question found two decisions in one run and none in the next).
+HOST_INTERVAL_S = {"bedesten.adalet.gov.tr": 2.0}
 COOLDOWN_S = 120.0
 TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
@@ -82,7 +86,9 @@ class Gateway:
             remaining = state.blocked_until - time.monotonic()
             if remaining > 0:
                 raise SourceBlocked(f"{source} is on cooldown: {state.blocked_reason}", remaining)
-            wait = state.last_request + self._min_interval - time.monotonic()
+            interval = max(self._min_interval, HOST_INTERVAL_S.get(host, 0.0)) \
+                if self._min_interval else 0.0      # tests turn pacing off
+            wait = state.last_request + interval - time.monotonic()
             if wait > 0:
                 await asyncio.sleep(wait)
             try:

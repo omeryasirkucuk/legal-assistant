@@ -165,3 +165,33 @@ def duration_text(days: int) -> str:
     months, days = divmod(rest, MONTH)
     parts = [f"{n} {w[unit]}" for n, unit in ((years, "year"), (months, "month"), (days, "day")) if n]
     return " ".join(parts) or f"0 {w['day']}"
+
+
+STEM = 5
+
+
+def paragraph_numbers(article_text: str) -> list[str]:
+    return [m.group(1) for m in re.finditer(r"(?:^|\n|[-–])\s*\((\d+)\)\s", article_text)]
+
+
+def items(text: str) -> list[tuple[str, str]]:
+    """The lettered items ("a) ...", "e) ...") of a paragraph with their words."""
+    folded = tr_fold(text)
+    marks = list(re.finditer(r"(?<![\w(])([^\W\d_])\)\s", folded))
+    return [(m.group(1), folded[m.end():marks[i + 1].start() if i + 1 < len(marks) else len(folded)].strip())
+            for i, m in enumerate(marks)]
+
+
+def item_text(text: str, item: str) -> str | None:
+    """The words of one lettered item of a paragraph, up to the next item."""
+    return next((words for letter, words in items(text) if letter == tr_fold(item)), None)
+
+
+def stems(text: str) -> set[str]:
+    return {w[:STEM] for w in re.findall(r"[^\W\d_]{4,}", tr_fold(text))}
+
+
+def distinctive(label: str, base_text: str) -> set[str]:
+    """The words of a case's label that its base provision does not contain: what makes the
+    case special ("with a weapon" for injury), to be found in the provision that governs it."""
+    return stems(label) - stems(base_text)

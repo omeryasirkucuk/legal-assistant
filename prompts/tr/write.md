@@ -22,7 +22,7 @@ Bir avukata, bir meslektaşının vereceği cevabı yazıyorsun. Sana avukatın 
 ## Cevabın biçimi (<shape>)
 Cevabın iskeleti avukatın sorularıdır (<questions>): her soruya açık bir cevap ver, hiçbirini atlama, kendi kalıbını sorulara tercih etme.
 
-**single** (tek bilgi): doğrudan cevap ve dayanak; ayrımlar varsa numaralı; ardından "**Dikkat:**" altında uygulamada bilinmesi gerekenler (hâkimin takdiri, istisnalar, birlikte uygulanan hükümler; soru bir süreyi ya da tutarı soruyorsa kaynaklarda aynı işlemde onunla karıştırılabilecek başka bir süre ya da tutar, örneğin itiraz süresinin yanında ödeme süresi), 2-4 madde. En fazla 250 kelime.
+**single** (tek bilgi): doğrudan cevap ve dayanak; ayrımlar varsa numaralı; ardından "**Dikkat:**" altında uygulamada bilinmesi gerekenler (hâkimin takdiri, istisnalar, birlikte uygulanan hükümler; soru bir işlemdeki bir süreyi ya da tutarı soruyorsa, kaynaklarda aynı işlemde işleyen diğer süreleri ve tutarları da mutlaka yaz: örneğin ödeme emrinde itiraz süresinin yanında ödeme süresi, bu süre atıf yapılan başka bir maddede yazıyorsa o maddeden), 2-4 madde. En fazla 250 kelime.
 
 **answers** (birden çok soru): önce 2-3 cümlelik genel değerlendirme. Sonra her soru için ### başlık (sorunun kısa hâli) ve altında önce net cevap (**Evet**/**Hayır**/koşullu), sonra gerekçe, şartlar ve dayanak. Ardından ### Dikkat (tipik hatalar, ispat, üçüncü kişiler), ### Nasıl ilerlenmeli (kısa adımlar), ### Sonuç. En fazla 800 kelime.
 

@@ -7,6 +7,7 @@ the standard chat-completions endpoint and verified, exact source-quote citation
 from __future__ import annotations
 
 import json
+import re
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from functools import cache
@@ -82,11 +83,22 @@ def uses_openai_compatible(settings=None) -> bool:
 
 def routed(role: Role) -> str | None:
     """The OpenRouter model a role is sent to instead of the configured provider, if any:
-    the answer writer ("write") and the petition writer ("draft")."""
+    the answer writer ("write") and the petition writer ("draft"), or with
+    ANTHROPIC_VIA_OPENROUTER every role, to the same Anthropic model there."""
     s = get_settings()
     if _runtime_config.get() or not s.decision_api_key:
         return None
-    return {"write": s.write_route, "draft": s.draft_route}.get(role) or None
+    explicit = {"write": s.write_route, "draft": s.draft_route}.get(role)
+    if explicit:
+        return explicit
+    if s.anthropic_via_openrouter and not uses_openai_compatible(s):
+        return openrouter_id(model_for(role))
+    return None
+
+
+def openrouter_id(model: str) -> str:
+    """OpenRouter's name for an Anthropic model: claude-sonnet-5-5 -> anthropic/claude-sonnet-5.5."""
+    return "anthropic/" + re.sub(r"-(\d+)-(\d+)$", r"-\1.\2", model)
 
 
 def openai_for(role: Role) -> bool:

@@ -126,6 +126,8 @@
     "method": "Hesap TCK m. 61'deki sırayla yapılır: artırım ve indirim oranları temel cezanın alt ve üst sınırına uygulanır; bir yıl 12 ay, bir ay 30 gün sayılır.",
     "not_read": "UYARI: {law_article} metninde {what} okunamadı; bu hâlin cezası hesaplanmadı, maddeden kontrol edin.",
     "what_range": "hapis cezasının alt ve üst sınırı",
-    "what_ratio": "artırım ya da indirim oranı"
+    "what_ratio": "artırım ya da indirim oranı",
+    "ignored": "Not: {law_article} \"{label}\" hâlini düzenlemediği için hesaba katılmadı.",
+    "not_found": "UYARI: \"{label}\" hâlini düzenleyen hüküm {law_article} içinde bulunamadı; bu hâlin cezası hesaplanmadı, maddeden kontrol edin."
   }
 }
