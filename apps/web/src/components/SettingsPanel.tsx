@@ -105,7 +105,7 @@ export function SettingsPanel({ onClose }: Props) {
         aria-labelledby="settings-title"
         className="flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-rule bg-paper shadow-xl"
       >
-        <header className="sticky top-0 flex items-start justify-between border-b border-rule bg-paper px-6 py-5">
+        <header className="sticky top-0 flex items-start justify-between border-b border-rule bg-paper px-4 py-4 sm:px-6 sm:py-5">
           <div>
             <h2 id="settings-title" className="font-serif text-2xl text-ink">
               {t("settings")}
@@ -120,7 +120,7 @@ export function SettingsPanel({ onClose }: Props) {
         {loading ? (
           <p className="p-6 text-sm text-muted">{t("settingsLoading")}</p>
         ) : settings ? (
-          <form onSubmit={submit} className="space-y-5 p-6">
+          <form onSubmit={submit} className="space-y-5 p-4 sm:p-6">
             <label className="block text-sm text-muted">
               {t("openaiBaseUrl")}
               <input
@@ -248,7 +248,7 @@ export function SettingsPanel({ onClose }: Props) {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             {saved && <p role="status" className="text-sm text-verified">{t("settingsSaved")}</p>}
             {testResult && <p role="status" className="text-sm text-verified">{testResult}</p>}
-            <div className="flex justify-end gap-3 border-t border-rule pt-4">
+            <div className="flex flex-wrap justify-end gap-3 border-t border-rule pt-4">
               <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm text-muted hover:bg-sheet">
                 {t("close")}
               </button>

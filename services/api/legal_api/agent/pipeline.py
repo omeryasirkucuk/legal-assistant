@@ -22,7 +22,7 @@ from legal_api import llm
 from legal_api.agent.answer import Event, step_event
 from legal_api.agent.atoms import Segment
 from legal_api.agent.power import POWERS, Power
-from legal_api.agent.research import research
+from legal_api.agent.research import Research, research
 from legal_api.agent.sources import Source, SourceFinder
 from legal_api.agent.understand import Understanding, understand
 from legal_api.agent.write import MAX_TOKENS, Written, write
@@ -35,6 +35,7 @@ from legal_api.drafting.style import around_petition
 from legal_api.drafting.tidy import tidy
 from legal_api.files.context import Attachment, for_understanding, for_writer
 from legal_api.grounding.evidence import EvidenceLedger
+from legal_api.matters.agenda import Agenda
 from legal_api.retrieval.statutes import indexed_laws
 from legal_api.sources.gateway import Gateway
 
@@ -83,10 +84,12 @@ async def answer_events(question: str, history: list[dict] | None = None,
                         usage: llm.Usage | None = None, style: StyleBook | None = None,
                         power: Power = POWERS["balanced"],
                         attachments: list[Attachment] | None = None,
-                        just_asked: bool = False) -> AsyncIterator[Event]:
+                        just_asked: bool = False,
+                        agenda: Agenda | None = None) -> AsyncIterator[Event]:
     """`style`: the lawyer's style, used when the message asks for a petition; `power`: how
     much work the answer gets; `attachments`: the lawyer's documents for this message;
-    `just_asked`: the previous turn asked the lawyer for facts (drafting/asking.py)."""
+    `just_asked`: the previous turn asked the lawyer for facts (drafting/asking.py);
+    `agenda`: the deadlines the lawyer recorded, a source when the message is about them."""
     attachments = attachments or []
     usage, ledger = usage or llm.Usage(), EvidenceLedger()
     started = time.monotonic()
@@ -127,16 +130,23 @@ async def answer_events(question: str, history: list[dict] | None = None,
             u.clarify = []
             u.requests = gaps.requests
         yield step_event("analyse", "done", issues=len(u.issues))
-        task = asyncio.create_task(
-            research(db, finder, search_text or question, u, usage, progress, power))
-        while not task.done() or not queue.empty():
-            getter = asyncio.create_task(queue.get())
-            done, _ = await asyncio.wait({getter, task}, return_when=asyncio.FIRST_COMPLETED)
-            if getter in done:
-                yield getter.result()
-            else:
-                getter.cancel()
-        found = task.result()
+        if _calendar_only(u, agenda):
+            # "What is due this week?" is answered from the calendar; nothing to search.
+            found = Research(trace={"calendar_only": True})
+        else:
+            task = asyncio.create_task(
+                research(db, finder, search_text or question, u, usage, progress, power))
+            while not task.done() or not queue.empty():
+                getter = asyncio.create_task(queue.get())
+                done, _ = await asyncio.wait({getter, task}, return_when=asyncio.FIRST_COMPLETED)
+                if getter in done:
+                    yield getter.result()
+                else:
+                    getter.cancel()
+            found = task.result()
+        if u.calendar and agenda is not None:
+            found.sources.insert(0, agenda.source(ledger))
+            found.trace["calendar"] = True
         instruction, max_tokens = None, MAX_TOKENS
         if u.task == "drafting":
             yield step_event("caselaw")
@@ -191,6 +201,11 @@ async def answer_events(question: str, history: list[dict] | None = None,
     finally:
         await gateway.aclose()
         await db.close()
+
+
+def _calendar_only(u: Understanding, agenda: Agenda | None) -> bool:
+    return (agenda is not None and u.calendar and u.task == "lookup" and not u.issues
+            and not u.statute_hints and not u.deadlines and not u.case_law_query)
 
 
 def _conversation(history: list[dict], message: str) -> str:

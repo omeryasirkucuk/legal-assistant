@@ -2,13 +2,15 @@
 
 // The desk: new chat, the calendar, the lawyer's files, search (files, their documents and chats), the case files (each with its next deadline), the
 // chats that belong to no file grouped by day, and the account. Collapses to a rail of icons
-// that keeps the main actions one click away.
+// that keeps the main actions one click away. On a phone it is a drawer over the page, opened
+// from the page's top bar (MobileBar) and closed by any choice made in it.
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, FolderOpen, FolderPlus, PanelLeft, Search, SquarePen, X } from "lucide-react";
 import { SearchResults } from "@/components/SearchResults";
 import { api, type ChatSummary, type DeskHits, type Matter, type TodayStats, type User } from "@/lib/api";
 import { daysUntil, urgency } from "@/lib/dates";
 import { t } from "@/lib/i18n";
+import { useWide } from "@/lib/useWide";
 import { UserMenu, initials } from "./UserMenu";
 
 type Props = {
@@ -32,6 +34,8 @@ type Props = {
   onFiles: () => void;
   filesOpen?: boolean;
   today: TodayStats | null;
+  drawerOpen: boolean;           // phone: the drawer is shown
+  onDrawerClose: () => void;
 };
 
 type Group = "today" | "yesterday" | "thisWeek" | "older";
@@ -80,6 +84,15 @@ export function Sidebar(props: Props) {
   const [hits, setHits] = useState<DeskHits | null>(null);
   const [menu, setMenu] = useState(false);
   const searchBox = useRef<HTMLInputElement>(null);
+  const wide = useWide();
+  const { drawerOpen, onDrawerClose } = props;
+
+  useEffect(() => {
+    if (wide || !drawerOpen) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onDrawerClose(); };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [wide, drawerOpen, onDrawerClose]);
 
   useEffect(() => {
     const q = query.trim();
@@ -92,7 +105,7 @@ export function Sidebar(props: Props) {
   }, [query]);
 
   function openSearch() {
-    if (collapsed) onToggle();
+    if (collapsed && wide) onToggle();
     setTimeout(() => searchBox.current?.focus(), 50);
   }
 
@@ -103,7 +116,7 @@ export function Sidebar(props: Props) {
       className={collapsed ? "bottom-2 left-14" : "bottom-16 left-2"} />
   );
 
-  if (collapsed) {
+  if (collapsed && wide) {
     return (
       <aside className="relative flex h-full w-14 shrink-0 flex-col items-center gap-1 border-r border-rule bg-desk py-3">
         <RailButton label={t("expandSidebar")} onClick={onToggle}><PanelLeft size={18} /></RailButton>
@@ -129,25 +142,36 @@ export function Sidebar(props: Props) {
     .map((g) => [g, loose.filter((c) => groupOf(c.updated_at, now) === g)] as [Group, ChatSummary[]])
     .filter(([, list]) => list.length > 0);
 
+  const shell = wide
+    ? "relative h-full w-72 shrink-0 border-r border-rule"
+    : `fixed inset-y-0 left-0 z-40 w-[min(20rem,86vw)] shadow-xl transition-transform duration-200 motion-reduce:transition-none ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`;
+
   return (
-    <aside className="relative flex h-full w-72 shrink-0 flex-col border-r border-rule bg-desk">
+    <>
+    {!wide && drawerOpen && (
+      <div onClick={onDrawerClose} aria-hidden className="fixed inset-0 z-30 bg-ink/30" />
+    )}
+    <aside className={`flex flex-col bg-desk ${shell}`} aria-hidden={!wide && !drawerOpen ? true : undefined}
+      inert={!wide && !drawerOpen ? true : undefined}>
       <div className="flex items-center justify-between px-3 pb-2 pt-3">
-        <RailButton label={t("collapseSidebar")} onClick={onToggle}><PanelLeft size={18} /></RailButton>
+        {wide
+          ? <RailButton label={t("collapseSidebar")} onClick={onToggle}><PanelLeft size={18} /></RailButton>
+          : <RailButton label={t("close")} onClick={onDrawerClose}><X size={18} /></RailButton>}
       </div>
       <div className="space-y-0.5 px-2">
         <button onClick={onNew}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink hover:bg-sheet">
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 max-md:py-2.5 text-sm font-medium text-ink hover:bg-sheet">
           <SquarePen size={17} className="text-muted" /> {t("newChat")}
         </button>
         <button onClick={props.onCalendar} aria-current={props.calendarOpen ? "page" : undefined}
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink ${props.calendarOpen ? "bg-sheet shadow-sm" : "hover:bg-sheet"}`}>
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 max-md:py-2.5 text-sm text-ink ${props.calendarOpen ? "bg-sheet shadow-sm" : "hover:bg-sheet"}`}>
           <CalendarDays size={17} className="text-muted" /> {t("calendar")}
         </button>
         <button onClick={props.onFiles} aria-current={props.filesOpen ? "page" : undefined}
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink ${props.filesOpen ? "bg-sheet shadow-sm" : "hover:bg-sheet"}`}>
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 max-md:py-2.5 text-sm text-ink ${props.filesOpen ? "bg-sheet shadow-sm" : "hover:bg-sheet"}`}>
           <FolderOpen size={17} className="text-muted" /> {t("myFiles")}
         </button>
-        <label className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink focus-within:bg-sheet hover:bg-sheet">
+        <label className="flex w-full items-center gap-3 rounded-lg px-3 py-2 max-md:py-2.5 text-sm text-ink focus-within:bg-sheet hover:bg-sheet">
           <Search size={17} className="shrink-0 text-muted" />
           <input ref={searchBox} value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder={t("searchChats")} aria-label={t("searchDesk")} title={t("searchDesk")}
@@ -180,7 +204,7 @@ export function Sidebar(props: Props) {
             ) : openMatters.map((m) => (
               <button key={m.id} onClick={() => props.onOpenMatter(m.id)}
                 aria-current={m.id === activeMatterId ? "page" : undefined}
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left ${m.id === activeMatterId ? "bg-sheet shadow-sm" : "hover:bg-sheet/70"}`}>
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 max-md:py-2 text-left ${m.id === activeMatterId ? "bg-sheet shadow-sm" : "hover:bg-sheet/70"}`}>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-ink">{m.client}</span>
                   {m.subject && <span className="block truncate text-xs text-faint">{m.subject}</span>}
@@ -198,11 +222,11 @@ export function Sidebar(props: Props) {
                 <div key={c.id}
                   className={`group flex items-center rounded-lg ${c.id === activeId ? "bg-sheet shadow-sm" : "hover:bg-sheet/70"}`}>
                   <button onClick={() => onSelect(c.id)} aria-current={c.id === activeId ? "page" : undefined}
-                    className="min-w-0 flex-1 truncate px-3 py-1.5 text-left text-sm text-ink">
+                    className="min-w-0 flex-1 truncate px-3 py-1.5 text-left text-sm text-ink max-md:py-2.5">
                     {c.title}
                   </button>
                   <button onClick={() => onDelete(c.id)} aria-label={t("deleteChat")} title={t("deleteChat")}
-                    className="mr-1 hidden rounded p-1 text-faint hover:text-danger group-hover:block focus-visible:block">
+                    className="mr-1 hidden rounded p-1 text-faint hover:text-danger group-hover:block focus-visible:block pointer-coarse:block pointer-coarse:p-2">
                     <X size={14} />
                   </button>
                 </div>
@@ -226,5 +250,6 @@ export function Sidebar(props: Props) {
       </div>
       {menuEl}
     </aside>
+    </>
   );
 }

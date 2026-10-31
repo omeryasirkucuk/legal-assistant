@@ -269,8 +269,8 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
         )}
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center gap-3">
-        <nav aria-label={t("folderPath")} className="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-[15px]">
+      <div className="mt-6 flex flex-wrap items-center gap-2 sm:mt-8 sm:gap-3">
+        <nav aria-label={t("folderPath")} className="flex min-w-0 flex-wrap items-center gap-1 text-[15px] max-sm:basis-full sm:flex-1">
           {[null, ...path].map((d, i) => {
             const id = d ? d.id : null;
             const last = i === path.length;
@@ -295,7 +295,7 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
           <Upload size={15} /> {uploading ? t("filesAdding", { n: uploading }) : t("filesAdd")}
         </button>
         <input ref={input} type="file" multiple hidden onChange={(e) => { if (e.target.files) add(e.target.files); e.target.value = ""; }} />
-        <div role="radiogroup" aria-label={t("filesLayout")} className="flex rounded-lg bg-desk p-0.5">
+        <div role="radiogroup" aria-label={t("filesLayout")} className="ml-auto flex rounded-lg bg-desk p-0.5">
           {([["list", List, "filesAsList"], ["grid", LayoutGrid, "filesAsIcons"]] as const).map(([l, Icon, key]) => (
             <button key={l} role="radio" aria-checked={layout === l} onClick={() => setLayout(l)} aria-label={t(key)} title={t(key)}
               className={`rounded-md p-1.5 ${layout === l ? "bg-sheet text-ink shadow-sm" : "text-muted hover:text-ink"}`}>

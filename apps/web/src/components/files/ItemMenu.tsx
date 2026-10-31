@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { t } from "@/lib/i18n";
 
-export type MenuItem = { label: string; onSelect: () => void; danger?: boolean };
+// `phoneOnly`: an action the row shows as its own button where there is room (sm and up).
+export type MenuItem = { label: string; onSelect: () => void; danger?: boolean; phoneOnly?: boolean };
 
 /** `className` places the menu (it must set a position, e.g. "absolute right-1 top-1"). */
 export function ItemMenu({ items, className = "" }: { items: MenuItem[]; className?: string }) {
@@ -27,14 +28,14 @@ export function ItemMenu({ items, className = "" }: { items: MenuItem[]; classNa
   return (
     <div ref={box} className={className || "relative"}>
       <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }} aria-label={t("moreActions")} aria-expanded={open}
-        className="rounded-md p-1.5 text-muted hover:bg-sheet hover:text-ink">
+        className="rounded-md p-1.5 text-muted hover:bg-sheet hover:text-ink pointer-coarse:p-2.5">
         <MoreHorizontal size={16} />
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-full z-30 mt-1 w-48 rounded-xl border border-rule bg-sheet p-1 shadow-lg">
           {items.map((it) => (
             <button key={it.label} role="menuitem" onClick={(e) => { e.stopPropagation(); setOpen(false); it.onSelect(); }}
-              className={`block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-paper ${it.danger ? "text-danger" : "text-ink"}`}>
+              className={`block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-paper pointer-coarse:py-2.5 ${it.danger ? "text-danger" : "text-ink"} ${it.phoneOnly ? "sm:hidden" : ""}`}>
               {it.label}
             </button>
           ))}

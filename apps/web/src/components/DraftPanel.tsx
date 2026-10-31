@@ -71,21 +71,21 @@ export function DraftPanel({ draft, onClose, onChange, onExpand, page = false }:
   const status = busy ? t("draftWorking") : failed ? t("draftAdjustFailed") : t("draftSelectionHint");
 
   return (
-    <aside className={`flex h-full w-full shrink-0 flex-col bg-paper ${page ? "" : "max-w-2xl border-l border-rule"}`}>
-      <header className="flex items-center gap-3 border-b border-rule px-5 py-3">
+    <aside className={`flex h-full w-full shrink-0 flex-col bg-paper ${page ? "" : "max-w-2xl border-l border-rule max-xl:fixed max-xl:inset-y-0 max-xl:right-0 max-xl:z-30 max-xl:shadow-2xl"}`}>
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-rule px-3 py-2.5 sm:flex-nowrap sm:px-5 sm:py-3">
         {page && (
           <button onClick={onClose} aria-label={t("back")} className="rounded-md p-1 text-muted hover:bg-sheet hover:text-ink">
             <ArrowLeft size={18} />
           </button>
         )}
-        <h2 className="min-w-0 flex-1 truncate font-serif text-lg text-ink">{draft.title || t("draft")}</h2>
-        <span aria-live="polite" className={`flex items-center gap-1.5 text-sm ${autosave.state === "error" ? "text-danger" : "text-faint"}`}>
+        <h2 className="min-w-0 flex-1 truncate font-serif text-lg text-ink max-sm:basis-[calc(100%-3rem)]">{draft.title || t("draft")}</h2>
+        <span aria-live="polite" className={`flex items-center gap-1.5 text-sm max-sm:order-3 ${autosave.state === "error" ? "text-danger" : "text-faint"}`}>
           {autosave.state === "saving" && <Loader2 size={14} className="animate-spin" />}
           {autosave.state === "saved" && <Check size={14} className="text-verified" />}
           {autosave.state === "error" && <CloudOff size={14} />}
           {saveText}
         </span>
-        <div className="flex items-center rounded-lg border border-rule">
+        <div className="flex items-center rounded-lg border border-rule max-sm:order-2">
           <Download size={14} className="ml-2.5 text-muted" aria-hidden />
           {FORMATS.map((f) => (
             <button key={f} disabled={busy} onClick={() => download(f)} title={t("draftDownloadAs", { format: FORMAT_NAMES[f] })}
@@ -96,24 +96,24 @@ export function DraftPanel({ draft, onClose, onChange, onExpand, page = false }:
         </div>
         {!page && onExpand && (
           <button onClick={onExpand} aria-label={t("draftExpand")} title={t("draftExpand")}
-            className="rounded-md p-1 text-faint hover:bg-sheet hover:text-ink">
+            className="hidden rounded-md p-1 text-faint hover:bg-sheet hover:text-ink md:block">
             <Maximize2 size={17} />
           </button>
         )}
         {!page && (
-          <button onClick={onClose} aria-label={t("close")} className="rounded-md p-1 text-faint hover:bg-sheet hover:text-ink">
+          <button onClick={onClose} aria-label={t("close")} className="rounded-md p-1 text-faint hover:bg-sheet hover:text-ink pointer-coarse:p-2">
             <X size={18} />
           </button>
         )}
       </header>
-      <div className="flex flex-wrap items-center gap-2 border-b border-rule px-5 py-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 border-b border-rule px-3 py-2 text-sm sm:px-5">
         {ACTIONS.map(([action, label]) => (
           <button key={action} disabled={busy} onClick={() => adjust(action)}
             className="rounded-full border border-rule px-3 py-1 text-ink hover:border-cite hover:text-cite disabled:opacity-50">
             {t(label)}
           </button>
         ))}
-        <span className={`ml-auto text-xs ${failed ? "text-danger" : "text-faint"}`} aria-live="polite">{status}</span>
+        <span className={`text-xs max-sm:basis-full sm:ml-auto ${failed ? "text-danger" : "text-faint"}`} aria-live="polite">{status}</span>
       </div>
       <PetitionEditor key={version} doc={doc} disabled={busy} onChange={edited} onReady={onReady} />
     </aside>

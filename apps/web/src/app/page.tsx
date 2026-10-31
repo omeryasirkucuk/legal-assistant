@@ -19,6 +19,7 @@ import { ChatMatterBar } from "@/components/ChatMatterBar";
 import { DeadlineSuggest } from "@/components/DeadlineSuggest";
 import { MatterForm } from "@/components/MatterForm";
 import { MatterView } from "@/components/MatterView";
+import { MobileBar } from "@/components/MobileBar";
 import type { AskOptions } from "@/lib/stream";
 import {
   api,
@@ -57,6 +58,8 @@ export default function ChatApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [styleOpen, setStyleOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);                // phone: the sidebar drawer
+  const closeNav = useCallback(() => setNavOpen(false), []);
   const [matters, setMatters] = useState<Matter[]>([]);
   const [view, setView] = useState<View>("chat");
   const [matterId, setMatterId] = useState<string | null>(null);   // the file being worked in
@@ -117,9 +120,11 @@ export default function ChatApp() {
       .catch((e) => e instanceof ApiError && e.status === 401 && router.replace("/login"));
   }, [router]);
 
+  // A chat follows its newest text; the other pages open at their top.
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" });
-  }, [messages, pending?.question, pending?.lines, pending?.plan]);
+    if (view === "chat") bottom.current?.scrollIntoView({ block: "end" });
+    else bottom.current?.closest("main")?.scrollTo({ top: 0 });
+  }, [view, messages, pending?.question, pending?.lines, pending?.plan]);
 
   const { attach } = runs;
   const refreshMatters = useCallback(() => {
@@ -288,6 +293,12 @@ export default function ChatApp() {
 
   if (!user) return null;
 
+  // A choice made in the phone's drawer closes it.
+  const nav = <A extends unknown[]>(fn: (...args: A) => unknown) => (...args: A) => {
+    setNavOpen(false);
+    fn(...args);
+  };
+
   const empty = view === "chat" && !messages.length && !pending;
   const currentMatter = matters.find((m) => m.id === matterId) ?? null;
   const lastAnswer = [...messages].reverse().find((m) => m.role === "assistant");
@@ -295,6 +306,8 @@ export default function ChatApp() {
   // A saved question with nothing under it: its answer failed or the server restarted.
   const last = messages[messages.length - 1];
   const unanswered = !pending && last?.role === "user" ? last.content : null;
+  const barTitle = view === "calendar" ? t("calendar") : view === "files" ? t("myFiles")
+    : view === "matter" ? currentMatter?.client ?? "" : chats.find((c) => c.id === chatId)?.title ?? t("newChat");
   const chatCost = messages.reduce(
     (sum, m) => sum + (m.meta.cost_usd ?? 0) + (m.meta.detail_cost_usd ?? 0), 0);
 
@@ -307,20 +320,22 @@ export default function ChatApp() {
         activeId={chatId}
         activeMatterId={view === "matter" ? matterId : null}
         calendarOpen={view === "calendar"}
-        onOpenMatter={openMatter}
-        onNewMatter={() => setNewMatterOpen(true)}
-        onCalendar={openCalendar}
-        onSelect={openChat}
-        onNew={newChat}
+        onOpenMatter={nav(openMatter)}
+        onNewMatter={nav(() => setNewMatterOpen(true))}
+        onCalendar={nav(openCalendar)}
+        onSelect={nav(openChat)}
+        onNew={nav(newChat)}
         onDelete={deleteChat}
         onLogout={() => api.logout().then(() => router.replace("/login"))}
-        onSettings={() => setSettingsOpen(true)}
-        onStyle={() => setStyleOpen(true)}
-        onFiles={openFiles}
+        onSettings={nav(() => setSettingsOpen(true))}
+        onStyle={nav(() => setStyleOpen(true))}
+        onFiles={nav(openFiles)}
         filesOpen={view === "files"}
         collapsed={collapsed}
         onToggle={toggleSidebar}
         today={today}
+        drawerOpen={navOpen}
+        onDrawerClose={closeNav}
       />
 
       {/* One scrolling area holds the text and, pinned to its bottom, the composer: both use
@@ -331,8 +346,9 @@ export default function ChatApp() {
         </main>
       ) : (
       <main className="@container flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <MobileBar title={barTitle} onMenu={() => setNavOpen(true)} onNew={newChat} />
         <div className="flex-1">
-          <div className="mx-auto w-full max-w-[64rem] px-6 pb-16 pt-10 @4xl:px-12">
+          <div className="mx-auto w-full max-w-[64rem] px-4 pb-16 pt-6 sm:px-6 md:pt-10 @4xl:px-12">
             {view === "matter" && matterId && (
               <MatterView key={`${matterId}-${matterVersion}`} matterId={matterId} onOpenChat={openChat}
                 onOpenDraft={openChat} onChanged={refreshMatters}
@@ -345,7 +361,7 @@ export default function ChatApp() {
                 onMove={(m) => moveChat(chatId, m)} />
             )}
             {empty && (
-              <div className="mt-[18vh] max-w-[38rem]">
+              <div className="mt-[10vh] max-w-[38rem] md:mt-[18vh]">
                 <h1 className="font-serif text-3xl text-ink">{t("emptyTitle")}</h1>
                 <p className="mt-3 text-[15px] leading-relaxed text-muted">{t("emptyBody")}</p>
               </div>
@@ -414,7 +430,7 @@ export default function ChatApp() {
             text passes under it. */}
         {view !== "calendar" && view !== "files" && (
         <div className="sticky bottom-0 z-10">
-        <div className="mx-auto grid w-full max-w-[64rem] gap-x-10 bg-paper px-6 pb-4 @4xl:grid-cols-[minmax(0,42rem)_15rem] @4xl:px-12">
+        <div className="mx-auto grid w-full max-w-[64rem] gap-x-10 bg-paper px-3 pb-3 sm:px-6 sm:pb-4 @4xl:grid-cols-[minmax(0,42rem)_15rem] @4xl:px-12">
           <div className="relative">
             <div className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-paper to-transparent" />
             {held && (

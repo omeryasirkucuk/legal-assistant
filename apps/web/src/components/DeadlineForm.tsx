@@ -40,7 +40,7 @@ function Segmented<T extends string>({ options, value, onChange, label }: {
     <div role="radiogroup" aria-label={label} className="flex rounded-lg bg-desk p-0.5 text-[13px]">
       {options.map(([v, key]) => (
         <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
-          className={`flex-1 rounded-md px-2 py-1.5 ${value === v ? "bg-sheet font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
+          className={`flex-1 whitespace-nowrap rounded-md px-2 py-1.5 ${value === v ? "bg-sheet font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
           {t(key)}
         </button>
       ))}
@@ -129,7 +129,7 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
       <div className="flex flex-wrap gap-1.5">
         {BRANCHES.map(([b, key]) => (
           <button key={b} type="button" onClick={() => setBranch(b)} aria-pressed={branch === b}
-            className={`rounded-full border px-2.5 py-0.5 text-xs ${branch === b ? "border-ink bg-ink text-white" : "border-rule text-muted hover:border-ink hover:text-ink"}`}>
+            className={`rounded-full border px-2.5 py-0.5 text-xs pointer-coarse:py-1.5 ${branch === b ? "border-ink bg-ink text-white" : "border-rule text-muted hover:border-ink hover:text-ink"}`}>
             {t(key)}
           </button>
         ))}
@@ -144,10 +144,10 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
   }, [onCancel]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/25 px-4 py-[8vh]"
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/25 px-3 py-4 sm:px-4 sm:py-[8vh]"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
     <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="deadline-form-title"
-      className="w-full max-w-md space-y-4 rounded-2xl border border-rule bg-paper p-6 shadow-xl">
+      className="w-full max-w-md space-y-4 rounded-2xl border border-rule bg-paper p-5 shadow-xl sm:p-6">
       <div className="flex items-baseline justify-between">
         <h2 id="deadline-form-title" className="font-serif text-xl text-ink">{t("deadlineAdd")}</h2>
         <button type="button" onClick={onCancel} aria-label={t("cancel")}
@@ -166,9 +166,9 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
         <>
           <div>
             <Label>{service === "electronic" ? t("noticeReached") : t("noticeDate")}</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input type="date" value={received} onChange={(e) => setReceived(e.target.value)}
-                aria-label={t("noticeDate")} className={`w-40 shrink-0 ${field}`} />
+                aria-label={t("noticeDate")} className={`w-full shrink-0 sm:w-40 ${field}`} />
               <div className="flex min-w-0 flex-1 items-center">
                 <div className="w-full"><Segmented label={t("noticeDate")} value={service} onChange={setService} options={SERVICES} /></div>
               </div>
@@ -202,7 +202,7 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
                 const on = n === a && unit === u;
                 return (
                   <button key={key} type="button" onClick={() => { setAmount(String(a)); setUnit(u); }}
-                    className={`rounded-full border px-2.5 py-0.5 text-xs ${on ? "border-cite bg-cite-soft text-cite" : "border-rule text-muted hover:border-cite hover:text-cite"}`}>
+                    className={`rounded-full border px-2.5 py-0.5 text-xs pointer-coarse:py-1.5 ${on ? "border-cite bg-cite-soft text-cite" : "border-rule text-muted hover:border-cite hover:text-cite"}`}>
                     {t(key)}
                   </button>
                 );

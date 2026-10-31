@@ -50,7 +50,7 @@ function Tick({ selected, selecting, onToggle, label, className = "" }: {
     <button role="checkbox" aria-checked={selected} aria-label={label} onClick={(e) => { e.stopPropagation(); onToggle(e); }}
       className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border ${
         selected ? "border-cite bg-cite text-white" : "border-faint bg-sheet text-transparent hover:border-ink"} ${
-        selected || selecting ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"} ${className}`}>
+        selected || selecting ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"} ${className}`}>
       <Check size={12} strokeWidth={3} />
     </button>
   );
@@ -131,8 +131,17 @@ type FileProps = {
   dragItems: () => Item[];
 };
 
+/** On a phone the row keeps only its menu; edit, open and download move into it. */
+function phoneActions(p: FileProps): MenuItem[] {
+  return [
+    ...(p.onEdit ? [{ label: t("fileEdit"), onSelect: p.onEdit, phoneOnly: true }] : []),
+    { label: t("fileOpen"), onSelect: p.onPreview, phoneOnly: true },
+    { label: t("fileDownload"), onSelect: () => { window.location.href = api.fileUrl(p.file.id); }, phoneOnly: true },
+  ];
+}
+
 export function FileRow(p: FileProps) {
-  const icon = "rounded-md p-1.5 text-muted hover:bg-sheet hover:text-ink";
+  const icon = "hidden rounded-md p-1.5 text-muted hover:bg-sheet hover:text-ink sm:block";
   return (
     <li {...dragging(p.dragItems)} className={`group -mx-2 flex items-center gap-3 rounded-lg px-2 py-3 ${p.selected ? "bg-cite-soft" : ""}`}>
       <Tick selected={p.selected} selecting={p.selecting} onToggle={p.onToggle} label={p.file.name} />
@@ -157,13 +166,13 @@ export function FileRow(p: FileProps) {
       </span>
       {p.onEdit && (
         <button onClick={p.onEdit}
-          className="flex items-center gap-1.5 rounded-lg border border-rule px-2.5 py-1 text-sm text-ink hover:border-cite hover:text-cite">
+          className="hidden items-center gap-1.5 rounded-lg border border-rule px-2.5 py-1 text-sm text-ink hover:border-cite hover:text-cite sm:flex">
           <PenLine size={14} /> {t("fileEdit")}
         </button>
       )}
       <button onClick={p.onPreview} aria-label={t("fileOpen")} title={t("fileOpen")} className={icon}><Eye size={16} /></button>
       <a href={api.fileUrl(p.file.id)} aria-label={t("fileDownload")} title={t("fileDownload")} className={icon}><Download size={16} /></a>
-      <ItemMenu items={p.menu} />
+      <ItemMenu items={[...phoneActions(p), ...p.menu]} />
     </li>
   );
 }
@@ -185,7 +194,7 @@ export function FileTile(p: FileProps) {
         <span className="mt-0.5 block truncate text-[11px] text-faint">{p.about || p.meta}</span>
         {p.matterName && <span className="block truncate text-[11px] text-cite">{p.matterName}</span>}
       </span>
-      <ItemMenu className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+      <ItemMenu className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
         items={[...(p.onEdit ? [{ label: t("fileEdit"), onSelect: p.onEdit }] : []), ...p.menu]} />
     </li>
   );
@@ -255,7 +264,7 @@ export function FolderTile(p: FolderProps) {
         <FolderName folder={p.folder} renaming={p.renaming} onDone={p.onRenamed} className="line-clamp-2 block break-words text-[13px] leading-snug" />
         <span className="block text-[11px] text-faint">{t("folderCount", { n: p.count })}</span>
       </span>
-      <ItemMenu className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100" items={p.menu} />
+      <ItemMenu className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100" items={p.menu} />
     </li>
   );
 }

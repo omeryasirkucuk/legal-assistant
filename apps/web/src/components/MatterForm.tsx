@@ -45,7 +45,7 @@ export function MatterForm({ initial, onSave, onClose }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/25 px-4 pt-[12vh]"
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/25 px-3 py-4 sm:px-4 sm:pt-[12vh]"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="matter-form-title"
         className="w-full max-w-md rounded-2xl bg-sheet p-6 shadow-2xl">
