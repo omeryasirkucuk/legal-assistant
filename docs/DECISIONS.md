@@ -2,6 +2,32 @@
 
 Each entry: what was decided, why, and what it replaced. Newest first.
 
+## D76 — Smaller open items: deadline controls, in-app confirm, budget, formatting, presets, English-only tree (2026-10-31)
+
+- The next deadline of a case (the large figure) has its own "done" and delete; delete asks
+  first, as the other rows do.
+- Deleting in My files and deleting a chat ask in an app dialog (`components/ConfirmDialog.tsx`,
+  `useConfirm`) instead of the browser's confirm box; a chat was deleted with no question at
+  all, and the delete button is always visible on phones since D72.
+- Spend outside answers (a petition rewritten with a button, a sample petition read, a style
+  learnt from edits) is recorded in `llm_spend` (`legal_api/spend.py`, migration a7c3e9f1b2d5)
+  and counted by the daily budget and the usage meter; the rewrite buttons stop at the limit.
+- A one-click rewrite keeps the editor's formatting (`rich.carry_over`): paragraphs it left
+  unchanged keep their node (italics, sizes, alignment), a rewritten one keeps the alignment
+  of the paragraph in its place.
+- Ready periods by kind of work in the deadline dialog (`locales/tr/deadline_rules.json`
+  presets, `GET /deadlines/presets`): appeal and cassation, replies, objections to a payment
+  order or a bill-based enforcement, enforcement complaints, criminal appeal, cassation and
+  objection, administrative appeal and cassation, and mediation before a reinstatement claim.
+  A test reads each article and fails unless its text states the period; the filing period
+  of administrative suits (IYUK 7) is left out because its text does not state it that way.
+- No Turkish text outside the allowed folders: comments translated, the attachment wording
+  moved to `locales/tr/attachments.json`, test data to `tests/fixtures/tr/test_strings.json`,
+  letter sets written as escapes; NOTICE keeps its authors' names.
+- Not done: search across chats by meaning. Local e5 scores were too close together (the right
+  chat 0.877, an unrelated one 0.875), so without a reranker or a model check it would point at
+  the wrong work.
+
 ## D75 — Models through OpenRouter; label-driven penalty fitting; slower decision service pace (2026-10-31)
 
 The Anthropic account ran out of credit; at the user's request every Anthropic model is now
@@ -119,7 +145,7 @@ Files are added on the page (button or drop onto the page) through the same uplo
 attachments, so each is read and labelled at once; the folder open at the time receives them.
 Folders (`file_folders`, `stored_files.folder_id`, migration `e2f6c9d4a1b7`,
 `api/folders.py`) nest; files and folders move by drag and drop onto a folder or the path,
-or through "Taşı"; a folder cannot go inside itself; deleting a folder moves what it held up
+or through "Move"; a folder cannot go inside itself; deleting a folder moves what it held up
 one level. The page shows a list or icons (remembered per browser). A file can be given to a
 case ("Davaya ekle", `PATCH /files/{id}` with `matter_id`), which makes it material in that
 case's chats (D66). While a filter is set, matching files are shown from every folder.
@@ -131,9 +157,9 @@ moves the selection. Copying (`POST /files/{id}/copy`) makes a file of its own i
 folder, read and labelled again, with " (2)", " (3)"... when the name is taken there; it
 applies to files (folders are moved or deleted).
 
-## D69 — A word-processor editor for petitions; "Dosyalarım" as a page (2026-10-31)
+## D69 — A word-processor editor for petitions; "My files" as a page (2026-10-31)
 
-The user asked for Word-like editing of petitions and for "Dosyalarım" to be a page where
+The user asked for Word-like editing of petitions and for "My files" to be a page where
 files can be edited, not a drawer.
 
 Editor (`components/PetitionEditor.tsx`, TipTap 2.27.2, MIT): an A4 sheet in Times New Roman
@@ -148,12 +174,12 @@ made again from it (bold survives through **, other formatting of the rewritten 
 not). The buttons act on a selection by its text (`drafting/locate.py`, matching without **
 and with any whitespace). Saving sends the document (`PUT /drafts/{id}` with `doc`); the
 note and checklist around the petition are kept. Beside a chat the editor is a side panel
-with a "Tam sayfada aç" button; the chat's layout now follows its own width (container
+with a "Open full page" button; the chat's layout now follows its own width (container
 queries), so the sources column drops below the answer when the panel is open.
 
-"Dosyalarım" is a page in the main area (`components/FilesView.tsx`): rename (the
+"My files" is a page in the main area (`components/FilesView.tsx`): rename (the
 extension stays; a petition's file renames its draft), open in the browser, download, delete,
-and "Düzenle", which opens a petition's draft, or for a document the lawyer added an
+and "Edit", which opens a petition's draft, or for a document the lawyer added an
 editable copy made once (`POST /drafts/from-file/{id}`) so the original stays. Edits to such
 a copy do not teach the style profile.
 Then, at the user's request: the editor saves as the lawyer types (a one-second pause; saves
@@ -176,9 +202,9 @@ words, every term must match). Results come in three groups, files, documents an
 "Takvim", is labelled "Ara", and snippets no longer show Markdown marks.
 Then, at the user's request: a case file is called a "dava" on screen (the section is
 "Davalar"; "Yeni dava", "Davaya ekle", "Davayla sor"...), so it is not confused with
-"Dosyalarım" (the lawyer's uploaded and generated files), which moved from the user menu
-to the sidebar under "Takvim". The order is Yeni sohbet, Takvim, Dosyalarım, Ara. "Dosya
-türü" for a deadline's branch stays, as UYAP names it so. Code and API keep "matter".
+"My files" (the lawyer's uploaded and generated files), which moved from the user menu
+to the sidebar under "Calendar". The order is New chat, Calendar, My files, Search. The "file type" label
+for a deadline's branch stays, as UYAP names it so. Code and API keep "matter".
 
 ## D67 — A chat outside any file asks before using a file it names (2026-10-31)
 
@@ -189,7 +215,7 @@ whole words, Turkish case-insensitive) or the file's case number exactly (`lib/m
 a first name, a surname, a longer word that starts with the name, or a nearby number does
 not count, and closed files are skipped. When a file is named, the message is held and the
 lawyer chooses (`components/MatterSuggest.tsx`): "Dosyayla sor" moves the chat into the file
-(so D66's details and documents go with it) and sends; "Dosyasız sor" sends as is and the
+(so D66's details and documents go with it) and sends; "Ask without the case" sends as is and the
 chat is not asked again. Several named files are listed for the lawyer to pick. No model call
 is made for this.
 
@@ -217,10 +243,10 @@ remembered per file). The server computes the last day (`POST /deadlines/calcula
 `calc/notice.py`) with the existing period calculator and shows each step before saving.
 Rules, with sources, in `locales/tr/deadline_rules.json`: electronic service counts at the end
 of the fifth day after it reached the address (Tebligat K. 7/a); a period ending in the
-recess is extended 7 days in civil (HMK 104) and administrative (İYUK 8/3) matters, 3 days
+recess is extended 7 days in civil (HMK 104) and administrative (IYUK 8/3) matters, 3 days
 in criminal ones (CMK 331/4, with a note that detention matters are not extended), not at
 all in enforcement; arbitration is not extended and the lawyer is told it depends on the
-agreed rules. "Son günü biliyorum" keeps the old direct entry. Suggested by the user from
+agreed rules. "I know the last day" keeps the old direct entry. Suggested by the user from
 another app's form; work types with preset periods were left out until each period can be
 sourced.
 Later the same day: the branch is chosen in both modes and saved with the deadline
@@ -243,7 +269,7 @@ commercial both results are given and the answer says which facts decide. The ca
 is cited like a source (evidence kind "calculation"). Live test: one question, $0.039.
 
 ## D63. Case files ("Dosyalar") with their deadlines, and a calendar (2026-10-31)
-Lawyers work by file ("müvekkil X'in boşanma dosyası"), and competitors offer case and
+Lawyers work by file ("client X's divorce file"), and competitors offer case and
 deadline management; chats and files were loose. Now:
 - Tables `matters` (client, subject, other side, court, docket number, notes, closed) and
   `matter_deadlines` (label, due date, done, the answer it came from); chats and stored
@@ -274,12 +300,12 @@ Added the same day at the user's request (the calendar read as a list): a month 
 default, beside the list (`components/MonthGrid.tsx`): weeks from Monday, today marked, each
 day's deadlines as two-line labels (what, whose file) coloured by nearness and opening the
 file, weekends and official holidays set back with the holiday's name, half-day eves noted,
-the judicial recess hatched from its first day; arrows move by month and "Bugün" returns.
+the judicial recess hatched from its first day; arrows move by month and "Today" returns.
 Holidays and the recess come from the period calculator's own data (`GET /holidays/{year}`),
 and a year without its religious holidays is said to be so.
 The title is two buttons (`components/PeriodPicker.tsx`): the month opens the twelve months,
 the year opens a page of twelve years with arrows, so a date a year away is two clicks.
-A click on an open deadline's circle no longer hides it at once: it opens "Tamamlandı / Sil / ×"
+A click on an open deadline's circle no longer hides it at once: it opens "Done / Delete / ×"
 under the line (`components/DeadlineActions.tsx`), in the file panel and the calendar list,
 because a slip of the mouse moved deadlines out of sight.
 
@@ -320,8 +346,7 @@ answer costs a lawyer a case, so dates are computed in code:
   step, cited like an article (`EvidenceLedger.add_calculation`). Whether the recess
   applies is not taken from the model (it called a money claim exempt): when the recess
   changes the last day both days are given with civil procedure arts. 103-104.
-- The writer copies dates from the calculation and says its warnings; a "Süreler
-  hesaplanıyor" step shows in the progress list.
+- The writer copies dates from the calculation and says its warnings; a "computing periods" step shows in the progress list.
 Two real questions at "fast", $0.009 and $0.007: notice served 7 March 2026, appeal period
 two weeks (HMK 345, confirmed in its text), calendar end Saturday 21 March in the Ramadan
 holiday, answer Monday 23 March with art. 93; served 7 July 2026, calendar end 21 July in
@@ -331,10 +356,10 @@ statute text (3,000 TL) is the original figure, not the yearly revalued one; to 
 with the fee calculator.
 
 ## D60. Request lines above the court set at the top right (2026-10-30)
-User question about the "İHTİYATİ TEDBİR TALEPLİDİR" line: it belongs above the court, but
+User question about the interim-measure request line: it belongs above the court, but
 the files centred it as if it were the court's heading. The lawyer's own petitions set such
-a line ("ADLİ YARDIM TALEPLİDİR") at the top right. A heading line ending in
-"...TALEPLİDİR" before the court (word in `locales/tr/style.json`, "request_flag") is now
+a line (the legal-aid request) at the top right. A heading line ending in the
+request word before the court (word in `locales/tr/style.json`, "request_flag") is now
 right-aligned in Word, PDF and UDF, and the court below it centred; body paragraphs are
 justified in Word too, as they already were in PDF and UDF. Checked on the latest divorce
 petition's PDF.
@@ -444,7 +469,7 @@ missing from it, is now added in code (checked on that draft without a model cal
 
 ## D53. No negative headings or explanations in brackets; courts named by case kind (2026-10-30)
 A lawyer rejected a Luna petition (divorce, written without the facts asked for) that opened
-with "[İHTİYATİ TEDBİR TALEBİ YOKTUR]", left the court as "[GÖREVLİ MAHKEMESİ]", put an
+with a "[no interim measure requested]" line, left the court as "[competent court]", put an
 explanation inside the value's brackets, and asked for nothing about the car the client
 wanted. Rules added: a conditional heading or section is left out when its condition does
 not hold, never written as "none"; brackets only name a missing short datum; the court is
@@ -592,9 +617,9 @@ petition ($0.157) with an interim-measure header, four grounds each with a quote
 the car handled by an interim measure, and forgiveness, time limits and the weak proof of
 adultery by messages in the checklist. The lawyer's own petition was read only; it holds
 personal data and was not stored or added to the repository.
-- Found in use (same day): "Genişlet" without a selection rewrote the whole stored text, and
+- Found in use (same day): "Longer" without a selection rewrote the whole stored text, and
   the model dropped the one-line note with its dashes, so the checklist went into the
-  petition file; and "İndir" stayed active while the change ran, so the lawyer downloaded the
+  petition file; and "Download" stayed active while the change ran, so the lawyer downloaded the
   file from before it. Now a button without a selection rewrites only the petition
   (`drafting/style.py: petition_span`), a rewrite that changes the dashes is rejected, and
   the download waits for the change and saves pending edits first. The expansion itself
@@ -614,7 +639,7 @@ User request: two filters in the files panel, format and content, ideally by typ
 - Labels are stored on `stored_files` (`kind`, `area`; migration `a7b2e5f9d4c6`) when a file is
   saved; files kept earlier are labelled the first time the list is opened. A drafted
   petition keeps the kind it was made as (notice for ihtarname, otherwise petition).
-- The panel shows three dropdowns (Format, Belge türü, Dava türü) offering only values present,
+- The panel shows three dropdowns (format, document kind, case kind) offering only values present,
   each with the count the other choices would leave; each file shows its kind and area.
 Rejected: a model call per file (cost per upload, and the word list was right on all test
 documents); embedding similarity to area descriptions (less predictable for short files).
@@ -637,10 +662,10 @@ meaning. Conditions set by the user: no drift, a reset, no extra latency or cost
   <learned_preferences>; the writer is told legal rules, required contents and citations come
   first. The sample to imitate is now the lawyer's petition of the same type closest in
   meaning to the case (sample vectors stored at upload), not the longest.
-- The style panel lists what was learnt ("kullanılıyor" or "bir kez görüldü"), each can be
-  forgotten, and "Öğrendiklerini sıfırla" forgets all learnt preferences, the length and
+- The style panel lists what was learnt ("in use" or "seen once"), each can be
+  forgotten, and "Reset what was learnt" forgets all learnt preferences, the length and
   language chosen and the formats counted (own petitions and written wishes stay).
-Measured: a simulated edit gave three preferences ("müvekkil" for "davacı", "kiracı davalı",
+Measured: a simulated edit gave three preferences ("client" for "claimant", "tenant defendant",
 a procedural section) and correctly ignored an address correction; $0.0006, 3 s in the
 background; choosing by meaning adds about 16 ms (local model) to an answer.
 
@@ -660,12 +685,12 @@ local storage for now.
   a message with attachments is not treated as a reformat.
 - Generated petitions are stored in the user's space in their format (and in other formats
   when downloaded), made again when the draft changes.
-- Power (`agent/power.py`): Hızlı (cheaper model writes, 8 articles, decisions only when
-  needed), Dengeli (default), Derin araştırma (16 articles, decisions always, 8 read and 4
+- Power (`agent/power.py`): Fast (cheaper model writes, 8 articles, decisions only when
+  needed), Balanced (default), Deep research (16 articles, decisions always, 8 read and 4
   kept, the writer thinks longer); remembered in the browser.
 - UI: the composer has an attachment button, chips for attachments, page-wide drop and paste,
   the mode, the power menu, a round send/stop button; a usage ring under it opens today's
-  answers and spend against the daily limit and the file space; "Dosyalarım" (from the
+  answers and spend against the daily limit and the file space; "My files" (from the
   account menu or the usage panel) lists, filters, downloads and deletes files. The composer
   is pinned inside the scrolling area so its menus are not cut and its edges match the text.
 Checked: tests, the browser (menus, usage, files panel), and one fast answer with an attached
@@ -677,7 +702,7 @@ the account as icons; the account must open a menu as in ChatGPT and Claude, hol
 petition samples; the samples panel was too technical for lawyers; the composer did not line
 up with the chat. Changes: the sidebar (a darker "desk" tone) collapses to an icon rail
 (state kept in the browser), chats are grouped by today, yesterday, this week and older; the
-account menu holds "Yazım tarzım", model settings (admins) and sign out; "Yazım tarzım" shows
+account menu holds "My writing style", model settings (admins) and sign out; "My writing style" shows
 the current style as one sentence and lets the lawyer pick length (short, medium, long) and
 language (plain, balanced, formal) or leave both to be learnt (`PUT /drafting/profile/style`;
 a choice replaces what the samples show and the buttons and edits move on from it), adds own
@@ -722,7 +747,7 @@ playbooks/tr/petitions, style from the lawyer's own petitions measured by code (
 sentence length, register from a formal-word lexicon, headings, closing formula), moved by
 four buttons (shorter, longer, plainer, more formal) and by the lawyer's saved edits, plus
 rules the lawyer writes. Built as phase 1 (tables style_samples, style_profiles, drafts;
-routes under /drafting and /drafts; panels "Örnek dilekçelerim" and the draft editor). One
+routes under /drafting and /drafts; panels "My sample petitions" and the draft editor). One
 end-to-end draft and one adjustment checked ($0.10, results in DRAFTING.md).
 
 ## D38. The writer applies the tier that fits the facts and does not correct itself (2026-10-30)
@@ -784,13 +809,13 @@ is-2 then cited four decisions and covered both points ($0.08). The answer named
 their internal keys ("the closest are E10 and E12"); keys written into the prose now become
 citation markers, shown as chips.
 Partition (tasinmaz-1, 0/2) was diagnosed, not fixed: the question and the issue phrases use
-practice words ("aynen taksim", "ortaklığın giderilmesi"), the civil code says "paylaşma" and
-"aynen bölünme"; TMK 699 ranks 61st in the text search (rank has no term rarity weighting) and
+practice words (division in kind, dissolution of co-ownership), the civil code says "sharing" and
+"division in kind" in other words; TMK 699 ranks 61st in the text search (rank has no term rarity weighting) and
 outside the vector results. A rarity-weighted rank moved it to 19th (12 results are read per
 search) and took 1 s per search, so it was not adopted. A prompt asking the understanding step to always name the governing
 article was tried once ($0.06): it named TMK 690 instead of 699 (the cheapest model does not
 recall the number), coverage rose to 1/2 only through decisions; reverted. A fix has to come
-from retrieval (vocabulary of the code, or reading the paylı mülkiyet articles as a group),
+from retrieval (vocabulary of the code, or reading the shared-ownership articles as a group),
 not from the model's memory.
 
 ## D34. Unanswered questions are dropped and can be asked again; tests clean up (2026-10-30)
@@ -837,7 +862,7 @@ included.
 User feedback: choosing one clarifying option sent it at once and started a new answer,
 before the lawyer could answer (or decide not to answer) the other questions; stopping that
 answer left the unanswered question in the chat. Options are now toggled per question and sent
-together with "Seçimlerimi gönder" (any number, none required). When an answer is stopped, its
+together with "Send my choices" (any number, none required). When an answer is stopped, its
 question is deleted on the server and the chat reloads; the cancel call waits up to 5 s for
 the run to finish that cleanup.
 
@@ -856,7 +881,7 @@ into "not required"; the router counts "what to do next / steps / procedure" as 
 the UI renders tables (remark-gfm), groups citation chips at the end of each paragraph, and
 shows the clarifying questions as one-click answers on the latest reply; zero-width characters
 are stripped. Measured in the chat: the first answer follows the three questions with
-"Hayır." under "does the seller's ignorance remove liability"; the follow-up is a 7-stage plan
+"No." under "does the seller's ignorance remove liability"; the follow-up is a 7-stage plan
 with evidence preservation (HMK 400, 402), notice, consumer mediation (TKHK 73/A), the
 consumer court and a table of legal bases ($0.075 and $0.088, about 40 s each). Still missing:
 the general civil court for private sales, the inspection firm's liability, alternative
@@ -867,7 +892,7 @@ Remaining errors after D27 had general causes:
 - Regime confusion: the answer applied obligations law art. 362 (usufructuary lease, 60 days)
   to a residential lease. The index kept only an article's own heading. Each article now
   stores its section path (books, parts, chapters, sub-chapters and "bap" divisions, e.g.
-  "Kira Sözleşmesi > Ürün Kirası"), parsed at sync (the service's text uses CRLF line
+  "Lease contract > Crop lease"), parsed at sync (the service's text uses CRLF line
   endings, normalised first; migration c3d9a7e1f2b4); the path is shown to the screening
   model and at the top of every article the writer reads, and the prompt says to tell
   regimes apart by it.

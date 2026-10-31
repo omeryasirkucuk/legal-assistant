@@ -1,6 +1,10 @@
+import json
 from datetime import date
+from pathlib import Path
 
 from legal_api.calc.deadlines import add_period, compute
+
+TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
 
 
 def test_periods_in_days_weeks_and_months():
@@ -32,9 +36,9 @@ def test_half_day_eves_and_uncovered_years_are_flagged():
 
 def test_the_period_length_is_checked_against_the_article_and_written_out():
     from legal_api.calc.sources import render, states_length
-    article = "İstinaf yoluna başvuru süresi iki haftadır. Bu süre kararın tebliği ile başlar."
+    article = TR["deadlines_1"]
     assert states_length(article, 2, "week") and not states_length(article, 1, "month")
-    assert states_length("Borçlu yedi gün içinde itiraz edebilir.", 7, "day")
+    assert states_length(TR["deadlines_2"], 7, "day")
     d = compute(date(2026, 3, 7), 2, "week", recess=False)
-    text = render("İstinaf", d, "HMK m. 345", True)
-    assert "23.03.2026 Pazartesi" in text.splitlines()[-1] and "Ramazan Bayramı" in text
+    text = render(TR["deadlines_3"], d, "HMK m. 345", True)
+    assert "23.03.2026 Pazartesi" in text.splitlines()[-1] and TR["deadlines_4"] in text

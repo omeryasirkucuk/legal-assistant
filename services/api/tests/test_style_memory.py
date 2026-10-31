@@ -1,4 +1,6 @@
+import json
 import uuid
+from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -8,6 +10,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from legal_api.config import get_settings
 from legal_api.drafting import memory, store
 from legal_api.main import create_app
+
+TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
 
 get_settings().invite_code = "test-invite"
 
@@ -30,26 +34,26 @@ async def session_and_user():
 
 
 def test_case_material_is_not_a_preference():
-    assert memory.acceptable("Usule ilişkin itirazları esastan önce yazar.")
-    assert not memory.acceptable("Aylık kira 25.000 TL olarak yazılır.")
-    assert not memory.acceptable("kısa")
+    assert memory.acceptable(TR["style_memory_1"])
+    assert not memory.acceptable(TR["style_memory_2"])
+    assert not memory.acceptable(TR["style_memory_3"])
 
 
 async def test_a_preference_is_used_only_once_confirmed(session_and_user):
     db, user = session_and_user
-    pref = "Kira davalarında işgal tazminatını ayrı bir talep olarak ekler."
+    pref = TR["style_memory_4"]
     await memory.remember(db, user, [pref], "dava")
-    assert await memory.relevant(db, user, "kiracı tahliye davası", None) == []
+    assert await memory.relevant(db, user, TR["style_memory_5"], None) == []
     # The same preference in other words, from another edit, counts as seen again.
-    await memory.remember(db, user, ["Kira davalarında işgal tazminatını ayrı talep olarak ekler."],
+    await memory.remember(db, user, [TR["style_memory_6"]],
                           "dava")
-    assert await memory.relevant(db, user, "kiracı tahliye davası", None) == [pref]
+    assert await memory.relevant(db, user, TR["style_memory_7"], None) == [pref]
 
 
 async def test_reset_forgets_what_was_learnt(session_and_user):
     db, user = session_and_user
-    await memory.remember(db, user, ["Müvekkil yerine davacı ifadesini kullanır."] * 2, None)
+    await memory.remember(db, user, [TR["style_memory_8"]] * 2, None)
     await store.choose_style(db, user, "short", "plain")
     await store.reset_learning(db, user)
-    book = await store.style_book(db, user, "dilekçe")
+    book = await store.style_book(db, user, TR["style_memory_9"])
     assert book.learnt == [] and book.preferences.length is None

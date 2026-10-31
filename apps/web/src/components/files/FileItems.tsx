@@ -116,7 +116,7 @@ export function FileName({ file, renaming, onDone, className = "" }: {
 
 type FileProps = {
   file: StoredFile;
-  about: string;                // "Dilekçe · Aile"
+  about: string;                // kind and area, e.g. "petition · family"
   meta: string;                 // size and date
   matterName: string | null;    // the case it is used in
   renaming: boolean;

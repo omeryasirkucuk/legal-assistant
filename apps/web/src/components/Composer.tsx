@@ -76,7 +76,7 @@ export function Composer({ followUp, busy, onSubmit, onStop, footer, placeholder
   // Files dropped anywhere on the page come here.
   useEffect(() => {
     let depth = 0;
-    // Not over an open panel ("Benden öğren" takes its own files).
+    // Not over an open panel ("learn from me" takes its own files).
     const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
       && !(e.target instanceof Element && e.target.closest('[role="dialog"]'));
     const enter = (e: DragEvent) => { if (hasFiles(e)) { depth += 1; setDragging(true); } };

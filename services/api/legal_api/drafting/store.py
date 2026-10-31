@@ -21,6 +21,7 @@ from legal_api.drafting.sample_profile import SampleProfile, analyze
 from legal_api.drafting.style import WORDS_PER_PAGE, measure
 from legal_api.drafting.types import petition_types
 from legal_api.embeddings import embed_passages, embed_query
+from legal_api.spend import record_spend
 
 MAX_RULES = 20
 
@@ -116,7 +117,9 @@ async def read_unread_samples(db: AsyncSession, user_id: uuid.UUID) -> None:
     """Samples kept before the model read samples: read now, once."""
     rows = [s for s in await samples_of(db, user_id) if not s.profile]
     for s in rows:
-        profile = await analyze(s.title, s.text, llm.Usage())
+        usage = llm.Usage()
+        profile = await analyze(s.title, s.text, usage)
+        await record_spend(db, user_id, "sample_read", usage)
         s.profile = profile.as_dict()
         s.petition_type = s.petition_type or profile.petition_type
         s.embedding = (await asyncio.to_thread(embed_passages,

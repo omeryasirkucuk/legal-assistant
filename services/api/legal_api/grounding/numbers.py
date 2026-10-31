@@ -2,8 +2,8 @@
 
 Periods, amounts and ratios are what a lawyer acts on, so a sentence written over cited
 sub-answers may only state numbers that appear in them. Statutes write numbers as separate
-words or, in older texts, joined into one word (eighteen as "onsekiz", twenty-four as
-"yirmidört"); both are read.
+words or, in older texts, joined into one word (eighteen and twenty-four each as one
+word); both are read.
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from legal_api.grounding.normalize import tr_fold
 from legal_api.locale import number_units, number_words
 
 _TOKEN = re.compile(r"\d+/\d+|\d+(?:[.,]\d+)?|\w+")
-# "dörtte bir" (one quarter): denominator word with the locative ending, then the numerator
-# word with any ending ("dörtte birinden", "dörtte üçüne").
+# A fraction in words (one quarter): the denominator word with the locative ending, then the
+# numerator word with any ending ("from one quarter", "to three quarters").
 _LOCATIVE = ("te", "ta", "de", "da")
 MAX_DENOMINATOR = 12
 # The word for one stands alone too often as "a" to count, but inside a joined number
@@ -88,7 +88,7 @@ def _denominator(token: str) -> int | None:
 
 
 def _numerator(token: str) -> int | None:
-    """A number word at the start of a token, whatever ending follows ("üçüne" -> 3)."""
+    """A number word at the start of a token, whatever ending follows ("to three" -> 3)."""
     for size in range(len(token), 1, -1):
         if token[:size] in _parts() and _parts()[token[:size]] < MAX_DENOMINATOR:
             return _parts()[token[:size]]
@@ -103,7 +103,7 @@ def _digit_fraction(token: str) -> float | None:
 
 def numbers_in(text: str) -> set[float]:
     """Every number in `text`. Adjacent number words make one number (ten + five -> 15);
-    fractions, in digits or words, count as their value (1/4 and "dörtte bir" -> 0.25)."""
+    fractions, in digits or words, count as their value (1/4 and one quarter in words -> 0.25)."""
     found: set[float] = set()
     number = _Number()
     tokens = _TOKEN.findall(tr_fold(text))
@@ -150,14 +150,14 @@ def unsupported_numbers(claim: str, sources: list[str]) -> set[float]:
 
 
 def digits_for_quantities(text: str) -> str:
-    """Number words written before a unit become digits ("Beş gün" -> "5 gün"), so a short
+    """Number words written before a unit become digits ("five days" in words -> "5 days"), so a short
     answer shows quantities the same way throughout. Other words are left alone."""
     units = "|".join(re.escape(u) for u in sorted(number_units(), key=len, reverse=True))
     pattern = re.compile(rf"\b((?:\w+\s+){{0,3}}?\w+)(\s+)(?=(?:{units})\w*\b)", re.IGNORECASE)
 
     def replace(m: re.Match) -> str:
         words = m.group(1).split()
-        # The longest tail of words that is wholly a number ("on beş", "onsekiz").
+        # The longest tail of words that is wholly a number (fifteen as two words, eighteen as one).
         for start in range(len(words)):
             tail = words[start:]
             values = [_values(tr_fold(w)) for w in tail]

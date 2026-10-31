@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-import { api, type Branch, type NoticeResult, type NoticeStep, type PeriodUnit, type Service } from "@/lib/api";
+import { api, type DeadlinePreset, type Branch, type NoticeResult, type NoticeStep, type PeriodUnit, type Service } from "@/lib/api";
 import { formatDay, todayIso } from "@/lib/dates";
 import { t, type MessageKey } from "@/lib/i18n";
 
@@ -93,6 +93,24 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
   const [branch, setBranch] = useBranch(matterId);
   const [due, setDue] = useState("");
   const [result, setResult] = useState<NoticeResult | null>(null);
+  const [presets, setPresets] = useState<DeadlinePreset[]>([]);
+  const [preset, setPreset] = useState<DeadlinePreset | null>(null);
+  useEffect(() => { api.deadlinePresets().then(setPresets).catch(() => {}); }, []);
+  // A period changed by hand is no longer the preset's, nor is its article the basis.
+  useEffect(() => {
+    if (preset && (Number(amount) !== preset.amount || unit !== preset.unit)) setPreset(null);
+  }, [preset, amount, unit]);
+
+  function pick(i: string) {
+    const p = presets[Number(i)];
+    setPreset(p ?? null);
+    if (!p) return;
+    setLabel(p.label);
+    setAmount(String(p.amount));
+    setUnit(p.unit);
+    setBranch(p.branch);
+    setMode("notice");
+  }
 
   const n = Number(amount);
   const bump = (by: number) => setAmount(String(Math.max(1, (Number.isInteger(n) ? n : 0) + by)));
@@ -157,6 +175,15 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
         <Label>{t("deadlineWhatFor")}</Label>
         <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)}
           placeholder={t("deadlineLabelHint")} aria-label={t("deadlineLabel")} className={`w-full ${field}`} />
+        {presets.length > 0 && (
+          <select value={preset ? presets.indexOf(preset) : ""} onChange={(e) => pick(e.target.value)}
+            aria-label={t("deadlinePresetPick")}
+            className={`mt-2 w-full text-sm ${preset ? "text-ink" : "text-muted"} ${field}`}>
+            <option value="">{t("deadlinePresetPick")}</option>
+            {presets.map((p, i) => <option key={p.label} value={i}>{p.label} ({p.citation})</option>)}
+          </select>
+        )}
+        {preset && <p className="mt-1 text-xs leading-snug text-faint">{t("deadlinePresetBasis", { citation: preset.citation })}</p>}
       </div>
 
       <Segmented label={t("deadlineAdd")} value={mode} onChange={setMode}

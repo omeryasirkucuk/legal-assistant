@@ -134,8 +134,8 @@ async def nearby(db: asyncpg.Pool, ask: str, kept: list[StatuteHit], judged: set
                  usage: llm.Usage) -> list[StatuteHit]:
     """Articles next to the best kept ones that are judged relevant too. A code keeps related
     rules side by side, and the one that answers can use other words than the lawyer: the
-    partition rule (civil code art. 699, "paylaşma") was not found by any search for
-    "ortaklığın giderilmesi" while art. 696 three articles before it was."""
+    partition rule (civil code art. 699, "sharing") was not found by any search for
+    "dissolution of co-ownership" while art. 696 three articles before it was."""
     have = {h.id for h in kept} | judged
     near: dict[int, StatuteHit] = {}
     async with db.acquire() as conn:

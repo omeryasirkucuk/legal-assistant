@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from legal_api.agent.turn import EvidenceCopy, Previous
 from legal_api.config import get_settings
-from legal_api.db.app_models import Chat, Message, MessageEvidence
+from legal_api.db.app_models import Chat, LlmSpend, Message, MessageEvidence
 
 HISTORY_TURNS = 6
 TITLE_CHARS = 60
@@ -94,7 +94,8 @@ async def save_answer(db: AsyncSession, chat: Chat, result) -> Message:
 
 
 async def spent_today(db: AsyncSession, user_id: uuid.UUID) -> float:
-    """LLM spend of the user's answers (and their detail sections) since 00:00 UTC."""
+    """LLM spend of the user's answers (and their detail sections) and of everything else
+    recorded in llm_spend, since 00:00 UTC."""
     start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     total = await db.scalar(
         select(func.coalesce(func.sum(
@@ -103,7 +104,10 @@ async def spent_today(db: AsyncSession, user_id: uuid.UUID) -> float:
         .join(Chat, Chat.id == Message.chat_id)
         .where(Chat.user_id == user_id, Message.role == "assistant",
                Message.created_at >= start))
-    return float(total or 0.0)
+    other = await db.scalar(select(func.coalesce(func.sum(LlmSpend.cost_usd), 0.0))
+                            .where(LlmSpend.user_id == user_id, LlmSpend.created_at >= start))
+    return float(total or 0.0) + float(other or 0.0)
+
 
 
 def message_cost():
@@ -124,11 +128,13 @@ async def today_stats(db: AsyncSession, user_id: uuid.UUID) -> dict:
     """The user's answers since 00:00 UTC: how many, how long they took, what they cost."""
     start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     seconds = cast(Message.meta["timings"]["total_s"].astext, Float)
-    count, average, longest, cost = (await db.execute(
-        select(func.count(), func.avg(seconds), func.max(seconds), func.sum(message_cost()))
+    count, average, longest = (await db.execute(
+        select(func.count(), func.avg(seconds), func.max(seconds))
         .join(Chat, Chat.id == Message.chat_id)
         .where(Chat.user_id == user_id, Message.role == "assistant",
                Message.created_at >= start))).one()
     return {"answers": int(count or 0), "average_s": round(float(average or 0), 1),
-            "longest_s": round(float(longest or 0), 1), "cost_usd": round(float(cost or 0), 4),
+            "longest_s": round(float(longest or 0), 1),
+            # The meter shows what the budget counts: answers and everything else.
+            "cost_usd": round(await spent_today(db, user_id), 4),
             "budget_usd": get_settings().daily_user_budget_usd}

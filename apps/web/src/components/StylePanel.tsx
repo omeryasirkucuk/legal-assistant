@@ -1,6 +1,6 @@
 "use client";
 
-// "Yazım tarzım": how the lawyer's petitions are written, in plain words. Length and language
+// My writing style: how the lawyer's petitions are written, in plain words. Length and language
 // are picked from three choices each (or left to be learnt); the lawyer's own petitions and
 // written wishes teach the rest.
 import { useEffect, useState } from "react";

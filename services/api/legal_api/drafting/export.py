@@ -68,8 +68,8 @@ def _is_heading(line: str) -> bool:
 
 
 def _is_request_flag(text: str) -> bool:
-    """A line above the court such as "İHTİYATİ TEDBİR TALEPLİDİR" or "ADLİ YARDIM
-    TALEPLİDİR"; lawyers set it at the top right."""
+    """A line above the court flagging a request (an interim measure, legal aid); lawyers set
+    it at the top right."""
     return tr_fold(text).endswith(style_terms()["request_flag"] + "dir")
 
 

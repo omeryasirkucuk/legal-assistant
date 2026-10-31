@@ -15,9 +15,9 @@ from legal_api.locale import style_terms
 
 WORDS_PER_PAGE = 450        # a typed A4 page of petition text
 _WORD = re.compile(r"\w+", re.UNICODE)
-# An upper-case label ending in a colon, optionally numbered ("II. AÇIKLAMALAR :", "A) KONU:").
-_HEADING = re.compile(r"^\s*(?:(?:[IVX]+|\d+|[A-ZÇĞİÖŞÜ])[.)-]\s*)?"
-                      r"([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ .,/()]{2,40}?)\s*:", re.MULTILINE)
+# An upper-case label ending in a colon, optionally numbered ("II. EXPLANATIONS :", "A) SUBJECT:").
+_HEADING = re.compile(r"^\s*(?:(?:[IVX]+|\d+|[A-Z\u00c7\u011e\u0130\u00d6\u015e\u00dc])[.)-]\s*)?"
+                      r"([A-Z\u00c7\u011e\u0130\u00d6\u015e\u00dc][A-Z\u00c7\u011e\u0130\u00d6\u015e\u00dc .,/()]{2,40}?)\s*:", re.MULTILINE)
 _NUMBERED = re.compile(r"^\s*(\d+)[.)-]\s+", re.MULTILINE)
 
 

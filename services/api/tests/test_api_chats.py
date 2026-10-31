@@ -1,4 +1,6 @@
+import json
 import uuid
+from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -9,6 +11,8 @@ from legal_api.chat.service import drop_unanswered
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, Message
 from legal_api.main import create_app
+
+TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
 
 get_settings().invite_code = "test-invite"
 _created: list[str] = []
@@ -89,7 +93,7 @@ async def test_an_unanswered_last_question_is_dropped():
     engine = create_async_engine(get_settings().database_url)
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         chat = await db.get(Chat, uuid.UUID(chat_id))
-        db.add(Message(chat_id=chat.id, role="user", content="cevapsız", meta={}))
+        db.add(Message(chat_id=chat.id, role="user", content=TR["api_chats_1"], meta={}))
         await db.commit()
         await drop_unanswered(db, chat)
         left = (await db.scalars(text("SELECT role FROM messages WHERE chat_id = :c")

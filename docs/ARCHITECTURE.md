@@ -119,8 +119,8 @@ answer, switching away only stops watching), `lib/pending.ts`
 (the streamed answer built from events; steps only advance, sources and lines are only
 added), components: `Sidebar` (collapsible to an icon rail with new chat, search and the account;
 chats grouped by day, history search), `UserMenu` (opened from the user's row or initials:
-email, today's use, "Yazım tarzım", model settings for admins, sign out), `StylePanel`
-("Yazım tarzım": length and language chosen in plain words or learnt, own petitions, written
+email, today's use, "My writing style", model settings for admins, sign out), `StylePanel`
+("My writing style": length and language chosen in plain words or learnt, own petitions, written
 wishes), `DraftFile` (a petition as a file card: download, other formats, edit),
 `DraftPanel` (the draft editor with the four adjustment buttons), `Composer` (ask mode, and decision search
 without LLM), `AnswerProgress` (live checklist of steps with counts and a running clock),

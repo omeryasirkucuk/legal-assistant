@@ -36,7 +36,7 @@ class Sample:
     closeness: float | None = None     # similarity in meaning to the case being drafted
     area: str = "other"                # area of law, as the model read it (sample_profile)
     case_kind: str | None = None       # drafting.cases id when the case is one of those kinds
-    matter: str = ""                   # the matter in a few words ("anlaşmalı boşanma")
+    matter: str = ""                   # the matter in a few words ("uncontested divorce")
 
 
 @dataclass
