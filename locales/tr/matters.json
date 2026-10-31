@@ -1,0 +1,15 @@
+{
+  "context_name": "Dosya: {client}",
+  "context_title": "Bu soru, avukatın \"{client}\" dosyasında soruluyor. Dosyanın bilgileri:",
+  "fields": {
+    "subject": "Konu",
+    "opponent": "Karşı taraf",
+    "court": "Mahkeme",
+    "case_no": "Esas no",
+    "notes": "Avukatın notları"
+  },
+  "documents": "Dosyadaki belgeler",
+  "document_name": "{name} (dosyadaki belge)",
+  "document_parts": "{name} (dosyadaki belge, soruyla ilgili kısımlar)",
+  "gap": "[…]"
+}

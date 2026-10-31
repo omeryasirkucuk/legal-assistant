@@ -28,12 +28,14 @@ code, comments and docs are English.
 | `corpus/` | Offline ingestion. `ingest.py` loads decisions from the public parquet dataset, `chunking.py` splits them into offset-preserving paragraph chunks, `embed.py` fills embeddings, `statutes.py` syncs core laws into the statute index. |
 | `retrieval/` | `hybrid.py`: decision search (full text + vector, fused with Reciprocal Rank Fusion). `statutes.py`: the same over statute articles (optionally within given laws), exact article lookup, and law-name resolution (number, abbreviation from `locales/tr/law_abbreviations.json`, or name). `references.py`: reads cross-references out of article text (vocabulary in `locales/tr/references.json`). Full-text matching uses the SQL function `any_terms()` (OR semantics), not `websearch_to_tsquery` (AND). |
 | `embeddings.py` | `intfloat/multilingual-e5-small` (384 dims) via sentence-transformers, on MPS/CUDA/CPU. |
-| `agent/` | The answer pipeline (below): `turn.py`, `route.py`, `reformat.py`, `queries.py`, `candidates.py`, `screen.py`, `follow.py`, `decompose.py`, `case_law.py`, `compose.py`, `sources.py`, `atoms.py`, `answer.py`, `detail.py`. |
+| `agent/` | The answer pipeline (below): `turn.py`, `route.py`, `pipeline.py`, `understand.py`, `research.py`, `write.py`; the earlier pipeline kept for comparison: `reformat.py`, `queries.py`, `candidates.py`, `screen.py`, `follow.py`, `decompose.py`, `case_law.py`, `compose.py`, `sources.py`, `atoms.py`, `answer.py`, `detail.py`. |
 | `decisions.py` | Client for a decision model (typed yes/no questions answered with probabilities, no text) via OpenRouter's Decisions API; `DECISION_API_KEY`, `DECISION_MODEL`. |
 | `grounding/` | `numbers.py`: numbers stated in text (digits and Turkish number words) for checking short answers. `evidence.py`: the evidence ledger. Each source gets a key (`E1`, `E2`, ...); citation strings are built from the source's structured fields, never by the model. `normalize.py`: Turkish casefolding and quote matching. |
 | `llm.py` | Provider client (Anthropic, or OpenAI-compatible such as OpenRouter or Open WebUI), role-based model choice (`main`, `draft`, `cheap`, `judge`), automatic prompt caching, token and cost accounting per pipeline step. |
 | `chat/` | History for follow-up questions and persistence of answers (`service.py`), answer runs independent of the connection (`runs.py`), generated titles (`titles.py`), sidebar search where partial words match (`history_search.py`: prefix full-text, Turkish-folded substring backed by trigram indexes, titles). |
-| `api/` | Routes: `auth`, `chats` (streaming answers, on-demand detail, history search), `search` (decision search without an LLM), `settings` (admin model settings), `health`. |
+| `api/` | Routes: `auth`, `chats` (streaming answers, on-demand detail, history search), `drafting` (samples, style profile, drafts, adjustments, Word export), `search` (decision search without an LLM), `settings` (admin model settings), `health`. |
+| `drafting/` | Petition drafting (docs/DRAFTING.md): `types.py` (petition types from `playbooks/tr/petitions`), `style.py` (measured style), `profile.py` (targets from samples and preferences), `feedback.py` (buttons and edits move preferences), `brief.py` and `prepare.py` (what the writer is told; required-content articles added to the sources), `adjust.py` (the four rewrites), `memory.py` (preferences learnt from edits, chosen by meaning), `export.py` (Word), `store.py` (samples, profile, drafts). |
+| `files/` | `store.py`: the per-user file space and quota; `extract.py`: text of uploaded files; `labels.py`: format, kind and area of law of each file, for filtering; `context.py`: attachments given to the model. |
 | `auth.py`, `privacy/` | scrypt password hashing, signed session cookie, encrypted provider credentials. |
 | `evaluation/` | `golden.py` runs the question set with a spend cap; `coverage.py` grades whether each expected point is covered. |
 | `locale.py`, `prompts.py`, `config.py` | Access to Turkish strings, prompts and settings (`.env`). |
@@ -49,49 +51,38 @@ code, comments and docs are English.
 
 ## Answer pipeline
 
+The chat answers through `agent/pipeline.py` (understand -> research -> write). The earlier
+pipeline (`agent/answer.py`, decompose -> sub-answers -> gists) is kept for comparison only.
+
 ```
 message in a chat
   0. route (decision model) new question | reformat the previous answer | follow-up question
-                            (agent/route.py, turn.py). Reformat: the previous answer's cited
-                            sub-answers are written again as gists under the lawyer's
-                            instruction, no new retrieval (reformat.py). Follow-up: retrieval
-                            uses the previous question together with the new message.
-question
-  1. candidate provisions   statute search on the question, fused with searches on 3
-                            statute-language phrases written by a cheap call (queries.py),
-                            24 candidates (candidates.py)
-     screen (decision model) each candidate judged in full: does it answer the question?
-                            p >= 0.85 shown to the planner in full, 0.4-0.85 as an excerpt
-                            to review, below 0.4 dropped (screen.py; skipped without a key)
-     follow references      cross-references in confirmed articles are read out of the text
-                            (retrieval/references.py); by label within an indexed law, kept if
-                            the decision model finds them relevant; for a repealed or
-                            unindexed law, references of one article to that law are merged,
-                            candidates are searched by content, and the successor is the
-                            article picked in a majority of 3 per-candidate judgments (follow.py)
-  2. decompose (LLM)        structured JSON: review of every candidate, branches and atomic
-                            sub-questions with the articles to read and an optional case-law
-                            query. Code then adds a sub-question for every confirmed article
-                            the plan left out (unless the planner rejected it), grouped by the
-                            planner's situation name, and one for every followed reference in
-                            the citing branch (decompose.py)
-  3. per sub-question, in parallel (atoms.py):
-       sources              the named articles (local index; live service only for a law the
-                            index does not hold); a statute search only if none was found;
-                            case-law passages when a case-law query was written: local
-                            archive (4) + live Court of Cassation search (4 decisions, closest
-                            passage each), screened by the decision model, best 2 (case_law.py)
-       cited answer (LLM)   sources as citation-enabled documents (Citations API); one short
-                            sentence or NOT_FOUND
-       retry                if NOT_FOUND: the named articles' neighbours (+-2), a statute
-                            search on the sub-question and, if the plan asked for no case
-                            law, screened decision passages for a phrase written by a cheap call
-  4. compose                a cheap call writes a gist per sub-answer; code joins each branch's
-                            gists into one line, citation keys from the sub-answers, a gist
-                            with a number its sub-answer lacks falls back to the sub-answer
-                            (compose.py). No line at all: "no answer found" message
-  5. message                <short>lines</short><detail>every cited sub-answer</detail>;
-                            history for later turns uses the short part only
+                            (agent/route.py, turn.py). Reformat: the previous answer written
+                            again from its own sources under the lawyer's instruction.
+  1. understand (LLM)       task (lookup, consultation, drafting, search, review), legal
+                            characterisation of the facts, the issues the answer rests on with
+                            a statute-language search phrase each, articles known to apply,
+                            a case-law query when practice matters, missing facts
+                            (agent/understand.py)
+  2. research               statute search on the question and every issue (all results
+                            judged); the named articles read from the local index (the
+                            understanding step sees the indexed laws); each candidate, with its
+                            section path, judged by the
+                            decision model ("does a complete answer need this rule": the rule,
+                            an available route, a precondition, a time limit, the competent
+                            court); kept: named articles and those >= 0.6, best 10; references
+                            of the clearly answering ones followed; screened case-law passages
+                            (local + live, 15 s budget) for consultations or a case-law query
+                            (agent/research.py)
+  3. write (Sonnet, streamed) one pass over all sources as citation-enabled documents, in the
+                            structure of the task (prompts/tr/write.md): lookup = ruling with
+                            basis, numbered cases, practical notes; consultation = short
+                            answer, routes with conditions and steps, this case, preconditions
+                            and deadlines, facts to clarify (agent/write.py)
+  4. check                  every sentence stating a quantity: its numbers must appear in the
+                            sources it relies on (cited or named by article), and the decision
+                            model must judge it supported; failures are shown as unverified.
+                            Quantities are then written as digits
 ```
 
 Grounding is enforced by construction. With the Anthropic provider, every cited passage is
@@ -126,14 +117,19 @@ the API process's memory, so a single API process is assumed. Detail: `POST /cha
 `lib/useChatRuns.ts` (answers in progress per chat; opening a chat re-attaches to its running
 answer, switching away only stops watching), `lib/pending.ts`
 (the streamed answer built from events; steps only advance, sources and lines are only
-added), components: `Sidebar` (chats with generated titles, history search, today's answer
-count and average time, settings for admins), `Composer` (ask mode, and decision search
+added), components: `Sidebar` (collapsible to an icon rail with new chat, search and the account;
+chats grouped by day, history search), `UserMenu` (opened from the user's row or initials:
+email, today's use, "Yazım tarzım", model settings for admins, sign out), `StylePanel`
+("Yazım tarzım": length and language chosen in plain words or learnt, own petitions, written
+wishes), `DraftFile` (a petition as a file card: download, other formats, edit),
+`DraftPanel` (the draft editor with the four adjustment buttons), `Composer` (ask mode, and decision search
 without LLM), `AnswerProgress` (live checklist of steps with counts and a running clock),
 `StreamingAnswer` (the plan's cases as placeholders, each replaced by its line as it arrives,
 words revealed in order, then citation chips; sources in the margin are only those cited),
 `AssistantAnswer` (saved answer: short answer first, details behind a toggle, numbered
 citation chips, sources in the margin, answer duration), `SourceDrawer` (full source text with
-official link and fetch time), `SettingsPanel` (admin model settings), `SearchResults`. All
+official link and fetch time), `SettingsPanel` (admin model settings), `SearchResults`. The composer sits in the answer column's grid and both the message area and the composer
+reserve the scrollbar width, so their edges line up. All
 copy comes from `locales/tr/common.json`. Existing chats can be given generated titles with
 `uv run python -m legal_api.chat.titles`.
 

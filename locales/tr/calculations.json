@@ -1,0 +1,57 @@
+{
+  "citation": "Süre hesabı: {label}",
+  "title": "Süre hesabı (sistem tarafından kodla yapılmıştır): {label}",
+  "start": "Başlangıç: {start} {weekday}; süre bu günden sonraki gün işlemeye başlar.",
+  "length": "Süre: {amount} {unit} ({law_article})",
+  "length_verified": "Süre uzunluğu maddenin metninde geçiyor.",
+  "length_unverified": "UYARI: {amount} {unit} ifadesi {law_article} metninde bulunamadı; sürenin uzunluğunu kontrol edin.",
+  "period": "Sürenin takvime göre son günü: {end} {weekday}.",
+  "recess": "Bu gün adli tatile (20 Temmuz - 31 Ağustos) rastlıyor; süre adli tatilin bitiminden itibaren bir hafta uzar: {end} {weekday}.",
+  "weekend": "{day} hafta sonuna rastlıyor; süre izleyen ilk iş günü biter: {end} {weekday}.",
+  "holiday": "{day} resmî tatil ({name}); süre izleyen ilk iş günü biter: {end} {weekday}.",
+  "half_day": "UYARI: Son gün {day}, {name} (13.00'ten sonra tatil). Sürenin o gün mesai bitiminde mi sona erdiğini kontrol edin.",
+  "not_covered": "UYARI: {year} yılının dinî bayram tarihleri sistemde yok; son günün tatile rastlayıp rastlamadığını kontrol edin.",
+  "result": "Sonuç: süre {end} {weekday} günü biter.",
+  "recess_unknown": "Adli tatil bu işe uygulanıyorsa: {end} {weekday}. Uygulanmıyorsa: {end_without} {weekday_without}.",
+  "units": {
+    "day": "gün",
+    "week": "hafta",
+    "month": "ay",
+    "year": "yıl"
+  },
+  "weekdays": [
+    "Pazartesi",
+    "Salı",
+    "Çarşamba",
+    "Perşembe",
+    "Cuma",
+    "Cumartesi",
+    "Pazar"
+  ],
+  "one": "bir",
+  "severance": {
+    "citation": "Kıdem ve ihbar tazminatı hesabı",
+    "title": "Kıdem ve ihbar tazminatı hesabı (sistem tarafından kodla yapılmıştır)",
+    "service": "Çalışma süresi: {start} - {end}: {years} yıl {months} ay {days} gün.",
+    "monthly": "Esas alınan aylık giydirilmiş brüt ücret (avukatın verdiği): {monthly}.",
+    "ceiling": "Fesih tarihindeki kıdem tazminatı tavanı: {ceiling}. Kıdem tazminatında esas alınan aylık ücret: {base}.",
+    "ceiling_missing": "UYARI: {end} tarihindeki kıdem tazminatı tavanı sistemde yok; tavanı kontrol edin.",
+    "severance": "Kıdem tazminatı (brüt): her tam yıl için 30 günlük ücret, artan süre için orantılı: {base} x {years_decimal} yıl = {severance}.",
+    "under_one_year": "Çalışma süresi bir yıldan az olduğu için kıdem tazminatı doğmaz.",
+    "stamp": "Damga vergisi (binde 7,59): {stamp}. Net kıdem tazminatı: {net}. Kıdem tazminatı tavanı aşmadığı ölçüde gelir vergisinden istisnadır.",
+    "notice": "İhbar süresi: {weeks} hafta. İhbar tazminatı (brüt): günlük ücret {daily} x {days} gün = {notice}. Gelir vergisi, yıl içindeki önceki kazançlara göre ayrıca hesaplanır.",
+    "condition": "Bu tutarlar, iş sözleşmesinin sona eriş biçiminin kıdem ve ihbar tazminatı hakkı doğurduğu varsayımıyla hesaplanmıştır."
+  },
+  "interest": {
+    "citation": "Faiz hesabı",
+    "title": "Faiz hesabı (sistem tarafından kodla yapılmıştır)",
+    "basis": "Anapara {principal}; faiz {start} tarihinden sonraki günden {end} gününe kadar işletilmiştir (basit faiz, yıl 365 gün).",
+    "kind_statutory": "Yasal (kanuni) faiz, 3095 sayılı Kanun m. 1:",
+    "kind_advance": "Avans faizi (ticari işlerde), TCMB avans işlemlerinde uygulanan oran, 3095 sayılı Kanun m. 2/2:",
+    "stretch": "{start} - {end}: {days} gün, yıllık %{rate}: {interest}",
+    "total": "Toplam faiz: {total}. Anapara ile birlikte: {sum}.",
+    "before_rates": "UYARI: Sistemdeki oran tablosu {first} tarihinden başlıyor; daha önceki günler için faiz hesaplanmadı.",
+    "after_known": "UYARI: Oranlar en son {known} tarihinde kontrol edildi; sonraki günler için son bilinen oran kullanıldı, değişiklik olup olmadığını kontrol edin.",
+    "both": "Hangi faizin uygulanacağı (yasal faiz mi, ticari işlerde avans faizi mi) işin niteliğine bağlıdır; iki hesap da verilmiştir."
+  }
+}

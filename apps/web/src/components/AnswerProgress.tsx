@@ -6,6 +6,10 @@ import type { Step, StepName } from "@/lib/stream";
 
 const LABELS: Record<StepName, [MessageKey, MessageKey]> = {
   understand: ["stepUnderstand", "stepUnderstandDone"],
+  analyse: ["stepAnalyse", "stepAnalyseDone"],
+  caselaw: ["stepCaselaw", "stepCaselawDone"],
+  calculate: ["stepCalculate", "stepCalculateDone"],
+  write: ["stepWrite", "stepWriteDone"],
   search: ["stepSearch", "stepSearchDone"],
   screen: ["stepScreen", "stepScreenDone"],
   references: ["stepReferences", "stepReferencesDone"],
@@ -17,7 +21,7 @@ const LABELS: Record<StepName, [MessageKey, MessageKey]> = {
 function label(step: Step): string {
   const [active, done] = LABELS[step.name];
   return t(step.state === "done" ? done : active, {
-    count: step.count ?? 0, done: step.done ?? 0, branches: step.branches ?? 0,
+    count: step.count ?? step.issues ?? 0, done: step.done ?? 0, branches: step.branches ?? 0,
   });
 }
 
@@ -35,7 +39,7 @@ export function AnswerProgress({ steps, startedAt }: { steps: Step[]; startedAt:
     <div className="mb-6 rounded-md border border-rule bg-sheet px-4 py-3" aria-live="polite">
       <div className="flex items-center justify-between text-xs text-faint">
         <span className="flex items-center gap-2">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cite" />
+          <span className="heartbeat h-1.5 w-1.5 rounded-full bg-cite" />
           {steps.length ? label(steps[steps.length - 1]) : t("stepUnderstand")}
         </span>
         <span className="tabular-nums">{t("elapsed", { seconds })}</span>
@@ -50,7 +54,7 @@ export function AnswerProgress({ steps, startedAt }: { steps: Step[]; startedAt:
                   step.state === "done" ? "bg-verified-soft text-verified" : "bg-cite-soft text-cite"
                 }`}
               >
-                {step.state === "done" ? "✓" : "•"}
+                {step.state === "done" ? "✓" : <span className="heartbeat h-1.5 w-1.5 rounded-full bg-cite" />}
               </span>
               <span className={step.state === "done" ? "text-muted" : "text-ink"}>{label(step)}</span>
             </li>

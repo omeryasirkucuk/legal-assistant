@@ -34,5 +34,13 @@
     "ü"
   ],
   "upper_letters": "A-ZÇĞİÖŞÜÂÎÛ",
-  "lower_letters": "a-zçğıöşüâîû"
+  "lower_letters": "a-zçğıöşüâîû",
+  "citation_patterns": [
+    "\\b(?:m|md|madde|maddesi|maddesinin)\\.?\\s*\\d+(?:\\s*/\\s*\\w+)*",
+    "\\b\\d{3,5}\\s+sayılı",
+    "\\b[A-ZÇĞİÖŞÜ]{2,6}(?:'\\w+)?\\s+(?:m\\.\\s*)?\\d+(?:\\s*/\\s*\\w+)*",
+    "\\b[EK]\\.\\s*\\d{4}\\s*/\\s*\\d+",
+    "\\b\\d{1,2}\\.\\d{1,2}\\.\\d{4}",
+    "\\b\\d+\\.\\s*(?:Hukuk|Ceza|İdari|Daire|fıkra|bent)"
+  ]
 }

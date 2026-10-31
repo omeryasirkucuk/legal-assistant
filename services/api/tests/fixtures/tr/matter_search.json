@@ -1,0 +1,11 @@
+{
+  "client": "Zeynep Kaya",
+  "subject": "Kira tespiti",
+  "notes": "Kiracı İzmir'de oturuyor",
+  "query_note": "izmir",
+  "file_name": "keşif.txt",
+  "file_text": "Keşif raporunda emsal kira bedeli 18.000 TL bulunmuştur.",
+  "query_text": "emsal kira",
+  "mark": "<<emsal>>",
+  "query_none": "ankara"
+}

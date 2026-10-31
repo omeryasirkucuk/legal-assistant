@@ -25,6 +25,7 @@ from legal_api.sources.types import Decision
 
 LOCAL_CANDIDATES = 4
 LIVE_DECISIONS = 4
+LIVE_BUDGET_S = 15
 MIN_QUERY_WORDS = 2
 KEEP = 2
 RELEVANT = 0.7      # passages are judged more loosely than statute candidates
@@ -35,6 +36,14 @@ INSTRUCTIONS = ("A lawyer asked the sub-question. Answer yes only if the court-d
                 "example how something is proved, or when a provision applies). A passage that "
                 "only quotes procedure, describes the parties' claims, or concerns another "
                 "issue is no.")
+# When the lawyer asks for decisions themselves, a decision on one of the case's issues is what
+# is wanted; judged by the instruction above, such passages scored 0.55-0.64 against a request
+# like "is there a precedent on this?" (0.9 and above with this one, procedure-only 0.15).
+PRECEDENT = ("A lawyer asked for court decisions on the case described by the request and its "
+             "legal characterisation. Answer yes if the court-decision passage decides or "
+             "states the court's view on one of the legal issues of that case, so the lawyer "
+             "could cite it as a precedent. A passage that only quotes procedure, only "
+             "describes the parties' claims, or concerns a different legal issue is no.")
 
 
 @dataclass(frozen=True)
@@ -65,45 +74,60 @@ def _closest_passage(text: str, ask: str) -> str:
     return chunks[max(range(len(chunks)), key=scores.__getitem__)]
 
 
-async def _search_relaxed(source: BedestenDecisions, query: str) -> list:
+async def _search_relaxed(source: BedestenDecisions, query: str,
+                          size: int = LIVE_DECISIONS) -> list:
     """The service matches every word; drop words from the end until something is found."""
     words = query.split()
     while words:
-        _, refs = await source.search(" ".join(words), size=LIVE_DECISIONS)
+        _, refs = await source.search(" ".join(words), size=size)
         if refs or len(words) <= MIN_QUERY_WORDS:
             return refs
         words = words[:-1]
     return []
 
 
-async def _live(source: BedestenDecisions, query: str, ask: str) -> list[Passage]:
+async def _live(source: BedestenDecisions, query: str, ask: str,
+                limit: int = LIVE_DECISIONS) -> list[Passage]:
+    """Live decisions within a time budget: requests to the service are queued process-wide
+    at one per second and can each take up to the gateway timeout, so several answers
+    searching at once could wait for minutes. Whatever arrived in time is used."""
+    found: list[Decision] = []
+
+    async def fetch_all() -> None:
+        for ref in (await _search_relaxed(source, query, limit))[:limit]:
+            found.append(await source.fetch(ref))
+
     try:
-        refs = await _search_relaxed(source, query)
-        found = [await source.fetch(ref) for ref in refs[:LIVE_DECISIONS]]
-    except SourceError:
-        return []
+        await asyncio.wait_for(fetch_all(), LIVE_BUDGET_S)
+    except (SourceError, TimeoutError):
+        pass
     return [Passage(_closest_passage(d.text, ask), d.text, live=d) for d in found]
 
 
-async def _screen(ask: str, passages: list[Passage], usage: llm.Usage) -> list[Passage]:
+async def _screen(ask: str, passages: list[Passage], usage: llm.Usage,
+                  keep: int = KEEP, instruction: str = INSTRUCTIONS) -> list[Passage]:
     if not decisions.enabled():
-        return passages[:KEEP]
+        return passages[:keep]
     async with decisions.client() as client:
         answers = await asyncio.gather(*(
             decisions.yes_probabilities(
                 client, {"sub_question": ask, "decision_passage": p.passage[:MAX_PASSAGE_CHARS]},
-                {"answers": INSTRUCTIONS}, usage, "case_law")
+                {"answers": instruction}, usage, "case_law")
             for p in passages))
     scored = [(a["answers"], p) for a, p in zip(answers, passages, strict=True)
               if a["answers"] is not None and a["answers"] >= RELEVANT]
     scored.sort(key=lambda x: -x[0])
-    return [p for _, p in scored[:KEEP]]
+    return [p for _, p in scored[:keep]]
 
 
 async def case_passages(conn: asyncpg.Connection, source: BedestenDecisions, query: str,
-                        ask: str, usage: llm.Usage) -> list[Passage]:
+                        ask: str, usage: llm.Usage, keep: int = KEEP,
+                        live_limit: int = LIVE_DECISIONS, precedents: bool = False
+                        ) -> list[Passage]:
+    """`precedents`: the lawyer asked for decisions themselves; more are read and kept, and
+    they are judged as precedents for the case rather than as answers to a sub-question."""
     local = await _local(conn, query)
-    live = await _live(source, query, ask)
+    live = await _live(source, query, ask, live_limit)
     seen, candidates = set(), []
     for p in [*live, *local]:
         key = (p.live.ref.case_no, p.live.ref.decision_no) if p.live else (
@@ -111,4 +135,4 @@ async def case_passages(conn: asyncpg.Connection, source: BedestenDecisions, que
         if key not in seen:
             seen.add(key)
             candidates.append(p)
-    return await _screen(ask, candidates, usage)
+    return await _screen(ask, candidates, usage, keep, PRECEDENT if precedents else INSTRUCTIONS)

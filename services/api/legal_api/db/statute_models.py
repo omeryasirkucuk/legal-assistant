@@ -24,6 +24,10 @@ class StatuteArticle(Base):
     label: Mapped[str] = mapped_column(String(32))                    # "269/a", "ek 1"
     position: Mapped[int] = mapped_column(Integer)                    # order within the law
     heading: Mapped[str] = mapped_column(Text, default="")            # marginal title
+    # Titles of the parts and chapters the article sits in, outermost first, joined by " > "
+    # ("Kira Sözleşmesi > Ürün Kirası"): the same marginal title means different things in
+    # different chapters, so the chapter decides which regime an article belongs to.
+    section: Mapped[str] = mapped_column(Text, default="", server_default="")
     text: Mapped[str] = mapped_column(Text)
     url: Mapped[str] = mapped_column(Text)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

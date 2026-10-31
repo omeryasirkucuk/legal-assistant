@@ -34,3 +34,18 @@ export function splitSections(raw: string): { short: string | null; detail: stri
   const detail = /<detail>([\s\S]*?)(?:<\/detail>|$)/.exec(text);
   return { short: short[1].trim(), detail: detail ? detail[1].trim() : "" };
 }
+
+// Citation markers moved to the end of their line (a paragraph or list item), each once:
+// a chip after every sentence made answers hard to read. Table rows keep theirs in place.
+export function groupCitations(raw: string): string {
+  return raw
+    .split("\n")
+    .map((line) => {
+      if (line.trimStart().startsWith("|")) return line;
+      const keys = [...line.matchAll(/\[\[(E\d+)\]\]/g)].map((m) => m[1]);
+      if (!keys.length) return line;
+      const body = line.replace(/\s*\[\[E\d+\]\]/g, "").trimEnd();
+      return `${body} ${[...new Set(keys)].map((k) => `[[${k}]]`).join(" ")}`;
+    })
+    .join("\n");
+}

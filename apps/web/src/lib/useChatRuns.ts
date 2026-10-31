@@ -5,7 +5,7 @@
 import { useCallback, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import { applyEvent, startPending, type Pending } from "./pending";
-import { askStream, followRun, type StreamEvent } from "./stream";
+import { askStream, followRun, type AskOptions, type StreamEvent } from "./stream";
 
 type Callbacks = {
   onTitle: (chatId: string, title: string) => void;
@@ -60,10 +60,10 @@ export function useChatRuns({ onTitle, onFinished }: Callbacks) {
     }
   }, [onFinished, update]);
 
-  const ask = useCallback((chatId: string, question: string) => {
+  const ask = useCallback((chatId: string, question: string, options: AskOptions = {}) => {
     setPending((all) => ({ ...all, [chatId]: startPending(question) }));
     return watch(chatId, (signal) =>
-      askStream(chatId, question, consume(chatId), signal).then(() => true));
+      askStream(chatId, question, consume(chatId), signal, options).then(() => true));
   }, [consume, watch]);
 
   // Picks up an answer still running on the server, if any.
@@ -72,11 +72,13 @@ export function useChatRuns({ onTitle, onFinished }: Callbacks) {
     return watch(chatId, (signal) => followRun(chatId, consume(chatId), signal));
   }, [consume, watch]);
 
+  // Stops the answer on the server; the unanswered question is removed there, so the chat is
+  // reloaded once the cancel has gone through.
   const stop = useCallback((chatId: string) => {
-    api.cancelRun(chatId).catch(() => {});
     watching.current[chatId]?.abort();
     update(chatId, () => null);
-  }, [update]);
+    api.cancelRun(chatId).catch(() => {}).finally(() => onFinished(chatId));
+  }, [onFinished, update]);
 
   return { pending, ask, attach, stop };
 }

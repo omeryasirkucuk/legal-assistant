@@ -65,6 +65,9 @@ class Chat(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"),
                                                index=True)
     title: Mapped[str] = mapped_column(String(200))
+    # the case file it belongs to (db/matter_models.py); None for a loose chat
+    matter_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("matters.id", ondelete="SET NULL"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now,
                                                  index=True)
@@ -105,3 +108,7 @@ class MessageEvidence(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (UniqueConstraint("message_id", "key"),)
+
+
+# Chats point to matters: their table must be known wherever chats are.
+from legal_api.db import matter_models  # noqa: F401
