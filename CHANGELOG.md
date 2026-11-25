@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 · 2026-11-26
+
+- Verify numeric corrections against their replacement source and rerun the existing approved method when the legal basis and event dates stay the same.
+
 ## 0.3.0 · 2026-11-26
 
 - Added an AI calculation workflow in chat that can research an unfamiliar method, bind its inputs and rules to source passages, and run a reproducible calculation.

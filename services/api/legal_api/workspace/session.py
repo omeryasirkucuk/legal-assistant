@@ -22,12 +22,21 @@ from legal_api.grounding.normalize import tr_fold
 from legal_api.prompts import prompt
 from legal_api.sources.gateway import SourceError
 from legal_api.workspace.documents import EditSet, excerpt, word_copy
-from legal_api.workspace.engine import VERSION, InvalidPlan, Plan, Record, Value, evaluate
+from legal_api.workspace.engine import (
+    VERSION,
+    InvalidPlan,
+    Key,
+    Passage,
+    Plan,
+    Record,
+    Value,
+    evaluate,
+)
 from legal_api.workspace.ground import STATEMENT_KEY, ground, review, schema, structured
 from legal_api.workspace.public import PublicResearch, public_query
 
 ACTIONS = ("search_files", "read_file", "search_law", "read_law", "search_cases", "search_web", "read_web",
-           "calculate", "finish", "blocked")
+           "calculate", "revise_inputs", "finish", "blocked")
 ACTION_SCHEMA = schema({"action": {"type": "string", "enum": list(ACTIONS)},
                         "payload": {"type": "string"}})
 MAX_TURNS = 16
@@ -54,6 +63,16 @@ class ReadFile(Record):
     file: str = Field(pattern=r"^F[1-9][0-9]{0,2}$")
     start: int = Field(ge=1, le=5000)
     sheet: str = Field(max_length=31)
+
+
+class InputPatch(Record):
+    key: Key
+    value: str = Field(min_length=1, max_length=40)
+    passage: Passage
+
+
+class InputRevision(Record):
+    changes: list[InputPatch] = Field(min_length=1, max_length=15)
 
 
 class Finish(Record):
@@ -237,6 +256,45 @@ class Workspace:
         self.comparison.append(f"{src.key} {src.citation}\n{src.text[:3500]}")
         return {"length": len(body), "range": [begin, end], "source": self._sources([Source(src, src.text)])}
 
+    async def _revise_inputs(self, question: str, revision: InputRevision) -> tuple[Plan, dict]:
+        if self.previous is None or (self.context.previous or {}).get("pending"):
+            raise InvalidPlan("Girdi düzeltmesi tamamlanmış önceki bir hesap gerektiriyor.")
+        candidate = self.previous.model_copy(deep=True)
+        candidate.updates_previous = True
+        inputs = {item.key: item for item in candidate.inputs}
+        seen = set()
+        for change in revision.changes:
+            item = inputs.get(change.key)
+            if item is None or change.key in seen:
+                raise InvalidPlan("Girdi düzeltmesi farklı ve mevcut girdi kimlikleri gerektiriyor.")
+            seen.add(change.key)
+            before, after = self.ledger.get(item.passage.ref), self.ledger.get(change.passage.ref)
+            if (item.unit == "date" or not before or not after
+                    or before.kind not in ("case_file", "statement")
+                    or after.kind not in ("case_file", "statement")):
+                raise InvalidPlan("Hukuki kural, oran veya tarih değişiyorsa yeniden hesap planı kur.")
+            item.value, item.passage = change.value, change.passage
+
+        new_values = evaluate(candidate)
+        proof = ground(self.ledger, candidate, new_values)
+        old_values = evaluate(self.previous)
+        updates = [{"key": item.key, "label": item.label, "meaning": item.meaning,
+                    "unit": item.unit, "before": old_values[item.key].dump(),
+                    "after": new_values[item.key].dump(), "source": proof["inputs"][item.key]}
+                   for item in candidate.inputs if item.key in seen]
+        verdict = await structured(
+            "judge", self.usage, "workspace_revision", prompt("workspace_revision"),
+            {"request": question, "verified_title": candidate.title,
+             "verified_rules": [rule.model_dump() for rule in candidate.rules],
+             "verified_steps": [step.model_dump() for step in candidate.steps],
+             "changes": updates, "compared_documents": self.comparison[-5:]},
+            schema({"approved": {"type": "boolean"}, "reason": {"type": "string"}}), 2200)
+        if verdict.get("approved") is not True:
+            reason = verdict.get("reason")
+            raise InvalidPlan((reason if isinstance(reason, str) else
+                               "Girdi düzeltmesi doğrulanamadı.")[:650])
+        return candidate, new_values
+
     async def _edits(self, items: list[EditSet], plan: Plan,
                      values: dict[str, Value]) -> tuple[list[dict], list[bytes]]:
         edits, copies = [], []
@@ -382,6 +440,12 @@ class Workspace:
                         self.current = candidate
                     result = {"status": "verified", "values": {key: values[key].dump()
                               for key in candidate.outputs}, "next": "finish veya varsa blocked"}
+                    context["calculation"] = result
+                elif action == "revise_inputs":
+                    revision = InputRevision.model_validate(payload)
+                    self.current, values = await self._revise_inputs(question, revision)
+                    result = {"status": "verified", "values": {key: values[key].dump()
+                              for key in self.current.outputs}, "next": "finish veya varsa blocked"}
                     context["calculation"] = result
                 elif action == "finish":
                     finish = Finish.model_validate(payload)
