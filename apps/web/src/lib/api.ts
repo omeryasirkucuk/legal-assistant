@@ -52,7 +52,7 @@ export type CalendarYear = {
   holidays: Array<{ day: string; name: string; half: boolean }>;
 };
 export type ComputedDeadline = { label: string; due: string; without_recess: string | null };
-export type Evidence = { key: string; kind: "decision" | "article"; citation: string; url: string };
+export type Evidence = { key: string; kind: "decision" | "article" | "case_file" | "calculation" | "statement" | "official" | "clock"; citation: string; url: string };
 export type Issue = { kind: string; severity: "error" | "warning"; paragraph: number; message: string };
 export type Claim = {
   sentence: string;
@@ -62,7 +62,15 @@ export type Claim = {
   reason?: "citation_unmatched" | "citation_missing" | "support_low";
 };
 export type Checked = { issues: Issue[]; claims: Claim[]; citation_check?: "source_passages" };
+export type WorkspaceSummary = {
+  revision: number;
+  format: "short" | "table" | "xlsx";
+  pending: boolean;
+  changes: Array<{ label: string; before: string; after: string; old_unit: string; unit: string }>;
+  edits: Array<{ name: string; changes: Array<{ paragraph: number; before: string; after: string }> }>;
+};
 export type MessageMeta = {
+  workspace?: WorkspaceSummary;
   checked?: Checked;
   repaired?: boolean;
   refused?: boolean;
@@ -193,6 +201,8 @@ export const api = {
   /** The file in the editor: a petition's draft, or an editable copy of an added document. */
   editFile: (id: string) => call<Draft>(`/drafts/from-file/${id}`, { method: "POST" }),
   fileUrl: (id: string) => `${API_URL}/files/${id}`,
+  workspaceOutput: (chat: string, message: string, output: string) =>
+    `${API_URL}/chats/${chat}/messages/${message}/output/${output}`,
   petitionTypes: () => call<PetitionType[]>("/drafting/types"),
   samples: () => call<StyleSample[]>("/drafting/samples"),
   uploadSample: (file: File, choice?: { replace?: string; keep?: boolean }) => {

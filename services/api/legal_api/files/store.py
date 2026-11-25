@@ -97,7 +97,7 @@ async def save(db: AsyncSession, user_id: uuid.UUID, name: str, data: bytes, ori
                media_type: str | None = None, chat_id: uuid.UUID | None = None,
                draft_id: uuid.UUID | None = None,
                petition_type: str | None = None,
-               matter_id: uuid.UUID | None = None) -> StoredFile:
+               matter_id: uuid.UUID | None = None, *, commit: bool = True) -> StoredFile:
     if len(data) > MAX_FILE_BYTES:
         raise FileTooLarge(name)
     if await used_bytes(db, user_id) + len(data) > get_settings().user_storage_bytes:
@@ -122,6 +122,8 @@ async def save(db: AsyncSession, user_id: uuid.UUID, name: str, data: bytes, ori
                         created_at=datetime.now(UTC))
     _write(_root() / rel, payload)
     db.add(stored)
+    if not commit:
+        return stored
     try:
         await db.commit()
     except Exception:

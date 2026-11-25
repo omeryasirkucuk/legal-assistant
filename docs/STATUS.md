@@ -1,5 +1,8 @@
 # Status
 
+Release 0.3.0 adds sourced calculations and document updates in chat. The app can save
+calculation revisions, present them inline or as Excel, and make checked Word copies.
+
 Release 0.2.0 adds locked setup, corpus readiness, verified citation passages and protected
 client data processing. See [CHANGELOG.md](../CHANGELOG.md) and the [privacy runbook](PRIVACY.md).
 The measurements and probes below describe the October evaluation runs.

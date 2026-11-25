@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     storage_dir: Path = REPO_ROOT / "var" / "storage"
     user_storage_bytes: int = 5 * 1024**3   # each user's space for attachments and made files
     data_mode: Literal["development", "protected"] = "development"
+    brave_search_api_key: str = ""
     document_encryption_key: str = ""
     private_model_base_url: str = ""
     private_model_api_key: str = ""

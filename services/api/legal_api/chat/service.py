@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy import Float, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from legal_api.agent.turn import EvidenceCopy, Previous
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, LlmSpend, Message, MessageEvidence
+from legal_api.files import store as file_store
+from legal_api.workspace.documents import WORD_MEDIA_TYPE
+from legal_api.workspace.session import Context
 
 HISTORY_TURNS = 6
 TITLE_CHARS = 60
@@ -73,6 +77,23 @@ async def previous_turn(db: AsyncSession, chat: Chat) -> Previous | None:
                      for e in evidence])
 
 
+
+async def workspace_context(db: AsyncSession, chat: Chat, files: list) -> Context:
+    """Find the latest durable plan even if another kind of answer intervened."""
+    row = (await db.execute(select(Message.id, Message.meta["workspace"]).where(
+        Message.chat_id == chat.id, Message.role == "assistant",
+        Message.meta["workspace"]["plan"].astext.is_not(None))
+        .order_by(Message.created_at.desc()).limit(1))).first()
+    context = Context(files)
+    if row:
+        context.previous = row[1]
+        context.previous_evidence = list(await db.scalars(
+            select(MessageEvidence).where(MessageEvidence.message_id == row.id,
+                                         MessageEvidence.kind != "calculation")
+            .order_by(MessageEvidence.key)))
+    return context
+
+
 async def save_answer(db: AsyncSession, chat: Chat, result) -> Message:
     """`result`: a pipeline WrittenResult (or the legacy AnswerResult): text, structure(),
     usage, timings, trace, ledger of sources, optionally checked."""
@@ -81,15 +102,34 @@ async def save_answer(db: AsyncSession, chat: Chat, result) -> Message:
         "cost_usd": round(result.usage.cost_usd, 4),
         "timings": result.timings,
         "trace": result.trace,
+        **({"workspace": result.workspace} if getattr(result, "workspace", None) else {}),
         **({"checked": result.checked} if getattr(result, "checked", None) else {}),
     })
     db.add(msg)
-    await db.flush()
-    db.add_all(MessageEvidence(message_id=msg.id, key=e.key, kind=e.kind, citation=e.citation,
-                               url=e.url, text=e.text, fetched_at=e.fetched_at)
-               for e in result.ledger)
-    chat.updated_at = datetime.now(UTC)
-    await db.commit()
+    written_files = []
+    try:
+        await db.flush()
+        db.add_all(MessageEvidence(message_id=msg.id, key=e.key, kind=e.kind, citation=e.citation,
+                                   url=e.url, text=e.text, fetched_at=e.fetched_at)
+                   for e in result.ledger)
+        workspace = getattr(result, "workspace", None)
+        copies = getattr(result, "workspace_files", [])
+        if workspace and copies:
+            updated = []
+            for edit, data in zip(workspace["edits"], copies, strict=True):
+                filename = f"{Path(edit['name']).stem[:190]}-hesap-v{workspace['revision']}.docx"
+                stored = await file_store.save(db, chat.user_id, filename, data, "generated",
+                                               WORD_MEDIA_TYPE, chat_id=chat.id, commit=False)
+                written_files.append(stored)
+                stored.message_id = msg.id
+                updated.append({**edit, "file_id": str(stored.id)})
+            msg.meta = {**msg.meta, "workspace": {**workspace, "edits": updated}}
+        chat.updated_at = datetime.now(UTC)
+        await db.commit()
+    except BaseException:
+        for file in written_files:
+            file_store.remove_from_disk(file)
+        raise
     return msg
 
 

@@ -56,6 +56,32 @@ citations show a warning alongside the complete answer. When the decision model 
 the app also checks cited claims against those specific sources and marks uncertain support.
 Previous chats display their original citations with a legacy verification label.
 
+## Calculations and document updates in chat
+
+Ask for a calculation in the existing chat. Attach the relevant files or open the chat in a
+case file. The assistant can read document locations, look up statutes and judgments, and
+build a calculation using arithmetic, dates, conditions and multiple results. The saved
+calculation keeps the inputs, quoted passages, applicable date, reasoning, operations and
+result. The source panel opens the material behind each step. If a material fact or rule
+cannot be verified, the answer identifies the item that remains open.
+
+You can ask for one line, a table in chat, or an editable Excel workbook. A format change can
+reuse the saved calculation. Supply a correction or a replacement document in the same chat
+to run a new revision and see which inputs and results changed. When you ask to update a Word
+file, the assistant can replace a verified amount at an exact location and save a separate
+copy in **My files**. Previous answers and their exports remain available in chat history.
+
+Paper scans need a readable text layer for this workflow. Word edits currently target amounts
+in the document body, within a single text run. Excel exports use formulas for the saved plan.
+Local changes within Excel are separate from the app's verified revision. Bring changed inputs
+back to the chat to verify and record a new revision.
+
+The same local legislation and decision indexes support this workflow. For synthetic or
+public-material development, an optional `BRAVE_SEARCH_API_KEY` adds web discovery when the
+indexes do not cover a rule. Outbound web queries are built from public legal terms. A result
+becomes evidence only after the official document is retrieved and its passage is checked.
+Protected mode keeps live source requests off and uses the local indexes.
+
 ## Client data
 
 Use `DATA_MODE=protected` for real client material. Protected mode encrypts original and

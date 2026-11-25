@@ -15,6 +15,7 @@ from legal_api.agent.sources import Source
 from legal_api.drafting.brief import StyleBook
 from legal_api.files.context import Attachment
 from legal_api.matters.agenda import Agenda
+from legal_api.workspace.session import Context
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,8 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
                       result: dict, style: StyleBook | None = None, power: Power = POWERS["balanced"],
                       attachments: list[Attachment] | None = None,
                       agenda: Agenda | None = None,
-                      usage: llm.Usage | None = None) -> AsyncIterator[Event]:
+                      usage: llm.Usage | None = None,
+                      workspace: Context | None = None) -> AsyncIterator[Event]:
     usage = usage if usage is not None else llm.Usage()
     just_asked = bool(previous and (previous.answer or {}).get("asked"))
     yield step_event("understand")
@@ -49,7 +51,7 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
     # attachments brings new material: it is answered afresh, not reformatted.
     if just_asked:
         kind = "followup"
-    elif attachments:
+    elif attachments or (previous and (previous.answer or {}).get("task") == "workspace"):
         kind = "new"
     else:
         kind = await route(message, previous.question if previous else None,
@@ -63,16 +65,16 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
         # from (the writer sees only the message; a date given in the request was lost).
         events = answer_events(f"{previous.question}\n\n{message}", history, result,
                                usage=usage, style=style, power=power, attachments=attachments,
-                               just_asked=True, agenda=agenda)
+                               just_asked=True, agenda=agenda, workspace=workspace)
     elif kind == "followup" and previous:
         events = answer_events(message, history, result,
                                search_text=f"{previous.question}\n{message}", usage=usage,
                                style=style, power=power, attachments=attachments,
-                               just_asked=just_asked, agenda=agenda)
+                               just_asked=just_asked, agenda=agenda, workspace=workspace)
     else:
         events = answer_events(message, history, result, usage=usage, style=style,
                                power=power, attachments=attachments, just_asked=just_asked,
-                               agenda=agenda)
+                               agenda=agenda, workspace=workspace)
     yield Event("route", {"kind": kind})
     yield step_event("understand", "done")
     async for event in events:

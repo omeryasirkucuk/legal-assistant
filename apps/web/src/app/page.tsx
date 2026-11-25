@@ -7,6 +7,7 @@ import { StreamingAnswer } from "@/components/StreamingAnswer";
 import { Composer } from "@/components/Composer";
 import { Sidebar } from "@/components/Sidebar";
 import { SourceDrawer } from "@/components/SourceDrawer";
+import { WorkspaceResult } from "@/components/WorkspaceResult";
 import { DraftFile } from "@/components/DraftFile";
 import { DraftPanel } from "@/components/DraftPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
@@ -56,6 +57,7 @@ export default function ChatApp() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [drawer, setDrawer] = useState<Drawer | null>(null);
   const [source, setSource] = useState<SourceText | null>(null);
+  const sourceRequest = useRef(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [styleOpen, setStyleOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -105,6 +107,7 @@ export default function ChatApp() {
     }, []),
   });
   const pending = chatId ? runs.pending[chatId] ?? null : null;
+  const sourceMessage = messages.find((m) => m.id === drawer?.messageId);
 
   useEffect(() => {
     visibleChat.current = chatId;
@@ -283,6 +286,7 @@ export default function ChatApp() {
     if (!pending) return;
     const ev = pending.evidence.find((e) => e.key === key);
     if (!ev) return;
+    sourceRequest.current++;
     setSource(null);
     setDrawer({ evidence: ev, number: 0, messageId: null });
   }
@@ -290,9 +294,14 @@ export default function ChatApp() {
   function openSource(evidence: Evidence[], raw: string, messageId: string | null, key: string) {
     const ev = evidence.find((e) => e.key === key);
     if (!ev) return;
+    const request = ++sourceRequest.current;
     setSource(null);
     setDrawer({ evidence: ev, number: citationOrder(raw).indexOf(key) + 1, messageId });
-    if (messageId && chatId) api.source(chatId, messageId, key).then(setSource).catch(() => {});
+    if (messageId && chatId) {
+      api.source(chatId, messageId, key).then((text) => {
+        if (sourceRequest.current === request) setSource(text);
+      }).catch(() => {});
+    }
   }
 
   if (!user) return null;
@@ -388,8 +397,11 @@ export default function ChatApp() {
                         ? m.meta.cost_usd + (m.meta.detail_cost_usd ?? 0) : undefined}
                       asked={m.meta.answer?.asked}
                       onOpenSource={(k) => openSource(m.evidence, m.content, m.id, k)}
-                      draftAction={(draftOf(m.id) || (matterId && m.meta.trace?.deadlines_computed?.length)) && (
+                      draftAction={(draftOf(m.id) || m.meta.workspace || (matterId && m.meta.trace?.deadlines_computed?.length)) && (
                         <>
+                          {chatId && m.meta.workspace && (
+                            <WorkspaceResult chatId={chatId} messageId={m.id} result={m.meta.workspace} />
+                          )}
                           {draftOf(m.id) && (
                             <DraftFile draft={draftOf(m.id)!} onEdit={() => setOpenDraft(draftOf(m.id) ?? null)} />
                           )}
@@ -463,7 +475,11 @@ export default function ChatApp() {
         evidence={drawer?.evidence ?? null}
         number={drawer?.number ?? 0}
         source={source}
-        onClose={() => setDrawer(null)}
+        related={sourceMessage?.evidence.filter((e) => e.kind !== "calculation")}
+        onSelect={sourceMessage
+          ? (key) => openSource(sourceMessage.evidence, sourceMessage.content, sourceMessage.id, key)
+          : undefined}
+        onClose={() => { sourceRequest.current++; setDrawer(null); }}
       />
       {openDraft && !draftPage && (
         <DraftPanel key={openDraft.id} draft={openDraft} onClose={() => setOpenDraft(null)}

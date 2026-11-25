@@ -36,10 +36,12 @@ from legal_api.drafting.prepare import DRAFT_MAX_TOKENS, drafting_instruction
 from legal_api.drafting.style import around_petition
 from legal_api.drafting.tidy import tidy
 from legal_api.files.context import Attachment, for_understanding, for_writer
-from legal_api.grounding.evidence import EvidenceLedger
+from legal_api.grounding.evidence import Evidence, EvidenceLedger
 from legal_api.matters.agenda import Agenda
 from legal_api.retrieval.statutes import indexed_laws
 from legal_api.sources.gateway import Gateway
+from legal_api.workspace.public import PublicResearch
+from legal_api.workspace.session import Context, Workspace
 
 
 @dataclass
@@ -48,11 +50,13 @@ class WrittenResult:
     question: str
     understanding: Understanding
     written: Written
-    ledger: EvidenceLedger
+    ledger: EvidenceLedger | list[Evidence]
     usage: llm.Usage
     timings: dict[str, float] = field(default_factory=dict)
     trace: dict = field(default_factory=dict)
     asked: bool = False      # the turn asked for facts instead of drafting
+    workspace: dict | None = None
+    workspace_files: list[bytes] = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -70,7 +74,9 @@ class WrittenResult:
         return self.written.text
 
     @property
-    def checked(self) -> dict:
+    def checked(self) -> dict | None:
+        if self.understanding.task == "workspace":
+            return None
         return {"issues": [], "claims": self.written.flagged, "citation_check": "source_passages"}
 
     def structure(self) -> dict:
@@ -87,7 +93,8 @@ async def answer_events(question: str, history: list[dict] | None = None,
                         power: Power = POWERS["balanced"],
                         attachments: list[Attachment] | None = None,
                         just_asked: bool = False,
-                        agenda: Agenda | None = None) -> AsyncIterator[Event]:
+                        agenda: Agenda | None = None,
+                        workspace: Context | None = None) -> AsyncIterator[Event]:
     """`style`: the lawyer's style, used when the message asks for a petition; `power`: how
     much work the answer gets; `attachments`: the lawyer's documents for this message;
     `just_asked`: the previous turn asked the lawyer for facts (drafting/asking.py);
@@ -114,6 +121,25 @@ async def answer_events(question: str, history: list[dict] | None = None,
         u = await understand(for_understanding(search_text or question, attachments),
                              history or [], usage, laws)
         mark("understand_s")
+        if u.task == "workspace":
+            yield step_event("analyse", "done", issues=len(u.issues))
+            yield step_event("calculate")
+            agent = Workspace(workspace or Context(), finder, PublicResearch(gateway), ledger, usage)
+            outcome = await agent.run(question, history or [])
+            mark("total_s")
+            yield step_event("calculate", "done")
+            for source in outcome.sources:
+                yield Event("evidence", {"key": source.key, "kind": source.kind,
+                                         "citation": source.citation, "url": source.url})
+            used = {source.key for source in outcome.sources}
+            res = WrittenResult(question, u, Written([Segment(outcome.text)], outcome.text, []),
+                                [e for e in ledger if e.key in used], usage, timings, u.trace(),
+                                workspace=outcome.snapshot, workspace_files=outcome.files)
+            yield Event("final", {"text": res.text, "cost_usd": round(usage.cost_usd, 4),
+                                  "timings": timings})
+            if result is not None:
+                result["result"] = res
+            return
         if u.task == "drafting":
             kind = kind_of(u.case_kind)
             gaps = await find_gaps(_conversation(history or [], for_understanding(

@@ -1,0 +1,1 @@
+Kullanıcının isteğinde önceki hesabı olduğu gibi kullanmak uygun mu? approved true yalnızca istek aynı hesabın biçimini değiştirmek, mevcut sonucunu tekrar göstermek veya aynı sonucu dosyaya aktarmak ise. Yeni değer, belge verisi, tarih, varsayım, farklı yöntem, farklı dosya veya yeni toplam varsa approved false. Hukuki sonuca dair ek bir talep de false.

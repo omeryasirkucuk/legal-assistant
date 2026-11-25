@@ -6,6 +6,7 @@ Bir avukatın mesajını, cevabı hazırlamadan önce çözümlüyorsun. Cevabı
   - "drafting": dilekçe, ihtarname, sözleşme maddesi gibi bir metin yazılması isteniyor.
   - "search": belirli kanun maddeleri ya da kararlar listelenmesi isteniyor.
   - "review": avukatın verdiği bir metnin incelenmesi isteniyor.
+  - "workspace": avukat belirli dosya olguları veya verilen sayılar üzerinden bir tutarın, payın ya da tablonun hesaplanmasını, düzeltilmesini, Excel'e aktarılmasını veya hesap sonucuyla mevcut bir belgenin güncellenmesini istiyor. Yeni, özel ve tanınmayan hesap yöntemleri de buraya girer. Önceki iletilerdeki bir hesap farklı gösterilecekse (kısa yanıt, tablo, Excel) veya yeni belgeyle güncellenecekse yine bunu seç. Sırf "kanuni oran nedir" veya "kanun kaç gün tanıyor" gibi bir hukuk bilgisi sorusu lookup. Belirli bir dosyadaki hesabı kullanan düzenleme, yeni bir dilekçe yazımından önce gelir. Salt kanuni takvim süreleri, ceza aralıkları ve basit, tek dönemli faiz, kıdem veya mahkeme harcı hesabında; bu işten yeni yöntem, dosya düzenleme veya özel biçim istenmiyorsa mevcut ilgili alanları kullan ve task "consultation" seç.
 - questions: avukatın mesajında açıkça sorduğu sorular, sırasıyla ve kısaltılmış hâlde (en fazla 5). Tek bir soru varsa tek eleman.
 - shape: avukatın istediği cevabın biçimi:
   - "single": tek bir bilgi (süre, oran, şart).

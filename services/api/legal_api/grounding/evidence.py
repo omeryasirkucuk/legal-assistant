@@ -14,7 +14,7 @@ from legal_api.grounding.normalize import tr_title
 from legal_api.locale import citation_template
 from legal_api.sources.types import Article, Court, DecisionRef
 
-EvidenceKind = Literal["decision", "article", "calculation"]
+EvidenceKind = Literal["decision", "article", "calculation", "official", "case_file", "statement", "clock"]
 
 
 @dataclass(frozen=True)
@@ -108,3 +108,11 @@ class EvidenceLedger:
     def add_calculation(self, *, source_id: str, citation: str, text: str) -> Evidence:
         """A result computed in code (calc/), shown and cited like any source."""
         return self._add(source_id, kind="calculation", citation=citation, url="", text=text)
+
+    def add_record(self, *, source_id: str, kind: EvidenceKind, citation: str, text: str,
+                   url: str = "") -> Evidence:
+        return self._add(source_id, kind=kind, citation=citation, text=text, url=url)
+
+    def retain(self, evidence) -> Evidence:
+        return self._add(f"retained:{evidence.key}", kind=evidence.kind, citation=evidence.citation,
+                         url=evidence.url, text=evidence.text, fetched_at=evidence.fetched_at)

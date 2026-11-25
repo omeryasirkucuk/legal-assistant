@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 · 2026-11-26
+
+- Added an AI calculation workflow in chat that can research an unfamiliar method, bind its inputs and rules to source passages, and run a reproducible calculation.
+- Added saved calculation revisions with visible input and result changes, optional formula-based Excel output, and sourced inline answers and tables.
+- Added checked amount replacements in Word copies with access to the original and previous outputs.
+- Added optional public-law web discovery for development and preserved local research in protected mode.
+
 ## 0.2.0 · 2026-11-26
 
 - Added protected mode with authenticated encryption for document files and a fixed private model connection.
