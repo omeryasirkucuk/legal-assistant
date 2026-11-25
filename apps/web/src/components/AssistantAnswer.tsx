@@ -149,12 +149,13 @@ function Verification({
   const [open, setOpen] = useState(false);
   const errors = checked.issues.filter((i) => i.severity === "error");
   const partial = checked.claims.filter((c) => c.verdict !== "supported");
-  const tone = errors.length ? "danger" : partial.length ? "caution" : "verified";
+  const currentCheck = checked.citation_check === "source_passages";
+  const tone = errors.length ? "danger" : partial.length || !currentCheck ? "caution" : "verified";
   const summary = errors.length
     ? t("unverified", { count: errors.length + partial.length })
     : partial.length
       ? t("verifiedWithWarnings", { count: partial.length })
-      : t("verified");
+      : t(currentCheck ? "verified" : "legacyVerification");
   const colors = {
     verified: "bg-verified-soft text-verified",
     caution: "bg-caution-soft text-caution",
@@ -179,14 +180,18 @@ function Verification({
           {errors.map((i, idx) => (
             <li key={`e${idx}`}>{i.message}</li>
           ))}
-          {partial.map((c, idx) => (
-            <li key={`c${idx}`}>
-              <span className="font-serif italic">&ldquo;{c.sentence}&rdquo;</span>{" "}
-              <span className="text-muted">
-                [{c.keys.map(number).filter((n) => n > 0).join(", ")}] {c.note}
-              </span>
-            </li>
-          ))}
+          {partial.map((c, idx) => {
+            const citations = c.keys.map(number).filter((n) => n > 0).join(", ");
+            const note = c.reason === "citation_unmatched" ? t("citationUnmatched")
+              : c.reason === "citation_missing" ? t("citationMissing")
+              : c.reason === "support_low" ? t("citationSupportLow") : c.note;
+            return (
+              <li key={`c${idx}`}>
+                {c.sentence && <span className="font-serif italic">&ldquo;{c.sentence}&rdquo;{" "}</span>}
+                <span className="text-muted">{citations && `[${citations}] `}{note}</span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

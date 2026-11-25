@@ -58,8 +58,9 @@ export type Claim = {
   keys: string[];
   verdict: "supported" | "partial" | "not_supported";
   note: string;
+  reason?: "citation_unmatched" | "citation_missing" | "support_low";
 };
-export type Checked = { issues: Issue[]; claims: Claim[] };
+export type Checked = { issues: Issue[]; claims: Claim[]; citation_check?: "source_passages" };
 export type MessageMeta = {
   checked?: Checked;
   repaired?: boolean;

@@ -16,7 +16,7 @@ from legal_api.agent.decompose import Atom
 from legal_api.agent.queries import case_query
 from legal_api.agent.sources import Source, SourceFinder
 from legal_api.config import get_settings
-from legal_api.grounding.normalize import contains_quote
+from legal_api.grounding.normalize import tr_fold
 from legal_api.prompts import prompt
 
 NOT_FOUND = "NOT_FOUND"
@@ -28,6 +28,7 @@ class Segment:
     text: str
     keys: tuple[str, ...] = ()        # evidence keys this text is cited to
     quotes: tuple[str, ...] = ()      # the exact cited passages
+    unverified: tuple[str, ...] = ()  # keys the writer named without a matching passage
 
 
 @dataclass
@@ -70,6 +71,50 @@ def _documents(sources: list[Source]) -> list[dict]:
 
 
 _SENTENCE_START = re.compile(r"(?:[.!?:]\s+|\n)(?=\S)")
+_QUOTE_TAG = re.compile(r"<quote\b([^<>]*)>([\s\S]*?)</quote>")
+_QUOTE_REF = re.compile(r'\bref\s*=\s*"(E\d+)"')
+_MARKER = re.compile(r"\[\[(E\d+)\]\]")
+_WIRE = re.compile(rf"\s*(?:{_QUOTE_TAG.pattern}|{_MARKER.pattern})")
+
+
+class CitationStream:
+    """Render prose deltas while the provider's quote and reference tags stay private."""
+
+    _tags = {"<quote": "</quote>", "[[": "]]"}
+
+    def __init__(self) -> None:
+        self.pending = ""
+        self.closing = ""
+
+    def feed(self, chunk: str) -> str:
+        self.pending += chunk
+        visible: list[str] = []
+        while self.pending:
+            if self.closing:
+                stop = self.pending.find(self.closing)
+                if stop == -1:
+                    self.pending = self.pending[-(len(self.closing) - 1):]
+                    break
+                self.pending = self.pending[stop + len(self.closing):]
+                self.closing = ""
+                continue
+            tags = [(i, close) for tag, close in self._tags.items()
+                    if (i := self.pending.find(tag)) >= 0]
+            if tags:
+                start, self.closing = min(tags)
+                visible.append(self.pending[:start])
+                self.pending = self.pending[start:]
+                continue
+            keep = max((len(tag[:i]) for tag in self._tags for i in range(1, len(tag))
+                        if self.pending.endswith(tag[:i])), default=0)
+            stop = len(self.pending) - keep
+            visible.append(self.pending[:stop])
+            self.pending = self.pending[stop:]
+            break
+        return "".join(visible)
+
+    def finish(self) -> str:
+        return "" if self.closing else self.pending
 
 
 def _last_sentence(piece: str) -> tuple[str, str]:
@@ -79,49 +124,45 @@ def _last_sentence(piece: str) -> tuple[str, str]:
     return piece[:cut], piece[cut:]
 
 
-def openai_segments_from(content, sources: list) -> list[Segment]:
-    """OpenAI-compatible endpoints do not expose Anthropic's document citation objects, so
-    the writer puts each sentence's source keys after it ([[E3]]), as Anthropic's citations
-    are rendered; the text is cut into segments at those markers.
-
-    A marker for a source that was not given is dropped. A cited sentence has no quote to
-    match, so `check` judges it against its sources. The older form, an exact quote in
-    <quote ref="E3">...</quote>[[E3]], is still read: a quote found in its source is kept as
-    the segment's quote, and its words are not left in the prose (appended after sentences
-    they broke the petition's text), nor is a quote the source does not contain.
-    """
+def openai_segments_from(content, sources: list, max_chars: int | None = None) -> list[Segment]:
+    """Attach only citations backed by a contiguous passage in the supplied source text."""
     text = "\n".join(block.text for block in content if block.type == "text").strip()
     documents = {
         (source.evidence.key if hasattr(source, "evidence") else source[0]):
-            (source.document if hasattr(source, "evidence") else source[2])
+            tr_fold((source.document if hasattr(source, "evidence") else source[2])[:max_chars])
         for source in sources
     }
-    verified: dict[int, str] = {}   # position of the marker a quote belongs to -> quote
-
-    def quoted(match: re.Match) -> str:
-        key, quote = match.group(1), match.group(2)
-        if key not in documents or not contains_quote(documents[key], quote):
-            return ""
-        verified[match.start()] = quote
-        return f"\x00{match.start()}\x00[[{key}]]"
-
-    text = re.sub(r'\s*<quote\s+ref="(E\d+)">([\s\S]*?)</quote>\s*(?:\[\[\1\]\])?', quoted, text)
-    segments, cursor = [], 0
-    for run in re.finditer(r"(?:\s*(?:\x00\d+\x00)?\[\[E\d+\]\])+", text):
-        keys = [k for k in re.findall(r"\[\[(E\d+)\]\]", run.group(0)) if k in documents]
-        quotes = [verified[int(p)] for p in re.findall(r"\x00(\d+)\x00", run.group(0))]
-        piece = text[cursor:run.start()]
-        # The marker belongs to the sentence before it: what precedes that sentence (a
-        # heading, the parties) is kept uncited, so it is not judged against the source.
+    segments: list[Segment] = []
+    cursor = 0
+    while (first := _WIRE.search(text, cursor)) is not None:
+        matched: dict[str, str] = {}
+        named: dict[str, None] = {}
+        run = first
+        while run is not None:
+            attributes, quote, marker = run.groups()
+            ref = _QUOTE_REF.search(attributes) if attributes else None
+            key = marker or (ref.group(1) if ref else "?")
+            named[key] = None
+            if quote and key in documents:
+                literal = tr_fold(quote).strip(" \"'")
+                if len(literal.split()) >= 4 and re.search(
+                    rf"(?<!\w){re.escape(literal)}(?!\w)", documents[key]
+                ):
+                    matched[key] = quote.strip()
+            cursor_end = run.end()
+            run = _WIRE.match(text, cursor_end)
+        piece = text[cursor:first.start()]
         lead, cited = _last_sentence(piece)
         if lead:
             segments.append(Segment(lead))
-        if cited or keys:
-            segments.append(Segment(cited, tuple(dict.fromkeys(keys)), tuple(quotes)))
-        cursor = run.end()
+        missing = tuple(key for key in named if key not in matched)
+        if cited or named:
+            segments.append(Segment(cited, tuple(matched), tuple(matched.values()), missing))
+        cursor = cursor_end
     if text[cursor:]:
-        segments.append(Segment(text[cursor:]))
-    return [s for s in segments if s.text.strip() or s.keys]
+        tail = text[cursor:].split("<quote", 1)[0]
+        segments.append(Segment(tail))
+    return [s for s in segments if s.text.strip() or s.keys or s.unverified]
 
 
 def segments_from(content, sources: list[Source]) -> list[Segment]:
@@ -129,9 +170,9 @@ def segments_from(content, sources: list[Source]) -> list[Segment]:
     for block in content:
         if block.type != "text":
             continue
-        cites = block.citations or []
-        keys = tuple(dict.fromkeys(sources[c.document_index].evidence.key for c in cites
-                                   if c.document_index < len(sources)))
+        cites = [c for c in block.citations or []
+                 if 0 <= c.document_index < len(sources) and c.cited_text]
+        keys = tuple(dict.fromkeys(sources[c.document_index].evidence.key for c in cites))
         segments.append(Segment(block.text, keys, tuple(c.cited_text for c in cites)))
     return segments
 

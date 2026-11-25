@@ -46,7 +46,10 @@ The settings API stores the key encrypted and exposes only whether it is configu
 settings are in `.env`. Set the input and output rates for a metered compatible provider that
 does not return a cost. The daily budget uses a spend ledger that survives chat deletion.
 
-OpenAI-compatible responses can refer to retrieved source IDs. The backend checks supplied
-quotes against the cited document and flags unsupported claims where it can verify them.
+New answers show a source chip for a provider citation or for a passage that the backend
+matches against the source text supplied to an OpenAI-compatible writer. Missing and unmatched
+citations show a warning alongside the complete answer. When the decision model is configured,
+the app also checks cited claims against those specific sources and marks uncertain support.
+Previous chats display their original citations with a legacy verification label.
 
 See `NOTICE` for third-party data and code attributions.
