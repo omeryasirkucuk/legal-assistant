@@ -5,7 +5,9 @@ import pytest
 
 from legal_api import llm
 from legal_api.agent.atoms import CitationStream, openai_segments_from
+from legal_api.agent.sources import Source
 from legal_api.config import Settings
+from legal_api.grounding.evidence import Evidence
 
 
 def _settings() -> Settings:
@@ -42,6 +44,14 @@ def test_citations_check_only_the_source_text_sent_to_the_model():
     assert openai_segments_from(content, sources)[0].keys == ("E1",)
     result = openai_segments_from(content, sources, max_chars=16)
     assert result[0].unverified == ("E1",) and not result[0].keys
+
+
+def test_internal_source_annotations_do_not_count_as_source_passages():
+    note = "This internal note was added during retrieval."
+    original = "The debtor may object within seven days."
+    source = Source(Evidence("E1", "article", "Source", "", original), note + "\n" + original)
+    blocks = [llm.TextBlock("text", f'Prose <quote ref="E1">{note}</quote>.')]
+    assert openai_segments_from(blocks, [source])[0].unverified == ("E1",)
 
 
 def test_stream_hides_provider_tags_split_across_chunks():

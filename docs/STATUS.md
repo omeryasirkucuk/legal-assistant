@@ -1,6 +1,8 @@
 # Status
 
-State as of 2026-10-31 (after PR #3). Update this page whenever the state changes.
+Release 0.2.0 adds locked setup, corpus readiness, verified citation passages and protected
+client data processing. See [CHANGELOG.md](../CHANGELOG.md) and the [privacy runbook](PRIVACY.md).
+The measurements and probes below describe the October evaluation runs.
 
 ## Working
 
@@ -80,8 +82,9 @@ article with its full text ("does this article state a rule that answers the que
    moving them to object storage is left for deployment. Images are not read as text (no OCR)
    but are shown to the model; old Word (.doc) and PowerPoint files are kept but not read.
    File filters (D45) label kind and area of law by a word list; a scan with no text is
-   labelled by its name only, and each file gets one area. Files have no backup and are not
-   encrypted at rest; both are needed before real client files are stored.
+   labelled by its name only, and each file gets one area. Protected mode encrypts file
+   payloads. Use encrypted database and temporary storage and exercise the backup and restore
+   procedure before processing client records.
 
 1. **Run-to-run variance** of the earlier pipeline's plans no longer applies to chat answers
    (D26); in the new pipeline, retrieval and the written reasoning still vary (see 10).
@@ -159,6 +162,7 @@ article with its full text ("does this article state a rule that answers the que
     rewritten ones (D76); italics and sizes inside a rewritten paragraph are not kept.
 20. Yearly table upkeep is manual: religious holidays, severance ceilings, TCMB advance rates,
     the court fee tariff and the appeal limits (locales/tr/court_costs.json, each January).
+    Fee and severance outputs flag missing tables. Interest amounts cover verified dates only.
     Penalty and court cost calculators checked live (D75): harc-1, ceza-2, ceza-3 pass.
 21. UDF output has not been opened in UYAP's own editor yet.
 22. The files filters (D45) are still word-list based.

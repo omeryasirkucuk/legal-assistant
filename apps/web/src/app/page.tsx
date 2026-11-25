@@ -446,6 +446,7 @@ export default function ChatApp() {
                 asked: !!lastAnswer.meta.answer?.asked,
               } : undefined}
               busy={!!pending && !pending.error}
+              protectedData={user.protected_data}
               onSubmit={(text, fileIds, power) => ask(text, { fileIds, power })}
               placeholder={view === "matter" && currentMatter ? t("askInMatter", { client: currentMatter.client }) : undefined}
               footer={<UsageMeter today={today} onOpenFiles={openFiles} />}

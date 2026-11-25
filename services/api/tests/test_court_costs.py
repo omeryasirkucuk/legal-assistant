@@ -42,3 +42,10 @@ def test_the_calculation_text_names_the_filing_year_or_warns_without_it():
     assert W["appeal_year"].format(year=2023) in text
     guessed = render(Decimal(100000), "asliye", "unknown", False, None, date(2026, 10, 31))
     assert W["year_unknown"].format(year=2026) in guessed and W["unknown_measure"] in guessed
+
+
+def test_a_future_fee_year_still_reports_a_covered_filing_year():
+    text = render(Decimal(100000), "asliye", "proportional", False, date(2026, 5, 1), date(2027, 1, 1))
+    assert W["fees_old"].format(fees_year=2026, year=2027) in text
+    assert W["appeal_year"].format(year=2026) in text
+    assert "2.439,75" not in text and "732,00" not in text

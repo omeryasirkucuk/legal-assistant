@@ -91,8 +91,15 @@ def select(scored: list[tuple[StatuteHit, float | None]], found: Candidates,
     cover is not left without a source (one run lost the enforcement route this way); the
     articles the understanding step named (the offence's own article next to the reduction
     rule); the rest by judgment."""
-    p_of = {h.id: (p or 0.0) for h, p in scored}
     by_id = {h.id: h for h, _ in scored}
+    if all(probability is None for _, probability in scored):
+        # Without a decision service, keep a source per issue, named articles and finally
+        # the fused search ranking. An unavailable screener must not erase every candidate.
+        issue_best = [top[0] for top in found.per_issue if top and top[0] in by_id]
+        hinted = [h.id for h in found.hits if h.id in found.hinted and h.id in by_id]
+        ids = list(dict.fromkeys([*issue_best, *hinted, *by_id]))[:limit]
+        return [], [by_id[i] for i in ids]
+    p_of = {h.id: (p or 0.0) for h, p in scored}
     answering = sorted((i for i in by_id if p_of[i] >= ANSWERS), key=lambda i: -p_of[i])
     # An issue's guaranteed source: the best-judged among all of its search results.
     # Taken from the issue's own top results first: the best-judged of all its results was

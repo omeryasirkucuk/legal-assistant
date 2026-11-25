@@ -210,7 +210,8 @@ async def add_document(matter_id: uuid.UUID, user: CurrentUser, db: DB,
                        file: Annotated[UploadFile, File()]) -> FileOut:
     m = await _matter(db, user, matter_id)
     try:
-        stored = await store.save(db, user.id, file.filename or "file", await file.read(),
+        stored = await store.save(db, user.id, file.filename or "file",
+                                  await file.read(store.MAX_FILE_BYTES + 1),
                                   "upload", file.content_type, matter_id=m.id)
     except store.FileTooLarge as e:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "file too large") from e

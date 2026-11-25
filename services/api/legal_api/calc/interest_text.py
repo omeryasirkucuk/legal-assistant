@@ -29,7 +29,9 @@ def render(results: list[Interest]) -> str:
         lines += [t["stretch"].format(start=_day(s.start), end=_day(s.end), days=s.days,
                                       rate=_rate(s.rate), interest=money(s.interest))
                   for s in r.stretches]
-        lines.append(t["total"].format(total=money(r.total), sum=money(r.total + r.principal)))
+        if r.stretches:
+            label = "partial_total" if r.warnings else "total"
+            lines.append(t[label].format(total=money(r.total), sum=money(r.total + r.principal)))
         if "before_rates" in r.warnings:
             lines.append(t["before_rates"].format(first=_day(_rates(r.kind)[0][0])))
         if "after_known" in r.warnings:

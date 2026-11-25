@@ -26,3 +26,15 @@ def test_the_calculation_is_written_out_in_turkish_money_format():
     from legal_api.calc.severance_text import render
     text = render(compute(date(2023, 3, 1), date(2026, 8, 31), Decimal(100000)))
     assert "73.729,87 TL" in text and "258.054,55 TL" in text and "8 hafta" in text
+
+
+def test_missing_ceiling_does_not_generate_a_purported_gross_or_net_amount():
+    from legal_api.calc.severance_text import render
+    from legal_api.locale import calculation_terms
+
+    r = compute(date(2020, 1, 1), date(2027, 3, 1), Decimal(100000))
+    text = render(r)
+    words = calculation_terms()["severance"]
+    assert words["ceiling_missing"].format(end="01.03.2027") in text
+    assert words["severance"].split("{")[0] not in text
+    assert words["stamp"].split("{")[0] not in text

@@ -184,8 +184,8 @@ async def _finished_title(task: asyncio.Task | None) -> str | None:
         return None
     try:
         return await task
-    except Exception:
-        logger.exception("title generation failed")
+    except Exception as exc:
+        logger.error("title generation failed (%s)", type(exc).__name__)
         return None
 
 
@@ -363,8 +363,8 @@ async def detail(chat_id: uuid.UUID, message_id: uuid.UUID, user: CurrentUser,
                         yield _sse("delta", {"text": item})
                     else:
                         segments = [{"text": s.text, "keys": list(s.keys)} for s in item]
-            except Exception:
-                logger.exception("detail stream failed for message %s", message_pk)
+            except Exception as exc:
+                logger.error("detail stream failed for message %s (%s)", message_pk, type(exc).__name__)
                 yield _sse("error", {})
                 return
             complete = True

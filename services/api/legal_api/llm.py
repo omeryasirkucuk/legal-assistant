@@ -59,9 +59,19 @@ def reset_runtime_config(token: Token) -> None:
     _runtime_config.reset(token)
 
 
+def _connection(settings) -> RuntimeConfig | None:
+    if settings.protected_data:
+        return RuntimeConfig(
+            "openai_compatible", settings.private_model_base_url, settings.private_model_api_key,
+            settings.openai_model_main, settings.openai_model_draft, settings.openai_model_cheap,
+            settings.openai_model_judge,
+        )
+    return _runtime_config.get()
+
+
 def model_for(role: Role) -> str:
     s = get_settings()
-    configured = _runtime_config.get()
+    configured = _connection(s)
     if configured:
         return {"main": configured.model_main, "draft": configured.model_draft,
                 "cheap": configured.model_cheap, "judge": configured.model_judge,
@@ -75,8 +85,9 @@ def model_for(role: Role) -> str:
 
 
 def uses_openai_compatible(settings=None) -> bool:
-    configured = _runtime_config.get()
-    provider_value = configured.provider if configured else (settings or get_settings()).llm_provider
+    settings = settings or get_settings()
+    configured = _connection(settings)
+    provider_value = configured.provider if configured else settings.llm_provider
     provider = provider_value.strip().casefold().replace("-", "_")
     return provider in {"openai", "openai_compatible", "openwebui", "open_webui"}
 
@@ -86,7 +97,7 @@ def routed(role: Role) -> str | None:
     the answer writer ("write") and the petition writer ("draft"), or with
     ANTHROPIC_VIA_OPENROUTER every role, to the same Anthropic model there."""
     s = get_settings()
-    if _runtime_config.get() or not s.decision_api_key:
+    if _connection(s) or not s.decision_api_key:
         return None
     explicit = {"write": s.write_route, "draft": s.draft_route}.get(role)
     if explicit:
@@ -122,7 +133,7 @@ def openai_client(route: bool = False) -> httpx.AsyncClient:
     """HTTP client for OpenAI-compatible services, including Open WebUI's /api endpoint;
     `route`: OpenRouter, for a role routed there (see `routed`)."""
     settings = get_settings()
-    configured = _runtime_config.get()
+    configured = _connection(settings)
     headers = {"content-type": "application/json"}
     if route:
         api_key, base_url = settings.decision_api_key, settings.decision_base_url + "/v1"
@@ -132,7 +143,8 @@ def openai_client(route: bool = False) -> httpx.AsyncClient:
     if api_key:
         headers["authorization"] = f"Bearer {api_key}"
     return httpx.AsyncClient(base_url=base_url.rstrip("/"),
-                             headers=headers, timeout=httpx.Timeout(180.0, connect=10.0))
+                             headers=headers, timeout=httpx.Timeout(180.0, connect=10.0),
+                             trust_env=not settings.protected_data)
 
 
 @dataclass

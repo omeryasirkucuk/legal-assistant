@@ -42,6 +42,11 @@ def _encrypt(value: str) -> str:
 
 def _out(row: LLMConnectionSettings | None) -> dict:
     s = get_settings()
+    if s.protected_data:
+        return {"provider": "openai_compatible", "operator_managed": True, "is_saved": True,
+                "base_url": "", "api_key_configured": bool(s.private_model_api_key),
+                "model_main": s.openai_model_main, "model_draft": s.openai_model_draft,
+                "model_cheap": s.openai_model_cheap, "model_judge": s.openai_model_judge}
     return {
         "provider": "openai_compatible",
         "is_saved": row is not None,
@@ -63,6 +68,8 @@ async def get_llm_settings(user: CurrentUser, db: DB) -> dict:
 @router.put("/llm")
 async def update_llm_settings(body: LLMSettingsUpdate, user: CurrentUser, db: DB) -> dict:
     _admin(user)
+    if get_settings().protected_data:
+        raise HTTPException(status.HTTP_409_CONFLICT, "model is managed by the operator")
     base_url = body.base_url.strip().rstrip("/")
     parsed = urlsplit(base_url)
     if (parsed.scheme not in {"http", "https"} or not parsed.netloc
@@ -104,6 +111,8 @@ async def update_llm_settings(body: LLMSettingsUpdate, user: CurrentUser, db: DB
 @router.get("/llm/models")
 async def list_llm_models(user: CurrentUser, db: DB) -> list[dict]:
     _admin(user)
+    if get_settings().protected_data:
+        raise HTTPException(status.HTTP_409_CONFLICT, "model is managed by the operator")
     row = await db.get(LLMConnectionSettings, 1)
     config = runtime_config(row)
     settings = get_settings()
@@ -140,7 +149,7 @@ async def list_llm_models(user: CurrentUser, db: DB) -> list[dict]:
 async def test_llm_connection(user: CurrentUser, db: DB) -> dict:
     _admin(user)
     row = await db.get(LLMConnectionSettings, 1)
-    if row is None:
+    if row is None and not get_settings().protected_data:
         raise HTTPException(status.HTTP_409_CONFLICT, "save a model connection first")
     token = llm.set_runtime_config(runtime_config(row))
     try:

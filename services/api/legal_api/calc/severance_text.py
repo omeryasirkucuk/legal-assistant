@@ -33,7 +33,7 @@ def render(r: Severance) -> str:
         lines.append(t["ceiling"].format(ceiling=money(r.ceiling), base=money(r.base)))
     if "under_one_year" in r.warnings:
         lines.append(t["under_one_year"])
-    else:
+    elif r.ceiling is not None:
         lines.append(t["severance"].format(base=money(r.base),
                                            years_decimal=f"{years:.4f}".replace(".", ","),
                                            severance=money(r.severance)))

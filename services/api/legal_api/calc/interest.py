@@ -59,12 +59,13 @@ def compute(principal: Decimal, start: date, end: date, kind: Kind) -> Interest:
     if first < rates[0][0]:
         warnings.append("before_rates")
         first = rates[0][0]
-    if end > _known_until():
+    last = min(end, _known_until())
+    if end > last:
         warnings.append("after_known")
     stretches = []
     for i, (since, rate) in enumerate(rates):
-        until = rates[i + 1][0] - timedelta(days=1) if i + 1 < len(rates) else end
-        a, b = max(first, since), min(end, until)
+        until = rates[i + 1][0] - timedelta(days=1) if i + 1 < len(rates) else last
+        a, b = max(first, since), min(last, until)
         if a > b:
             continue
         days = (b - a).days + 1

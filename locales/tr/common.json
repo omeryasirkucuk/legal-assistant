@@ -70,6 +70,8 @@
   "citationUnmatched": "Bu atıf için kaynakta eşleşen bir alıntı bulunamadı.",
   "citationMissing": "Bu yanıt için doğrulanmış kaynak atfı bulunamadı.",
   "citationSupportLow": "Atıf metni bulundu. Kaynağın bu sonuca uygulanabilirliğini kontrol et.",
+  "privateModelManaged": "Bu çalışma alanında model bağlantısı sunucu tarafından yönetilir. Dava içeriği bu bağlantı üzerinden işlenir.",
+  "privateAttachments": "Ekler şifreli saklanır. Gönderdiğinde içerikleri çalışma alanının özel model bağlantısında işlenir.",
   "unverified": "{count} sorun doğrulanamadı. İşaretli kısımları kullanmadan önce kaynaktan kontrol et.",
   "showDetails": "Ayrıntıları göster",
   "hideDetails": "Ayrıntıları gizle",

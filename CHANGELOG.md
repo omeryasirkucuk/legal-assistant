@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 · 2026-11-26
+
+- Added protected mode with authenticated encryption for document files and a fixed private model connection.
+- Kept case research in local indexes in protected mode, with a ranked-source fallback if a screener is unavailable.
+- Added a resumable migration for existing files, safer downloads, and a protected server command and recovery runbook.
+- Check citations against the stored original passage as well as the excerpt given to the model.
+- Report gaps in dated calculation tables without emitting fee or severance estimates for uncovered periods.
+
 ## 0.1.2 · 2026-11-26
 
 - Require a matching passage before showing a source chip for a compatible model's citation.

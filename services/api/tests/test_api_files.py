@@ -1,4 +1,6 @@
+import base64
 import json
+import os
 import uuid
 from pathlib import Path
 
@@ -8,6 +10,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from legal_api.config import get_settings
+from legal_api.db.file_models import StoredFile
+from legal_api.db.session import get_sessionmaker
+from legal_api.files.store import encrypt_existing
 from legal_api.main import create_app
 
 get_settings().invite_code = "test-invite"
@@ -49,6 +54,39 @@ async def test_the_quota_is_enforced(client, monkeypatch):
     monkeypatch.setattr(get_settings(), "user_storage_bytes", 10)
     r = await client.post("/files", files={"file": ("a.txt", b"x" * 11)})
     assert r.status_code == 507
+
+
+async def test_existing_and_new_files_are_sealed_without_changing_downloads(client, monkeypatch):
+    settings = get_settings()
+    data = b"Synthetic client document"
+    legacy = (await client.post("/files", files={"file": ("original.txt", data)})).json()
+    monkeypatch.setattr(settings, "document_encryption_key", base64.urlsafe_b64encode(os.urandom(32)).decode())
+    async with get_sessionmaker()() as db:
+        assert await encrypt_existing(db, file_ids=[uuid.UUID(legacy["id"])]) == 1
+        assert await encrypt_existing(db, file_ids=[uuid.UUID(legacy["id"])]) == 0
+    monkeypatch.setattr(settings, "data_mode", "protected")
+    new = (await client.post("/files", files={"file": ("new.txt", data)})).json()
+
+    for item in [legacy, new]:
+        async with get_sessionmaker()() as db:
+            row = await db.get(StoredFile, uuid.UUID(item["id"]))
+            assert row.encrypted and item["name"] not in row.path
+            path = settings.storage_dir / row.path
+            assert data not in path.read_bytes()
+            assert not (settings.storage_dir / "users" / str(row.user_id) / str(row.id)).exists()
+        response = await client.get(f"/files/{item['id']}")
+        assert response.content == data and response.headers["cache-control"] == "no-store"
+        assert (await client.delete(f"/files/{item['id']}")).status_code == 204
+        assert not path.exists()
+
+
+async def test_non_previewable_upload_is_download_only(client):
+    data = b"<p>Synthetic document fixture</p>"
+    file_id = (await client.post("/files", files={"file": ("sample.html", data, "text/html")})).json()["id"]
+    response = await client.get(f"/files/{file_id}?inline=true")
+    assert response.headers["content-type"] == "application/octet-stream"
+    assert response.headers["content-disposition"].startswith("attachment")
+    assert response.headers["x-content-type-options"] == "nosniff"
 
 
 async def test_a_file_is_renamed_keeping_its_extension(client):

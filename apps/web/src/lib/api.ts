@@ -7,7 +7,7 @@ export type Health = {
   pgvector: boolean;
 };
 
-export type User = { id: string; email: string; name: string; is_admin: boolean };
+export type User = { id: string; email: string; name: string; is_admin: boolean; protected_data?: boolean };
 export type LLMSettings = {
   provider: "openai_compatible";
   is_saved: boolean;
@@ -17,6 +17,7 @@ export type LLMSettings = {
   model_cheap: string;
   model_judge: string;
   api_key_configured: boolean;
+  operator_managed?: boolean;
 };
 export type LLMModel = { id: string; name: string };
 export type ChatSummary = {
@@ -270,7 +271,7 @@ export const api = {
   source: (chatId: string, messageId: string, key: string) =>
     call<SourceText>(`/chats/${chatId}/messages/${messageId}/evidence/${key}`),
   llmSettings: () => call<LLMSettings>("/settings/llm"),
-  saveLLMSettings: (body: Omit<LLMSettings, "provider" | "is_saved" | "api_key_configured"> &
+  saveLLMSettings: (body: Omit<LLMSettings, "provider" | "is_saved" | "api_key_configured" | "operator_managed"> &
     { api_key?: string; clear_api_key: boolean }) =>
     call<LLMSettings>("/settings/llm", { method: "PUT", body: JSON.stringify(body) }),
   llmModels: () => call<LLMModel[]>("/settings/llm/models"),

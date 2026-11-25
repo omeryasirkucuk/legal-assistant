@@ -1,5 +1,14 @@
 # Local changelog
 
+## 0.2.0 · 2026-11-26
+
+- Run `make migrate` before deploying. Stop API writes and run `uv run --locked python -m legal_api.files.encrypt` from `services/api` with the document key configured to seal existing files.
+- Configure a reviewed private model endpoint, HTTPS, encrypted Postgres storage and an encrypted backup with tested recovery before using protected mode with client records.
+- Use `make api-protected` after migration to start without logging request URLs.
+- Keep the document key, the server secret and the backup recovery key in separate operator-controlled storage.
+- Internal retrieval notes cannot generate a verified source chip.
+- Interest stops at the last verified table date. Advance the coverage when publishing verified rate updates.
+
 ## 0.1.2 · 2026-11-26
 
 - Compatible writers now emit a contiguous passage for each citation. The API strips provider tags from the live stream.

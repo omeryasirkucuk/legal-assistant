@@ -24,10 +24,15 @@ def render(value: Decimal | None, court: str, measure: str, bodily_harm: bool,
            filed: date | None, today: date) -> str:
     data = court_costs()
     w, year = data["words"], data["fees_year"]
-    f = fees(value, court, measure, bodily_harm)
     lines = [w["title"]]
     if value:
         lines.append(w["value"].format(value=_tl(value)))
+    if today.year != year:
+        lines.append(w["fees_old"].format(fees_year=year, year=today.year))
+        if value:
+            lines += _appeal_lines(value, filed or today, filed is None)
+        return "\n".join(lines)
+    f = fees(value, court, measure, bodily_harm)
     lines.append(w["application"].format(court=w["courts"].get(court, w["courts"]["asliye"]),
                                          amount=_tl(f.application), year=year))
     if measure == "unknown" and f.proportional and f.fixed:
@@ -43,8 +48,6 @@ def render(value: Decimal | None, court: str, measure: str, bodily_harm: bool,
         lines.append(w["fixed"].format(amount=_tl(f.fixed)))
         if f.proportional is None:
             lines.append(w["filing_total"].format(amount=_tl(f.application + f.fixed)))
-    if today.year != year:
-        lines.append(w["fees_old"].format(fees_year=year, year=today.year))
     if value:
         lines += _appeal_lines(value, filed or today, filed is None)
     lines.append(w["appeal_fees"].format(year=year, istinaf=_tl(Decimal(data["fees"]["appeal_istinaf"])),

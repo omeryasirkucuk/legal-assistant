@@ -91,7 +91,7 @@ def start(chat_id: uuid.UUID,
         except asyncio.CancelledError:
             run.emit("cancelled", {})
         except Exception as exc:
-            logger.exception("answer run failed for chat %s", chat_id)
+            logger.error("answer run failed for chat %s (%s)", chat_id, type(exc).__name__)
             run.emit("error", {"unavailable": True} if llm.unavailable(exc) else {})
         finally:
             run.finish()

@@ -127,11 +127,11 @@ def _last_sentence(piece: str) -> tuple[str, str]:
 def openai_segments_from(content, sources: list, max_chars: int | None = None) -> list[Segment]:
     """Attach only citations backed by a contiguous passage in the supplied source text."""
     text = "\n".join(block.text for block in content if block.type == "text").strip()
-    documents = {
-        (source.evidence.key if hasattr(source, "evidence") else source[0]):
-            tr_fold((source.document if hasattr(source, "evidence") else source[2])[:max_chars])
-        for source in sources
-    }
+    documents = {}
+    for source in sources:
+        key, excerpt, original = ((source.evidence.key, source.document, source.evidence.text)
+                                  if isinstance(source, Source) else (source[0], source[2], source[2]))
+        documents[key] = (tr_fold(excerpt[:max_chars]), tr_fold(original))
     segments: list[Segment] = []
     cursor = 0
     while (first := _WIRE.search(text, cursor)) is not None:
@@ -145,8 +145,8 @@ def openai_segments_from(content, sources: list, max_chars: int | None = None) -
             named[key] = None
             if quote and key in documents:
                 literal = tr_fold(quote).strip(" \"'")
-                if len(literal.split()) >= 4 and re.search(
-                    rf"(?<!\w){re.escape(literal)}(?!\w)", documents[key]
+                if len(literal.split()) >= 4 and all(
+                    re.search(rf"(?<!\w){re.escape(literal)}(?!\w)", doc) for doc in documents[key]
                 ):
                     matched[key] = quote.strip()
             cursor_end = run.end()
@@ -167,13 +167,17 @@ def openai_segments_from(content, sources: list, max_chars: int | None = None) -
 
 def segments_from(content, sources: list[Source]) -> list[Segment]:
     segments = []
+    originals = [tr_fold(source.evidence.text) for source in sources]
     for block in content:
         if block.type != "text":
             continue
-        cites = [c for c in block.citations or []
-                 if 0 <= c.document_index < len(sources) and c.cited_text]
-        keys = tuple(dict.fromkeys(sources[c.document_index].evidence.key for c in cites))
-        segments.append(Segment(block.text, keys, tuple(c.cited_text for c in cites)))
+        cites = [c for c in block.citations or [] if 0 <= c.document_index < len(sources)]
+        verified = [c for c in cites if (quote := tr_fold(c.cited_text))
+                    and quote in originals[c.document_index]]
+        keys = tuple(dict.fromkeys(sources[c.document_index].evidence.key for c in verified))
+        unverified = tuple(dict.fromkeys(sources[c.document_index].evidence.key for c in cites
+                                         if sources[c.document_index].evidence.key not in keys))
+        segments.append(Segment(block.text, keys, tuple(c.cited_text for c in verified), unverified))
     return segments
 
 
