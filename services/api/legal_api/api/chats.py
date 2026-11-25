@@ -8,11 +8,12 @@ import logging
 import time
 import uuid
 from collections.abc import AsyncIterator
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from legal_api import llm
 from legal_api.agent.detail import detail_stream
@@ -30,10 +31,12 @@ from legal_api.chat.service import (
     spent_today,
     title_from,
     today_stats,
+    workspace_context,
 )
 from legal_api.chat.titles import generate_title
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, LLMConnectionSettings, Message, MessageEvidence
+from legal_api.db.file_models import StoredFile
 from legal_api.db.session import get_sessionmaker
 from legal_api.drafting.files import refresh_draft_file
 from legal_api.drafting.store import file_format, record_reply, save_draft, style_book
@@ -48,6 +51,9 @@ from legal_api.matters.service import files_of as matter_files
 from legal_api.matters.service import owned as owned_matter
 from legal_api.privacy.llm_settings import runtime_config
 from legal_api.spend import record_spend
+from legal_api.workspace.documents import WORD_MEDIA_TYPE
+from legal_api.workspace.workbook import MEDIA_TYPE as XLSX_TYPE
+from legal_api.workspace.workbook import workbook
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 logger = logging.getLogger(__name__)
@@ -137,6 +143,18 @@ async def stats_today(user: CurrentUser, db: DB) -> dict:
     return await today_stats(db, user.id)
 
 
+def _message_meta(metadata: dict) -> dict:
+    snapshot = metadata.get("workspace")
+    if not snapshot:
+        return metadata
+    return {**metadata, "workspace": {
+        "revision": snapshot["revision"], "format": snapshot["format"],
+        "pending": bool(snapshot.get("pending")), "changes": snapshot["changes"],
+        "edits": [{"name": item["name"], "changes": item["changes"]}
+                  for item in snapshot["edits"]],
+    }}
+
+
 @router.get("/{chat_id}/messages")
 async def list_messages(chat_id: uuid.UUID, user: CurrentUser, db: DB) -> list[MessageOut]:
     chat = await _owned_chat(db, user, chat_id)
@@ -150,7 +168,7 @@ async def list_messages(chat_id: uuid.UUID, user: CurrentUser, db: DB) -> list[M
     for message_id, key, kind, citation, url in evidence:
         by_message.setdefault(message_id, []).append(
             {"key": key, "kind": kind, "citation": citation, "url": url})
-    return [MessageOut(id=str(m.id), role=m.role, content=m.content, meta=m.meta or {},
+    return [MessageOut(id=str(m.id), role=m.role, content=m.content, meta=_message_meta(m.meta or {}),
                        evidence=by_message.get(m.id, []), created_at=m.created_at.isoformat())
             for m in messages]
 
@@ -166,6 +184,45 @@ async def evidence_text(chat_id: uuid.UUID, message_id: uuid.UUID, key: str,
         raise HTTPException(status.HTTP_404_NOT_FOUND)
     return {"key": row.key, "kind": row.kind, "citation": row.citation, "url": row.url,
             "text": row.text, "fetched_at": row.fetched_at.isoformat()}
+
+
+
+@router.get("/{chat_id}/messages/{message_id}/output/{output}")
+async def workspace_output(chat_id: uuid.UUID, message_id: uuid.UUID, output: str,
+                           user: CurrentUser, db: DB) -> Response:
+    chat = await _owned_chat(db, user, chat_id)
+    message = await db.scalar(select(Message).where(Message.id == message_id,
+                                                    Message.chat_id == chat.id,
+                                                    Message.role == "assistant"))
+    snapshot = (message.meta or {}).get("workspace") if message else None
+    if not snapshot:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    try:
+        if output == "xlsx" and snapshot["format"] == "xlsx":
+            payload = await asyncio.to_thread(workbook, snapshot)
+            filename = f"Hesap-v{snapshot['revision']}.xlsx"
+            kind = XLSX_TYPE
+        elif output.isascii() and output.isdigit() and len(output) == 1:
+            position = int(output)
+            if position >= len(snapshot["edits"]):
+                raise HTTPException(status.HTTP_404_NOT_FOUND)
+            edit = snapshot["edits"][position]
+            file = await db.get(StoredFile, uuid.UUID(edit["file_id"]))
+            if not file or file.user_id != user.id:
+                raise HTTPException(status.HTTP_404_NOT_FOUND)
+            payload = await asyncio.to_thread(read_file, file)
+            filename = file.name
+            kind = WORD_MEDIA_TYPE
+        else:
+            raise HTTPException(status.HTTP_404_NOT_FOUND)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "Çıktı bu kayıt üzerinden yeniden üretilemedi.") from exc
+    return Response(payload, media_type=kind, headers={
+        "Content-Disposition": f"attachment; filename=output; filename*=UTF-8''{quote(filename)}",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 def _sse(event: str, data: dict) -> str:
@@ -218,6 +275,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
     attachments = [Attachment(f.name, f.media_type, f.text,
                               read_file(f) if f.media_type.startswith("image/") else None)
                    for f in files]
+    in_file = []
     # In a case file, its parties, court, notes and documents come with every question.
     matter = await owned_matter(db, user.id, chat.matter_id) if chat.matter_id else None
     if matter is not None:
@@ -229,6 +287,12 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
                            *await asyncio.to_thread(matter_material, text, docs)]
     # The recorded deadlines, cited only if the question turns out to be about them.
     agenda = await load_agenda(db, user.id, matter)
+    chat_files = await db.scalars(select(StoredFile).where(
+        StoredFile.user_id == user.id, or_(StoredFile.chat_id == chat.id,
+                                         StoredFile.id.in_([f.id for f in in_file])))
+        .order_by(StoredFile.created_at.desc(), StoredFile.id).limit(75))
+    seen_files = {f.id: f for f in [*files, *chat_files]}
+    context = await workspace_context(db, chat, list(seen_files.values()))
     power = power_of(body.power)
     question_id = str(question.id)
     llm_config = runtime_config(await db.get(LLMConnectionSettings, 1))
@@ -260,7 +324,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
                       if previous is None else None)
         try:
             async for event in turn_events(text, turns, previous, holder, style, power,
-                                           attachments, agenda, usage=usage):
+                                           attachments, agenda, usage=usage, workspace=context):
                 run.emit(event.type, event.data)
             title = await _finished_title(title_task)
         finally:

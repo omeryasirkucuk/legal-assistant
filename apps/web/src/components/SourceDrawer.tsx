@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Evidence, SourceText } from "@/lib/api";
+import { API_URL, type Evidence, type SourceText } from "@/lib/api";
 import { t } from "@/lib/i18n";
 
 type Props = {
   evidence: Evidence | null;
   number: number;
   source: SourceText | null;
+  related?: Evidence[];
+  onSelect?: (key: string) => void;
   onClose: () => void;
 };
 
-export function SourceDrawer({ evidence, number, source, onClose }: Props) {
+export function SourceDrawer({ evidence, number, source, related, onSelect, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -33,9 +35,12 @@ export function SourceDrawer({ evidence, number, source, onClose }: Props) {
           <div className="min-w-0 flex-1">
             <h2 className="text-[15px] font-semibold leading-snug text-ink">{evidence.citation}</h2>
             <div className="mt-1 flex flex-wrap gap-x-4 text-sm text-muted">
-              <a href={evidence.url} target="_blank" rel="noreferrer" className="text-cite hover:underline">
-                {t("openOfficial")}
-              </a>
+              {evidence.url && (
+                <a href={evidence.kind === "case_file" ? `${API_URL}${evidence.url}` : evidence.url}
+                  target="_blank" rel="noreferrer" className="text-cite hover:underline">
+                  {t(evidence.kind === "case_file" ? "workspaceOpenFile" : "openOfficial")}
+                </a>
+              )}
               {source && (
                 <span>{t("fetchedAt", { date: new Date(source.fetched_at).toLocaleString("tr-TR") })}</span>
               )}
@@ -46,7 +51,18 @@ export function SourceDrawer({ evidence, number, source, onClose }: Props) {
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-          {source ? (
+          {evidence.kind === "calculation" && related && related.length > 0 && (
+            <ul className="mb-5 space-y-2 border-b border-rule pb-4 text-sm">
+              {related.map((item) => (
+                <li key={item.key}>
+                  <button onClick={() => onSelect?.(item.key)} className="text-left text-cite hover:underline">
+                    {item.citation}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {source?.key === evidence.key ? (
             <div className="mx-auto max-w-[38rem] whitespace-pre-wrap font-serif text-[0.975rem] leading-[1.75] text-ink">
               {source.text}
             </div>

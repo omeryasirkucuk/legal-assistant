@@ -84,7 +84,7 @@ class Gateway:
         await self._client.aclose()
 
     async def request(self, method: str, url: str, *, source: str, expect: str = "json",
-                      **kwargs: Any) -> httpx.Response:
+                      max_bytes: int | None = None, **kwargs: Any) -> httpx.Response:
         if not self._allow_requests:
             raise SourceError("live source requests are disabled in protected mode")
         host = urlsplit(url).hostname or url
@@ -99,7 +99,19 @@ class Gateway:
             if wait > 0:
                 await asyncio.sleep(wait)
             try:
-                response = await self._client.request(method, url, **kwargs)
+                if max_bytes is None:
+                    response = await self._client.request(method, url, **kwargs)
+                else:
+                    async with self._client.stream(method, url, **kwargs) as download:
+                        body = bytearray()
+                        async for chunk in download.aiter_bytes(chunk_size=65536):
+                            body.extend(chunk)
+                            if len(body) > max_bytes:
+                                raise SourceError(f"{source} exceeded the source size limit")
+                        response = httpx.Response(
+                            download.status_code, headers={k: v for k, v in download.headers.items()
+                                                       if k.lower() != "content-encoding"},
+                            content=bytes(body), request=download.request)
             except httpx.TimeoutException as exc:
                 raise SourceError(f"{source} timed out") from exc
             except httpx.TransportError as exc:

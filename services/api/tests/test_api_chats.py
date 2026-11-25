@@ -45,7 +45,7 @@ async def test_answer_spend_survives_chat_deletion(monkeypatch):
     async def title(_question, _usage):
         return None
 
-    async def answer(_message, _history, _previous, result, *_args, usage):
+    async def answer(_message, _history, _previous, result, *_args, usage, workspace):
         usage.record("test", SimpleNamespace(cost=0.012), "write")
         result["result"] = SimpleNamespace(
             text="Answer", structure=lambda: {}, usage=usage, timings={}, trace={}, ledger=[],

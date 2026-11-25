@@ -23,7 +23,7 @@ from legal_api.drafting.sample_profile import AREAS
 from legal_api.drafting.types import petition_types
 from legal_api.prompts import prompt
 
-TASKS = ("lookup", "consultation", "drafting", "search", "review")
+TASKS = ("lookup", "consultation", "drafting", "search", "review", "workspace")
 SHAPES = ("single", "answers", "routes", "plan", "draft", "list")
 MAX_ISSUES = 8
 MAX_HINTS = 10
