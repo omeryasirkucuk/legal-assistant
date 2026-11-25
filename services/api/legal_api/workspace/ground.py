@@ -120,13 +120,15 @@ async def structured(role, usage: llm.Usage, purpose: str, system: str, data: di
 
 
 async def review(usage: llm.Usage, question: str, plan: Plan, grounding: dict,
-                 notes: list[str], previous_title: str | None) -> None:
+                 notes: list[str], previous_title: str | None) -> bool:
     data = {"request": question, "plan": plan.model_dump(), "passages": grounding,
             "comparison_context": notes, "previous_plan": previous_title}
     verdict = await structured("judge", usage, "workspace_verify", prompt("workspace_verify"),
                                data, schema({"approved": {"type": "boolean"},
-                                             "reason": {"type": "string"}}), 3500)
+                                             "reason": {"type": "string"},
+                                             "updates_previous": {"type": "boolean"}}), 3500)
     if verdict.get("approved") is not True:
         reason = verdict.get("reason")
         raise InvalidPlan((reason if isinstance(reason, str) else
                            "Hesap ve kaynak ilişkisi doğrulanamadı.")[:700])
+    return bool(previous_title and verdict.get("updates_previous", plan.updates_previous))

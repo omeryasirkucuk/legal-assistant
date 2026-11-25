@@ -4,7 +4,7 @@
 
 - Refresh both installations with `make setup`. Calculation revisions use existing chat and file tables.
 - Continue refreshing the local corpus for case work. Development deployments can set `BRAVE_SEARCH_API_KEY` to discover official public sources.
-- For a smoke test, calculate from a readable document, open its evidence, request a different output format, and add a replacement document to verify the new revision.
+- For a smoke test, calculate from a readable document, open its evidence, request a different output format, and add a replacement document to verify the new revision. The workbook can be recalculated in a compatible spreadsheet application.
 
 ## 0.2.0 · 2026-11-26
 

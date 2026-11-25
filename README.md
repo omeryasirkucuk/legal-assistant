@@ -67,12 +67,12 @@ cannot be verified, the answer identifies the item that remains open.
 
 You can ask for one line, a table in chat, or an editable Excel workbook. A format change can
 reuse the saved calculation. Supply a correction or a replacement document in the same chat
-to run a new revision and see which inputs and results changed. When you ask to update a Word
+to run a new revision and see which inputs and results changed. State which document is authoritative when two files disagree. When you ask to update a Word
 file, the assistant can replace a verified amount at an exact location and save a separate
 copy in **My files**. Previous answers and their exports remain available in chat history.
 
 Paper scans need a readable text layer for this workflow. Word edits currently target amounts
-in the document body, within a single text run. Excel exports use formulas for the saved plan.
+in the document body, within a single text run. Excel exports contain formulas and the cited source excerpts for the saved plan.
 Local changes within Excel are separate from the app's verified revision. Bring changed inputs
 back to the chat to verify and record a new revision.
 

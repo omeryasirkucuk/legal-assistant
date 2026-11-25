@@ -372,10 +372,17 @@ class Workspace:
                         raise InvalidPlan("Bu düzenlemeye bağlanabilecek bir önceki hesap yok.")
                     values = evaluate(candidate)
                     grounded = ground(self.ledger, candidate, values)
-                    await review(self.usage, question, candidate, grounded, self.comparison[-6:],
-                                 self.previous.title if self.previous else None)
-                    self.current = candidate
-                    result = {key: values[key].dump() for key in candidate.outputs}
+                    repeated = self.current and self.current.outputs == candidate.outputs and (
+                        self.current.steps == candidate.steps and
+                        evaluate(self.current) == values)
+                    if not repeated:
+                        candidate.updates_previous = await review(
+                            self.usage, question, candidate, grounded, self.comparison[-6:],
+                            self.previous.title if self.previous else None)
+                        self.current = candidate
+                    result = {"status": "verified", "values": {key: values[key].dump()
+                              for key in candidate.outputs}, "next": "finish veya varsa blocked"}
+                    context["calculation"] = result
                 elif action == "finish":
                     finish = Finish.model_validate(payload)
                     plan = self.current or (self.previous if finish.reuse else None)

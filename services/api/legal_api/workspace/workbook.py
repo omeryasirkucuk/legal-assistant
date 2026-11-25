@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 from datetime import date
 from decimal import Decimal
+from textwrap import wrap
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -53,15 +54,25 @@ def _format(sheet, header: int, widths: tuple[int, ...]) -> None:
     for row in sheet.iter_rows(min_row=header + 1):
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
-        sheet.row_dimensions[row[0].row].height = 30 if sheet.title == "Hesap" else 55
+        visible_lines = 1
+        for cell, width in zip(row, widths, strict=False):
+            if cell.value and cell.data_type == "s":
+                lines = sum(max(1, len(wrap(line, max(6, width - 5))))
+                            for line in str(cell.value).splitlines())
+                visible_lines = max(visible_lines, lines)
+        sheet.row_dimensions[row[0].row].height = min(375, max(27, 15 * visible_lines + 5))
 
 
 def _number_format(value) -> str:
     if isinstance(value.data, date):
-        return "dd.mm.yyyy"
+        return "yyyy-mm-dd"
     if value.unit not in ("number", "day"):
         return '#,##0.00'
-    return "0.##########"
+    return "General"
+
+
+def _unit(unit: str) -> str:
+    return {"TRY": "TL", "date": "Tarih", "day": "Gün", "number": ""}.get(unit, unit)
 
 
 def workbook(snapshot: dict) -> bytes:
@@ -85,7 +96,7 @@ def workbook(snapshot: dict) -> bytes:
     for key in plan.outputs:
         row = sheet.max_row + 1
         _set_text(sheet.cell(row, 1), labels[key])
-        sheet.cell(row, 3, values[key].unit)
+        sheet.cell(row, 3, _unit(values[key].unit))
         sheet.cell(row, 2).number_format = _number_format(values[key])
     steps = book.create_sheet("Girdiler ve işlemler")
     steps.append(["Kalem", "Değer", "Birim", "İşlem / dayanak", "Kaynak"])
@@ -99,7 +110,7 @@ def workbook(snapshot: dict) -> bytes:
             raise ValueError("Excel bu girdinin ondalık hassasiyetini koruyamıyor.")
         steps.cell(row, 2, value.data).number_format = _number_format(value)
         _set_text(steps.cell(row, 1), item.label)
-        steps.cell(row, 3, item.unit)
+        steps.cell(row, 3, _unit(item.unit))
         proof = snapshot["grounding"]["inputs"][item.key]
         _set_text(steps.cell(row, 4), item.meaning)
         _set_text(steps.cell(row, 5), f"{proof['citation']}\n{proof['quote']}\n{proof['url']}")
@@ -110,7 +121,7 @@ def workbook(snapshot: dict) -> bytes:
         value = values[step.key]
         _set_text(steps.cell(row, 1), step.label)
         steps.cell(row, 2, _formula(step.operation, args)).number_format = _number_format(value)
-        steps.cell(row, 3, value.unit)
+        steps.cell(row, 3, _unit(value.unit))
         rule = rules[step.rule]
         _set_text(steps.cell(row, 4), f"{rule.applies_on}\n{rule.reasoning}")
         _set_text(steps.cell(row, 5), "\n".join(
