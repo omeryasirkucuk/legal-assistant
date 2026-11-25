@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.3.1 · 2026-11-26
+
+- Check input-only revisions by replacing a verified amount in chat and confirming that the original rule and the previous result remain viewable. No database migration is needed.
+
 ## 0.3.0 · 2026-11-26
 
 - Refresh both installations with `make setup`. Calculation revisions use existing chat and file tables.

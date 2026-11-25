@@ -67,7 +67,7 @@ cannot be verified, the answer identifies the item that remains open.
 
 You can ask for one line, a table in chat, or an editable Excel workbook. A format change can
 reuse the saved calculation. Supply a correction or a replacement document in the same chat
-to run a new revision and see which inputs and results changed. State which document is authoritative when two files disagree. When you ask to update a Word
+to run a new revision and see which inputs and results changed. For a correction limited to a numeric input, the app verifies the replacement and reuses the approved rules, dates and operations. State which document is authoritative when two files disagree. When you ask to update a Word
 file, the assistant can replace a verified amount at an exact location and save a separate
 copy in **My files**. Previous answers and their exports remain available in chat history.
 

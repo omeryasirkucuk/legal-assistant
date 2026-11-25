@@ -42,14 +42,13 @@ def record(ref, quote):
     return {"ref": ref, "quote": quote}
 
 
-def proposal(document, law, correction=None):
-    amount = record(correction, "yeni dekonttaki 150.000,00 TL") if correction else record(
-        document, "Faiz indirimi sonrası erken ödenen tutar: 120.000,00 TL")
+def proposal(document, law):
+    amount = record(document, "Faiz indirimi sonrası erken ödenen tutar: 120.000,00 TL")
     return {
-        "title": "Erken ödeme tazminatı üst sınırı", "updates_previous": bool(correction),
+        "title": "Erken ödeme tazminatı üst sınırı",
         "inputs": [
             {"key": "erken", "label": "Erken ödenen ana tutar", "unit": "TRY",
-             "value": "150000" if correction else "120000", "passage": amount,
+             "value": "120000", "passage": amount,
              "meaning": "Faiz indirimi sonrası ödeme"},
             {"key": "tarih", "label": "Erken ödeme tarihi", "unit": "date",
              "value": "2025-06-18", "passage": record(document, DATE),
@@ -156,7 +155,7 @@ async def test_chat_unknown_case_reformat_update_edit_and_account_isolation(monk
 
     async def create(_role, _usage, purpose, **params):
         context = json.loads(params["messages"][0]["content"])
-        if purpose in ("workspace_verify", "workspace_reuse", "workspace_edit"):
+        if purpose in ("workspace_verify", "workspace_revision", "workspace_reuse", "workspace_edit"):
             result = {"approved": True, **({"reason": ""} if purpose == "workspace_verify" else {})}
         else:
             assert purpose == "workspace_plan"
@@ -175,10 +174,9 @@ async def test_chat_unknown_case_reformat_update_edit_and_account_isolation(monk
                                     format="short")
             elif msg == CORRECTION:
                 if n == 0:
-                    plan = context["previous"]
-                    document = plan["inputs"][1]["passage"]["ref"]
-                    law = plan["rules"][0]["passages"][0]["ref"]
-                    result = action("calculate", **proposal(document, law, context["statement"]))
+                    result = action("revise_inputs", changes=[{
+                        "key": "erken", "value": "150000",
+                        "passage": record(context["statement"], "yeni dekonttaki 150.000,00 TL")}])
                 else:
                     file = next(f["id"] for f in context["files"] if f["name"] == "talep.docx")
                     result = action("finish", format="short", reuse=False, edits=[{
