@@ -17,7 +17,8 @@ def _sources() -> list[Source]:
 
 
 def _block(text, *doc_indexes):
-    cites = [SimpleNamespace(document_index=i, cited_text=f"q{i}") for i in doc_indexes]
+    passages = ("Metin bir.", "Metin iki.")
+    cites = [SimpleNamespace(document_index=i, cited_text=passages[i]) for i in doc_indexes]
     return SimpleNamespace(type="text", text=text, citations=cites or None)
 
 

@@ -7,9 +7,8 @@
 import { useEffect } from "react";
 import { EditorContent, useEditor, type Editor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
-import TextStyle from "@tiptap/extension-text-style";
+import { TextStyle } from "@tiptap/extension-text-style";
 import {
   AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Italic, List, ListOrdered, Redo2,
   Underline as UnderlineIcon, Undo2,
@@ -21,8 +20,7 @@ import { t, type MessageKey } from "@/lib/i18n";
 /** The editor's schema; also used to show a document read-only (generateHTML). */
 export const EXTENSIONS = [
   StarterKit.configure({ heading: false, codeBlock: false, code: false, blockquote: false,
-                         horizontalRule: false, strike: false }),
-  Underline,
+                         horizontalRule: false, strike: false, link: false, trailingNode: false }),
   TextStyle,
   FontSize,
   TextAlign.configure({ types: ["paragraph"], alignments: ["left", "center", "right", "justify"],
@@ -97,6 +95,7 @@ export function PetitionEditor({ doc, disabled = false, onChange, onReady }: {
 }) {
   const editor = useEditor({
     immediatelyRender: false,
+    shouldRerenderOnTransaction: true,
     extensions: EXTENSIONS,
     content: doc as JSONContent,
     editorProps: { attributes: { class: "petition-sheet", spellcheck: "true", lang: "tr" } },

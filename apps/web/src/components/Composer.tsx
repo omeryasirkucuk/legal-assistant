@@ -23,6 +23,7 @@ type Props = {
   onStop: () => void;
   footer?: React.ReactNode;    // beside the box, below it (the usage meter)
   placeholder?: string;        // in a case file: asking in that file
+  protectedData?: boolean;
 };
 
 function usePower(): [Power, (p: Power) => void] {
@@ -43,7 +44,7 @@ function usePower(): [Power, (p: Power) => void] {
 
 export type FollowUp = { key: string; items: Clarification[]; asked: boolean };
 
-export function Composer({ followUp, busy, onSubmit, onStop, footer, placeholder }: Props) {
+export function Composer({ followUp, busy, onSubmit, onStop, footer, placeholder, protectedData }: Props) {
   const [text, setText] = useState("");
   const [picks, setPicks] = useState<Picks>({});
   const [closed, setClosed] = useState<string | null>(null);   // key of the dismissed questions
@@ -147,6 +148,9 @@ export function Composer({ followUp, busy, onSubmit, onStop, footer, placeholder
               </li>
             ))}
           </ul>
+        )}
+        {protectedData && files.length > 0 && (
+          <p className="px-4 pt-2 text-xs text-muted">{t("privateAttachments")}</p>
         )}
         <textarea
           ref={area}

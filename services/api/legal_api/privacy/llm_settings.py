@@ -1,12 +1,13 @@
 """Resolve the saved application connection into a per-request runtime config."""
 
+from legal_api.config import get_settings
 from legal_api.db.app_models import LLMConnectionSettings
 from legal_api.llm import RuntimeConfig
 from legal_api.privacy.credentials import decrypt_credential
 
 
 def runtime_config(row: LLMConnectionSettings | None) -> RuntimeConfig | None:
-    if row is None:
+    if row is None or get_settings().protected_data:
         return None
     return RuntimeConfig(
         provider="openai_compatible",

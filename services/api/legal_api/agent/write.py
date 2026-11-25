@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from functools import cache
 
 from legal_api import decisions, llm
-from legal_api.agent.atoms import Segment, openai_segments_from
+from legal_api.agent.atoms import CitationStream, Segment, openai_segments_from, segments_from
 from legal_api.agent.power import POWERS, Power
 from legal_api.agent.sources import Source
 from legal_api.agent.understand import Understanding
@@ -26,15 +26,14 @@ from legal_api.locale import reference_terms
 from legal_api.prompts import prompt
 
 MAX_DOCUMENT_CHARS = 8000
-CITE_AGAIN = ("<note>The previous attempt cited no document. Cite the documents for every legal "
-              "statement using the citation feature.</note>")
+CITE_AGAIN = ("<note>The previous attempt produced no verifiable citation. Follow the citation "
+              "instructions for each sourced legal statement.</note>")
 # Includes the model's thinking; 4,000 cut a consultation answer off mid-section.
 MAX_TOKENS = 8000
-# Correct sentences scored about 0.9, a period applied to the wrong case 0.67, plain errors
-# below 0.05 (probe on obligations law art. 315, 2026-10-30). At 0.8 correct sentences in long
-# paragraphs (decision quotes, relations between provisions) were flagged too, so only clear
-# contradictions are flagged; wrong-case errors are not caught by this check.
-SUPPORTED = 0.5
+# A probe scored a period applied to the wrong case at 0.67. Treat ambiguous scores as
+# requiring review, since some accurate long paragraphs also scored below 0.8.
+SUPPORTED = 0.8
+PARTIAL = 0.5
 CHECK_SOURCE_CHARS = 6000
 MAX_PARAGRAPH_CHARS = 2000
 MIN_JUDGED_WORDS = 4    # words a piece needs to be judged on its own
@@ -80,16 +79,8 @@ def _request(message: str, u: Understanding, instruction: str | None,
 
 def _segments(final, sources: list[Source], role: llm.Role = "write") -> list[Segment]:
     if llm.openai_for(role):
-        return openai_segments_from(final.content, sources)
-    out = []
-    for block in final.content:
-        if block.type != "text":
-            continue
-        cites = block.citations or []
-        keys = tuple(dict.fromkeys(sources[c.document_index].evidence.key for c in cites
-                                   if c.document_index < len(sources)))
-        out.append(Segment(block.text, keys, tuple(c.cited_text for c in cites)))
-    return out
+        return openai_segments_from(final.content, sources, MAX_DOCUMENT_CHARS)
+    return segments_from(final.content, sources)
 
 
 # Zero-width characters in statute texts were copied into answers, sometimes as the literal
@@ -97,17 +88,11 @@ def _segments(final, sources: list[Source], role: llm.Role = "write") -> list[Se
 _INVISIBLE = re.compile(r"\\u200[bcd]|\\ufeff|[\u200b\u200c\u200d\ufeff]")
 
 
-# A document key written into the prose ("the closest are E10 and E12"); the lawyer cannot
-# read it, so it becomes a citation marker (shown as a chip that opens the source).
-_BARE_KEY = re.compile(r"(?<!\[\[)\b(E\d+)\b(?!\]\])")
+_RAW_MARKER = re.compile(r"[ \t]*\[\[E\d+\]\]")
 
 
-def clean(text: str, keys: set[str] | None = None) -> str:
-    text = _INVISIBLE.sub("", text)
-    if keys:
-        text = _BARE_KEY.sub(lambda m: f"[[{m.group(1)}]]" if m.group(1) in keys else m.group(0),
-                             text)
-    return text
+def clean(text: str) -> str:
+    return _RAW_MARKER.sub("", _INVISIBLE.sub("", text))
 
 
 def assemble(segments: list[Segment]) -> str:
@@ -138,62 +123,47 @@ def without_citations(text: str) -> str:
 
 
 def _referenced_sources(segment: Segment, sources: list[Source]) -> list[Source]:
-    """The sources a sentence cites, and those whose article it names in its text."""
-    named = set(re.findall(r"\d+(?:/\w+)?", segment.text))
-    return [s for s in sources if s.evidence.key in segment.keys
-            or (getattr(s.evidence, "article_number", None)
-                and s.evidence.article_number in named)]
+    return [s for s in sources if s.evidence.key in segment.keys]
 
 
 async def check(segments: list[Segment], sources: list[Source], message: str,
                 usage: llm.Usage) -> list[dict]:
-    """Sentences stating quantities are checked: every number must appear in a source (first
-    the ones the sentence cites or names, else any), and a sentence that cites or names its
-    sources must be judged supported by them (a period applied to the wrong case passes a
-    number check but not this one)."""
-    titles = [s.evidence.citation for s in sources] + [message]
+    """Check citation matches, quantities and, when enabled, support from cited sources."""
     to_judge: list[tuple[Segment, list[Source]]] = []
     flagged: list[dict] = []
     for seg in segments:
+        if seg.unverified:
+            flagged.append(_flag(seg, "", "citation_unmatched"))
         body = without_citations(seg.text)
         # A piece cut off by citation marks ("315).**", "the fastest route.") cannot be judged
         # on its own; its numbers are still checked below.
         judged = len(re.findall(r"[^\W\d_]{2,}", body)) >= MIN_JUDGED_WORDS
-        if not numbers_in(body):
-            # A citation with no quote matched to its source (a writer without document
-            # citations) is judged against its sources like a sentence with numbers.
-            if seg.keys and not seg.quotes and judged:
-                to_judge.append((seg, _referenced_sources(seg, sources)))
-            continue
         relied = _referenced_sources(seg, sources)
-        missing = unsupported_numbers(body, [*seg.quotes, *(s.document for s in relied),
-                                             *titles])
-        if missing:
-            # Not in the sources the sentence relies on: a number no source states at all is
-            # flagged; one stated elsewhere is judged against every source below.
-            missing = unsupported_numbers(body, [*(s.document for s in sources), *titles])
+        if numbers_in(body):
+            available = relied or sources
+            missing = unsupported_numbers(body, [message, *seg.quotes,
+                                                  *(s.document for s in available)])
             if missing:
                 flagged.append(_flag(seg, ", ".join(f"{n:g}" for n in sorted(missing))))
                 continue
-            relied = []
         if relied and judged:
             to_judge.append((seg, relied))
     if to_judge and decisions.enabled():
         context = _paragraphs(segments)
-        # Every source, not only the ones the sentence names: a correct sentence may rest on a
-        # source it does not name; a wrong one is still contradicted by the one it does.
-        everything = "\n\n".join(f"{s.evidence.citation}:\n{s.document[:CHECK_SOURCE_CHARS]}"
-                                   for s in sources)
         async with decisions.client() as client:
             verdicts = await asyncio.gather(*(
                 decisions.yes_probabilities(
                     client, {"sentence": seg.text.strip(), "paragraph": context[id(seg)],
-                             "sources": everything},
+                             "sources": "\n\n".join(
+                                 f"{s.evidence.citation}:\n{s.document[:CHECK_SOURCE_CHARS]}"
+                                 for s in relied)},
                     {"supported": SUPPORT_CHECK}, usage, "check")
-                for seg, _ in to_judge))
+                for seg, relied in to_judge))
         for (seg, _), v in zip(to_judge, verdicts, strict=True):
-            if v["supported"] is not None and v["supported"] < SUPPORTED:
-                flagged.append(_flag(seg, ""))
+            score = v["supported"]
+            if score is not None and score < SUPPORTED:
+                flagged.append(_flag(seg, "", "support_low", "partial" if score >= PARTIAL
+                                     else "not_supported"))
     return flagged
 
 
@@ -218,9 +188,10 @@ def _paragraphs(segments: list[Segment]) -> dict[int, str]:
     return out
 
 
-def _flag(seg: Segment, note: str) -> dict:
-    return {"sentence": seg.text.strip(), "keys": list(seg.keys), "verdict": "not_supported",
-            "note": note}
+def _flag(seg: Segment, note: str, reason: str | None = None,
+          verdict: str = "not_supported") -> dict:
+    return {"sentence": seg.text.strip(), "keys": list(seg.keys), "verdict": verdict,
+            "note": note, **({"reason": reason} if reason else {})}
 
 
 async def write(message: str, u: Understanding, sources: list[Source], usage: llm.Usage,
@@ -231,35 +202,43 @@ async def write(message: str, u: Understanding, sources: list[Source], usage: ll
     as the case's material but not cited as legal sources."""
     """Yields text deltas while writing, then the Written answer."""
     system = prompt("write")
-    if llm.openai_for(power.write_role):
+    compatible = llm.openai_for(power.write_role)
+    if compatible:
         keys = ", ".join(s.evidence.key for s in sources)
         system += "\n\n" + prompt("quote_citations").replace("{keys}", keys)
     content = [*_documents(sources), *(context or []),
                {"type": "text", "text": _request(message, u, instruction, previous)}]
     final = None
     for attempt in range(2):
+        citations = CitationStream()
         async for item in llm.stream(power.write_role, usage, "write", max_tokens=max_tokens,
                                      system=system,
                                      output_config={"effort": power.write_effort},
                                      messages=[{"role": "user", "content": content}]):
             if isinstance(item, str):
                 if attempt == 0:
-                    yield item
+                    visible = citations.feed(item)
+                    if visible:
+                        yield visible
             else:
                 final = item
+        if attempt == 0 and (tail := citations.finish()):
+            yield tail
         segments = _segments(final, sources, power.write_role) if final else []
         # An answer that cites nothing cannot be checked or followed to its sources (one came
         # back as a single uncited block); it is written once more.
-        if not sources or any(s.keys for s in segments) or llm.openai_for(power.write_role):
+        if not sources or any(s.keys for s in segments) or (final and final.stop_reason == "refusal"):
             break
         content[-1] = {"type": "text", "text": _request(message, u, instruction, previous)
                        + "\n" + CITE_AGAIN}
     flagged = await check(segments, sources, message, usage)
+    if (segments and not any(s.keys or s.unverified for s in segments)
+            and (final is None or final.stop_reason != "refusal")):
+        flagged.append(_flag(Segment(""), "", "citation_missing"))
     if final is not None and final.stop_reason == "max_tokens":
         flagged.append({"sentence": "", "keys": [], "verdict": "not_supported",
                         "note": "answer cut off at the length limit"})
     # Quantities as digits throughout; checked above on the text as written.
-    keys = {s.evidence.key for s in sources}
-    segments = [Segment(digits_for_quantities(clean(s.text, keys)), s.keys, s.quotes)
+    segments = [Segment(digits_for_quantities(clean(s.text)), s.keys, s.quotes, s.unverified)
                 for s in segments]
     yield Written(segments, assemble(segments), flagged)

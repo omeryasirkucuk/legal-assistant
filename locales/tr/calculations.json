@@ -35,7 +35,7 @@
     "service": "Çalışma süresi: {start} - {end}: {years} yıl {months} ay {days} gün.",
     "monthly": "Esas alınan aylık giydirilmiş brüt ücret (avukatın verdiği): {monthly}.",
     "ceiling": "Fesih tarihindeki kıdem tazminatı tavanı: {ceiling}. Kıdem tazminatında esas alınan aylık ücret: {base}.",
-    "ceiling_missing": "UYARI: {end} tarihindeki kıdem tazminatı tavanı sistemde yok; tavanı kontrol edin.",
+    "ceiling_missing": "{end} tarihindeki kıdem tazminatı tavanı tabloda yok. Brüt ve net kıdem tutarı için o tarihin tavanı gerekiyor.",
     "severance": "Kıdem tazminatı (brüt): her tam yıl için 30 günlük ücret, artan süre için orantılı: {base} x {years_decimal} yıl = {severance}.",
     "under_one_year": "Çalışma süresi bir yıldan az olduğu için kıdem tazminatı doğmaz.",
     "stamp": "Damga vergisi (binde 7,59): {stamp}. Net kıdem tazminatı: {net}. Kıdem tazminatı tavanı aşmadığı ölçüde gelir vergisinden istisnadır.",
@@ -50,8 +50,9 @@
     "kind_advance": "Avans faizi (ticari işlerde), TCMB avans işlemlerinde uygulanan oran, 3095 sayılı Kanun m. 2/2:",
     "stretch": "{start} - {end}: {days} gün, yıllık %{rate}: {interest}",
     "total": "Toplam faiz: {total}. Anapara ile birlikte: {sum}.",
+    "partial_total": "Tablonun kapsadığı günlere ait faiz: {total}.",
     "before_rates": "UYARI: Sistemdeki oran tablosu {first} tarihinden başlıyor; daha önceki günler için faiz hesaplanmadı.",
-    "after_known": "UYARI: Oranlar en son {known} tarihinde kontrol edildi; sonraki günler için son bilinen oran kullanıldı, değişiklik olup olmadığını kontrol edin.",
+    "after_known": "Oran tablosu {known} tarihine kadar doğrulandı. Sonraki günlerin faizi hesaplanmadı.",
     "both": "Hangi faizin uygulanacağı (yasal faiz mi, ticari işlerde avans faizi mi) işin niteliğine bağlıdır; iki hesap da verilmiştir."
   }
 }

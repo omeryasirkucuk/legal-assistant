@@ -21,6 +21,19 @@ def test_days_outside_the_tables_are_flagged():
     assert "after_known" in compute(Decimal(1), date(2026, 1, 1), date(2027, 6, 1), "statutory").warnings
 
 
+def test_no_interest_is_reported_for_days_after_the_table_coverage():
+    from legal_api.calc.interest import _known_until
+    from legal_api.calc.interest_text import render
+    from legal_api.locale import calculation_terms
+
+    r = compute(Decimal(100000), date(2026, 6, 30), date(2027, 6, 1), "statutory")
+    assert r.stretches[-1].end == _known_until()
+    text = render([r])
+    words = calculation_terms()["interest"]
+    assert words["partial_total"].split("{")[0] in text
+    assert words["total"].split("{")[0] not in text
+
+
 def test_the_calculation_is_written_out_with_both_kinds_when_unclear():
     from legal_api.calc.interest_text import render
     text = render([compute(Decimal(100000), date(2026, 6, 30), date(2026, 8, 30), k)

@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from legal_api import llm
-from legal_api.agent.atoms import Segment, openai_segments_from
+from legal_api.agent.atoms import CitationStream, Segment, openai_segments_from
 from legal_api.config import get_settings
 from legal_api.prompts import prompt
 
@@ -29,25 +29,29 @@ async def detail_stream(question: str, short_answer: str, sources: list[tuple[st
         keys = ", ".join(key for key, _, _ in sources)
         system += "\n\n" + prompt("quote_citations").replace("{keys}", keys)
     final = None
+    citation_stream = CitationStream()
     async for item in llm.stream("main", usage, "detail", max_tokens=6000,
                                  system=system,
                                  output_config={"effort": get_settings().answer_effort},
                                  messages=[{"role": "user", "content": [
                                      *documents, {"type": "text", "text": request}]}]):
         if isinstance(item, str):
-            yield item
+            if visible := citation_stream.feed(item):
+                yield visible
         else:
             final = item
+    if tail := citation_stream.finish():
+        yield tail
     segments = []
     if llm.uses_openai_compatible() and final:
-        segments = openai_segments_from(final.content, sources)
+        segments = openai_segments_from(final.content, sources, MAX_DOCUMENT_CHARS)
         yield segments
         return
     for block in final.content if final else []:
         if block.type != "text":
             continue
         cites = block.citations or []
-        keys = tuple(dict.fromkeys(sources[c.document_index][0] for c in cites
-                                   if c.document_index < len(sources)))
+        cites = [c for c in cites if 0 <= c.document_index < len(sources) and c.cited_text]
+        keys = tuple(dict.fromkeys(sources[c.document_index][0] for c in cites))
         segments.append(Segment(block.text, keys, tuple(c.cited_text for c in cites)))
     yield segments

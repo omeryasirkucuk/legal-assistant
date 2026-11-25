@@ -34,7 +34,7 @@ from legal_api.drafting.tidy import tidy
 from legal_api.drafting.types import petition_types
 from legal_api.files.extract import UnsupportedFile, text_of
 from legal_api.files.labels import file_format
-from legal_api.files.store import QuotaExceeded
+from legal_api.files.store import MAX_FILE_BYTES, QuotaExceeded
 from legal_api.files.store import read as read_file
 from legal_api.spend import record_spend
 
@@ -179,8 +179,11 @@ async def upload_sample(user: CurrentUser, db: DB, file: Annotated[UploadFile, F
                         keep: Annotated[bool, Form()] = False) -> SampleOut:
     """A petition the lawyer wrote (Word, UYAP, PDF, OpenDocument, RTF or text), to learn
     their style from."""
+    data = await file.read(MAX_FILE_BYTES + 1)
+    if len(data) > MAX_FILE_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "file too large")
     try:
-        text = text_of(file.filename or "", await file.read())
+        text = text_of(file.filename or "", data)
     except UnsupportedFile as e:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "unsupported") from e
     except (zipfile.BadZipFile, KeyError, ValueError) as e:

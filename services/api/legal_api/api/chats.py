@@ -47,6 +47,7 @@ from legal_api.matters.service import context as matter_context
 from legal_api.matters.service import files_of as matter_files
 from legal_api.matters.service import owned as owned_matter
 from legal_api.privacy.llm_settings import runtime_config
+from legal_api.spend import record_spend
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 logger = logging.getLogger(__name__)
@@ -183,8 +184,8 @@ async def _finished_title(task: asyncio.Task | None) -> str | None:
         return None
     try:
         return await task
-    except Exception:
-        logger.exception("title generation failed")
+    except Exception as exc:
+        logger.error("title generation failed (%s)", type(exc).__name__)
         return None
 
 
@@ -253,21 +254,29 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
         run.emit("question", {"id": question_id, "content": text,
                               "started_at": time.time() * 1000})
         holder: dict = {}
-        title_usage = llm.Usage()
+        usage = llm.Usage()
         # The first question names the chat; written alongside the answer.
-        title_task = (asyncio.create_task(generate_title(text, title_usage))
+        title_task = (asyncio.create_task(generate_title(text, usage))
                       if previous is None else None)
-        async for event in turn_events(text, turns, previous, holder, style, power,
-                                       attachments, agenda):
-            run.emit(event.type, event.data)
-        title = await _finished_title(title_task)
+        try:
+            async for event in turn_events(text, turns, previous, holder, style, power,
+                                           attachments, agenda, usage=usage):
+                run.emit(event.type, event.data)
+            title = await _finished_title(title_task)
+        finally:
+            if title_task is not None:
+                if not title_task.done():
+                    title_task.cancel()
+                await asyncio.gather(title_task, return_exceptions=True)
+            async with get_sessionmaker()() as session:
+                await record_spend(session, user_pk, "chat_answer", usage)
+                await session.commit()
         async with get_sessionmaker()() as session:
             stored_chat = await session.get(Chat, chat_pk)
             if stored_chat is None:      # deleted while answering
                 return
             if title:
                 stored_chat.title = title
-            holder["result"].usage.calls.extend(title_usage.calls)
             result = holder["result"]
             saved = await save_answer(session, stored_chat, result)
             draft = None
@@ -344,26 +353,31 @@ async def detail(chat_id: uuid.UUID, message_id: uuid.UUID, user: CurrentUser,
 
     async def events() -> AsyncIterator[str]:
         token = llm.set_runtime_config(llm_config)
+        usage = llm.Usage()
+        segments = []
+        complete = False
         try:
-            usage = llm.Usage()
-            segments = []
             try:
                 async for item in detail_stream(question or "", msg.content, sources, usage):
                     if isinstance(item, str):
                         yield _sse("delta", {"text": item})
                     else:
                         segments = [{"text": s.text, "keys": list(s.keys)} for s in item]
-            except Exception:
-                logger.exception("detail stream failed for message %s", message_pk)
+            except Exception as exc:
+                logger.error("detail stream failed for message %s (%s)", message_pk, type(exc).__name__)
                 yield _sse("error", {})
                 return
-            async with get_sessionmaker()() as session:
-                stored = await session.get(Message, message_pk)
-                stored.meta = {**stored.meta, "detail": segments,
-                               "detail_cost_usd": round(usage.cost_usd, 4)}
-                await session.commit()
-            yield _sse("detail", {"segments": segments})
+            complete = True
         finally:
-            llm.reset_runtime_config(token)
+            try:
+                async with get_sessionmaker()() as session:
+                    if complete and (stored := await session.get(Message, message_pk)) is not None:
+                        stored.meta = {**stored.meta, "detail": segments,
+                                       "detail_cost_usd": round(usage.cost_usd, 4)}
+                    await record_spend(session, user.id, "chat_detail", usage)
+                    await session.commit()
+            finally:
+                llm.reset_runtime_config(token)
+        yield _sse("detail", {"segments": segments})
 
     return _stream(events())

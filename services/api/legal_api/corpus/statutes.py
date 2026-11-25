@@ -151,13 +151,17 @@ async def fetch_law(statutes: bs.BedestenStatutes, number: str):
 
 
 async def sync(numbers: list[str]) -> None:
+    if not all(re.fullmatch(r"[0-9]{1,5}", number) for number in numbers):
+        raise ValueError("statute sync accepts public law numbers only")
     conn = await asyncpg.connect(asyncpg_dsn())
     await register_vector(conn)
-    gateway = Gateway()
+    gateway = Gateway(allow_requests=True)
     statutes = bs.BedestenStatutes(gateway)
     try:
         for number in numbers:
             ref, articles = await fetch_law(statutes, number)
+            if not articles:
+                raise ValueError(f"law {number} returned no articles; keeping the current index")
             vectors = embed_passages([f"{a.section}\n{a.heading}\n{a.text}"[:2000]
                                       for a in articles])
             now = datetime.now(UTC)

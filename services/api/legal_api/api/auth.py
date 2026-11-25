@@ -6,7 +6,7 @@ import hmac
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from legal_api.auth import (
     COOKIE,
@@ -38,10 +38,12 @@ class UserOut(BaseModel):
     email: str
     name: str
     is_admin: bool
+    protected_data: bool
 
 
 def _out(user: User) -> UserOut:
-    return UserOut(id=str(user.id), email=user.email, name=user.name, is_admin=user.is_admin)
+    return UserOut(id=str(user.id), email=user.email, name=user.name, is_admin=user.is_admin,
+                   protected_data=get_settings().protected_data)
 
 
 def _set_cookie(response: Response, user: User) -> None:
@@ -54,6 +56,8 @@ async def register(body: Registration, response: Response, db: DB) -> UserOut:
     expected = get_settings().invite_code
     if not expected or not hmac.compare_digest(body.invite_code.strip(), expected):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid invite code")
+    # Pick one initial administrator even when two invitations are used concurrently.
+    await db.execute(text("SELECT pg_advisory_xact_lock(739128301)"))
     email = body.email.lower()
     if await db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")

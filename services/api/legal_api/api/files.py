@@ -80,7 +80,8 @@ async def upload(user: CurrentUser, db: DB, file: Annotated[UploadFile, File()],
     if folder_id:
         await owned_folder(db, user.id, folder_id)
     try:
-        stored = await store.save(db, user.id, file.filename or "file", await file.read(),
+        stored = await store.save(db, user.id, file.filename or "file",
+                                  await file.read(store.MAX_FILE_BYTES + 1),
                                   "upload", file.content_type)
         stored.folder_id = folder_id
         await db.commit()
@@ -116,9 +117,14 @@ async def usage(user: CurrentUser, db: DB) -> dict:
 async def download(file_id: uuid.UUID, user: CurrentUser, db: DB,
                    inline: bool = False) -> Response:
     f = await _owned(db, user, file_id)
-    kind = "inline" if inline else "attachment"
-    return Response(store.read(f), media_type=f.media_type, headers={
-        "Content-Disposition": f"{kind}; filename=\"file\"; filename*=UTF-8''{quote(f.name)}"})
+    data = store.read(f)
+    preview_type = store.inline_type(data) if inline else None
+    kind = "inline" if preview_type else "attachment"
+    return Response(data, media_type=preview_type or "application/octet-stream", headers={
+        "Content-Disposition": f"{kind}; filename=\"file\"; filename*=UTF-8''{quote(f.name)}",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -176,7 +182,7 @@ async def preview(file_id: uuid.UUID, user: CurrentUser, db: DB) -> dict:
     f = await _owned(db, user, file_id)
     if f.media_type == "application/pdf":
         return {"kind": "pdf"}
-    if f.media_type.startswith("image/"):
+    if f.media_type in store.INLINE_TYPES:
         return {"kind": "image"}
     if f.draft_id:
         draft = await db.get(Draft, f.draft_id)

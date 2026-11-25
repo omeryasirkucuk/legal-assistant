@@ -15,25 +15,54 @@ from an official or public source and rendered by the backend, never written fro
 
 ## Local development
 
-Requirements: Docker, [uv](https://docs.astral.sh/uv/), Node.js 20+.
+Install Docker Compose, Python 3.12 or newer through [uv](https://docs.astral.sh/uv/),
+and Node.js 20 or newer with npm.
 
 ```bash
-cp .env.example .env      # configure an LLM provider and its API key
-make api                  # starts Postgres (pgvector), runs migrations, serves http://localhost:8000
+cp .env.example .env      # first-time setup, then fill in the settings below
+make setup                # install the Python and web lockfiles
+make corpus               # migrate Postgres and load the core statutes from Bedesten
+make api                  # serve http://localhost:8000
 make web                  # serves http://localhost:3000
-make test                 # backend tests
+make test                 # backend tests, with or without a populated statute index
 ```
 
-The API supports Anthropic and OpenAI-compatible chat-completions providers. Set `SECRET_KEY`
-to a random value of at least 32 characters in `.env` so saved provider credentials can be
-encrypted. The first account
-is the administrator and can configure Open WebUI from **Model settings** in the UI. Set the
-Open WebUI base URL ending in `/api` (for example, `http://localhost:8080/api`), an API key, and
-the model IDs shown by your instance. The key is encrypted in the database and never returned
-by the settings API. Open WebUI's API key must have chat-completions access enabled. Compatible
-answers are shown only when they cite a source ID and include an exact quote found in that source.
-For headless setup, the equivalent provider, endpoint, key, and model defaults can be set in
-`.env`. For metered compatible providers, set the optional input and output price-per-million-token
-variables so the per-user budget can account for their usage.
+Set `SECRET_KEY` in `.env` to a cryptographically random value of at least 32 characters.
+Set `INVITE_CODE` to register the first account, which becomes the administrator. Clear it
+and restart the API when registration should close. Use `COOKIE_SECURE=true` when serving
+the API over HTTPS. An alternate web API URL goes in `apps/web/.env.local` as
+`NEXT_PUBLIC_API_URL` before starting or building the web app.
+
+`make corpus` uses the public legislation service and downloads the local embedding model on
+first use. Run it again to refresh the index. `GET /health` reports database and pgvector
+status. `GET /ready` returns HTTP 503 until the required core laws are indexed and lists
+missing law numbers. To populate the optional local decision archive, follow the ingestion
+commands in [Architecture](docs/ARCHITECTURE.md#running-locally).
+
+Maintain the dated calculator tables in `locales/tr`. Fee and severance results require a table
+covering the requested period. Interest calculations report the covered days and identify any
+part of the request outside the table.
+
+The API supports Anthropic and OpenAI-compatible chat-completions providers. For Open WebUI,
+an administrator can set **Model settings** to a base URL ending in `/api` such as
+`http://localhost:8080/api`, a key with chat-completions access, and the instance's model IDs.
+The settings API stores the key encrypted and exposes only whether it is configured. Headless
+settings are in `.env`. Set the input and output rates for a metered compatible provider that
+does not return a cost. The daily budget uses a spend ledger that survives chat deletion.
+
+New answers show a source chip when the cited passage matches the stored original. For
+OpenAI-compatible writers, the passage must also appear in the supplied excerpt. Missing and unmatched
+citations show a warning alongside the complete answer. When the decision model is configured,
+the app also checks cited claims against those specific sources and marks uncertain support.
+Previous chats display their original citations with a legacy verification label.
+
+## Client data
+
+Use `DATA_MODE=protected` for real client material. Protected mode encrypts original and
+generated file payloads, pins inference to an operator-configured endpoint, and uses local
+legal indexes for case research. Users continue to read and download their complete content.
+`make api-protected` starts the configured API with request access logging disabled. Use
+[the privacy and recovery runbook](docs/PRIVACY.md) to migrate existing files, secure
+Postgres and temporary files, and test an encrypted backup restore before opening access.
 
 See `NOTICE` for third-party data and code attributions.

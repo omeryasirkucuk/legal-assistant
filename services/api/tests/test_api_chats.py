@@ -1,12 +1,15 @@
 import json
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from legal_api.agent.answer import Event
+from legal_api.api import chats
 from legal_api.chat.service import drop_unanswered
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, Message
@@ -36,6 +39,30 @@ async def _delete_test_users():
                            {"emails": list(_created)})
     await engine.dispose()
     _created.clear()
+
+
+async def test_answer_spend_survives_chat_deletion(monkeypatch):
+    async def title(_question, _usage):
+        return None
+
+    async def answer(_message, _history, _previous, result, *_args, usage):
+        usage.record("test", SimpleNamespace(cost=0.012), "write")
+        result["result"] = SimpleNamespace(
+            text="Answer", structure=lambda: {}, usage=usage, timings={}, trace={}, ledger=[],
+        )
+        yield Event("final", {"text": "Answer"})
+
+    monkeypatch.setattr(chats, "generate_title", title)
+    monkeypatch.setattr(chats, "turn_events", answer)
+    async with await _client() as c:
+        await c.post("/auth/register", json={"email": _email("test"), "password": "secret-pass",
+                                              "name": "Test", "invite_code": "test-invite"})
+        chat_id = (await c.post("/chats", json={"content": "Question"})).json()["id"]
+        response = await c.post(f"/chats/{chat_id}/messages", json={"content": "Question"})
+        assert "event: saved" in response.text
+        assert (await c.get("/chats/stats/today")).json()["cost_usd"] == 0.012
+        assert (await c.delete(f"/chats/{chat_id}")).status_code == 204
+        assert (await c.get("/chats/stats/today")).json()["cost_usd"] == 0.012
 
 
 async def _client() -> AsyncClient:

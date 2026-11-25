@@ -40,8 +40,9 @@ class Previous:
 async def turn_events(message: str, history: list[dict], previous: Previous | None,
                       result: dict, style: StyleBook | None = None, power: Power = POWERS["balanced"],
                       attachments: list[Attachment] | None = None,
-                      agenda: Agenda | None = None) -> AsyncIterator[Event]:
-    usage = llm.Usage()
+                      agenda: Agenda | None = None,
+                      usage: llm.Usage | None = None) -> AsyncIterator[Event]:
+    usage = usage if usage is not None else llm.Usage()
     just_asked = bool(previous and (previous.answer or {}).get("asked"))
     yield step_event("understand")
     # A reply to a question turn carries the facts for the request asked about; a message with

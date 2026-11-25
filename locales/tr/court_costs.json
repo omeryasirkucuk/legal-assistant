@@ -48,6 +48,6 @@
     "appeal_fees": "Kanun yolu başvuru harçları ({year}): istinaf {istinaf} TL, temyiz {temyiz} TL; ayrıca üst mahkeme başvurma harcı {upper} TL.",
     "year_unknown": "UYARI: Davanın açıldığı tarih belli değil; sınırlar {year} yılına göre verildi. Dava daha önce açıldıysa o yılın sınırı uygulanır.",
     "year_not_covered": "UYARI: {year} yılının parasal sınırları sistemde yok; sınırları kontrol edin.",
-    "fees_old": "UYARI: Harç tutarları {fees_year} tarifesine göredir; ödeme {year} yılında yapılacaksa o yılın tarifesine bakın."
+    "fees_old": "Sistemdeki harç tarifesi {fees_year} yılına ait. Tutar hesaplamak için {year} yılı tarifesi gerekiyor."
   }
 }

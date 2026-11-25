@@ -71,7 +71,7 @@ class WrittenResult:
 
     @property
     def checked(self) -> dict:
-        return {"issues": [], "claims": self.written.flagged}
+        return {"issues": [], "claims": self.written.flagged, "citation_check": "source_passages"}
 
     def structure(self) -> dict:
         return {"format": "written", "task": self.understanding.task,

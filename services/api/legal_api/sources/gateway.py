@@ -19,6 +19,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from legal_api.config import get_settings
+
 USER_AGENT = "legal-assistant/0.1 (grounded legal research prototype)"
 MIN_INTERVAL_S = 1.0
 # Hosts that asked for more room: the decision service answered HTTP 429 to a search followed
@@ -67,7 +69,10 @@ _SHARED_HOSTS: dict[str, _HostState] = {}
 
 class Gateway:
     def __init__(self, transport: httpx.AsyncBaseTransport | None = None,
-                 min_interval: float = MIN_INTERVAL_S, shared: bool = True):
+                 min_interval: float = MIN_INTERVAL_S, shared: bool = True,
+                 allow_requests: bool | None = None):
+        self._allow_requests = (not get_settings().protected_data if allow_requests is None
+                                else allow_requests)
         self._client = httpx.AsyncClient(
             transport=transport, timeout=TIMEOUT, headers={"User-Agent": USER_AGENT},
             follow_redirects=False,
@@ -80,6 +85,8 @@ class Gateway:
 
     async def request(self, method: str, url: str, *, source: str, expect: str = "json",
                       **kwargs: Any) -> httpx.Response:
+        if not self._allow_requests:
+            raise SourceError("live source requests are disabled in protected mode")
         host = urlsplit(url).hostname or url
         state = self._hosts.setdefault(host, _HostState())
         async with state.lock:

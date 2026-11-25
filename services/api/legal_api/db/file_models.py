@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -41,6 +41,7 @@ class StoredFile(Base):
     size: Mapped[int] = mapped_column(BigInteger)
     sha256: Mapped[str] = mapped_column(String(64))
     path: Mapped[str] = mapped_column(Text)                 # relative to the storage dir
+    encrypted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     text: Mapped[str] = mapped_column(Text, default="")     # extracted text, for answers
     # what the file is, for filtering (files/labels.py); None until labelled
     kind: Mapped[str | None] = mapped_column(String(32))    # petition, decision, contract, ...

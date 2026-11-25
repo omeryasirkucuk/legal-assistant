@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,12 +23,21 @@ class Settings(BaseSettings):
     invite_code: str = ""
     # True behind HTTPS (the public deployment); False for plain-http local development.
     cookie_secure: bool = False
+    web_origins: list[str] = ["http://localhost:3000"]
     # Per-user LLM spend allowed per calendar day (UTC), protecting the shared API key.
     daily_user_budget_usd: float = 3.0
 
     database_url: str = "postgresql+asyncpg://legal:legal@localhost:5433/legal"
     storage_dir: Path = REPO_ROOT / "var" / "storage"
     user_storage_bytes: int = 5 * 1024**3   # each user's space for attachments and made files
+    data_mode: Literal["development", "protected"] = "development"
+    document_encryption_key: str = ""
+    private_model_base_url: str = ""
+    private_model_api_key: str = ""
+
+    @property
+    def protected_data(self) -> bool:
+        return self.data_mode == "protected"
 
     # LLM provider: Anthropic directly, or any OpenAI-compatible chat completions endpoint
     # (including Open WebUI). For Open WebUI, set OPENAI_BASE_URL to http://host:port/api.

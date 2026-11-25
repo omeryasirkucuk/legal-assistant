@@ -119,6 +119,16 @@ export function SettingsPanel({ onClose }: Props) {
 
         {loading ? (
           <p className="p-6 text-sm text-muted">{t("settingsLoading")}</p>
+        ) : settings?.operator_managed ? (
+          <div className="space-y-3 p-6 text-sm text-muted">
+            <p>{t("privateModelManaged")}</p>
+            <button type="button" onClick={testConnection} disabled={testing}
+              className="rounded-md border border-rule px-3 py-2 hover:bg-sheet disabled:opacity-60">
+              {testing ? t("connectionTesting") : t("testConnection")}
+            </button>
+            {testResult && <p role="status">{testResult}</p>}
+            {error && <p role="alert" className="text-danger">{error}</p>}
+          </div>
         ) : settings ? (
           <form onSubmit={submit} className="space-y-5 p-4 sm:p-6">
             <label className="block text-sm text-muted">

@@ -4,8 +4,10 @@ import httpx
 import pytest
 
 from legal_api import llm
-from legal_api.agent.atoms import openai_segments_from
+from legal_api.agent.atoms import CitationStream, openai_segments_from
+from legal_api.agent.sources import Source
 from legal_api.config import Settings
+from legal_api.grounding.evidence import Evidence
 
 
 def _settings() -> Settings:
@@ -20,16 +22,43 @@ def test_openai_answer_keeps_only_citations_backed_by_their_source():
     def segs(text):
         return openai_segments_from([llm.TextBlock("text", text)], sources)
     marked = segs("The debtor objects within seven days [[E1]]. Then the creditor sues.")
-    assert marked[0].keys == ("E1",) and marked[0].quotes == ()
+    assert marked[0].keys == () and marked[0].unverified == ("E1",)
     assert marked[1].text.strip() == ". Then the creditor sues." and not marked[1].keys
     # An exact quote is kept as the segment's quote, its words are not left in the prose.
     quoted = segs('Seven days. <quote ref="E1">may object within seven days</quote>[[E1]]')
     assert quoted[0].quotes == ("may object within seven days",)
+    assert quoted[0].keys == ("E1",) and not quoted[0].unverified
     assert "may object" not in "".join(s.text for s in quoted)
-    # An unknown source or a quote the source does not contain leaves no citation.
+    # Unknown sources and unsupported quotations leave a warning attached to the prose.
     for text in ('Five days. <quote ref="E1">objects within five days</quote>[[E1]]',
+                 'Seven days <quote ref="E1">may object ... seven days</quote>',
                  "Five days [[E9]]"):
-        assert all(not s.keys for s in segs(text))
+        segments = segs(text)
+        assert all(not s.keys for s in segments)
+        assert segments[0].unverified and "<quote" not in segments[0].text
+
+
+def test_citations_check_only_the_source_text_sent_to_the_model():
+    sources = [("E1", "Source", "Earlier passage. The debtor may object within seven days.")]
+    content = [llm.TextBlock("text", 'Usable prose <quote ref="E1">may object within seven days</quote>.')]
+    assert openai_segments_from(content, sources)[0].keys == ("E1",)
+    result = openai_segments_from(content, sources, max_chars=16)
+    assert result[0].unverified == ("E1",) and not result[0].keys
+
+
+def test_internal_source_annotations_do_not_count_as_source_passages():
+    note = "This internal note was added during retrieval."
+    original = "The debtor may object within seven days."
+    source = Source(Evidence("E1", "article", "Source", "", original), note + "\n" + original)
+    blocks = [llm.TextBlock("text", f'Prose <quote ref="E1">{note}</quote>.')]
+    assert openai_segments_from(blocks, [source])[0].unverified == ("E1",)
+
+
+def test_stream_hides_provider_tags_split_across_chunks():
+    raw = 'One<quote ref="E1">internal passage</quote> and two [[E4]].'
+    stream = CitationStream()
+    visible = "".join(stream.feed(letter) for letter in raw) + stream.finish()
+    assert visible == "One and two ."
 
 
 async def test_openwebui_create_uses_api_route_and_normalizes_response(monkeypatch):
@@ -102,6 +131,7 @@ async def test_openai_stream_yields_text_and_final_usage(monkeypatch):
 def test_a_marker_cites_only_the_sentence_before_it():
     sources = [("E1", "Enforcement Law art. 62", "The debtor may object within seven days.")]
     segs = openai_segments_from([llm.TextBlock(
-        "text", "COURT HEADING\n\nPARTIES: A v. B\n\nThe debtor may object in seven days [[E1]].")], sources)
+        "text", 'COURT HEADING\n\nPARTIES: A v. B\n\nThe debtor may object in seven days '
+        '<quote ref="E1">may object within seven days</quote>.')], sources)
     cited = [s for s in segs if s.keys]
     assert len(cited) == 1 and cited[0].text == "The debtor may object in seven days"

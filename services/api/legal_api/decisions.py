@@ -14,7 +14,8 @@ from legal_api.config import get_settings
 
 
 def enabled() -> bool:
-    return bool(get_settings().decision_api_key)
+    settings = get_settings()
+    return bool(settings.decision_api_key and not settings.protected_data)
 
 
 async def yes_probabilities(client: httpx.AsyncClient, state: dict,
@@ -74,6 +75,8 @@ def _record(data: dict, usage: llm.Usage, purpose: str) -> None:
 
 def client() -> httpx.AsyncClient:
     s = get_settings()
+    if s.protected_data:
+        raise RuntimeError("external decision services are disabled in protected mode")
     return httpx.AsyncClient(base_url=s.decision_base_url.rstrip("/") + "/",
                              headers={"authorization": f"Bearer {s.decision_api_key}",
                                       "content-type": "application/json"},

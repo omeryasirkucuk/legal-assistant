@@ -1,6 +1,4 @@
-"""Model spend outside chat answers (a petition rewritten with a button, a sample petition
-read, a style learnt from edits), recorded so the daily budget counts all of a lawyer's use
-(chat/service.spent_today)."""
+"""Model spend used by the daily budget, kept independently of user content."""
 
 from __future__ import annotations
 
