@@ -94,20 +94,11 @@ async def save_answer(db: AsyncSession, chat: Chat, result) -> Message:
 
 
 async def spent_today(db: AsyncSession, user_id: uuid.UUID) -> float:
-    """LLM spend of the user's answers (and their detail sections) and of everything else
-    recorded in llm_spend, since 00:00 UTC."""
+    """Recorded model spend since 00:00 UTC, independent of chat retention."""
     start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    total = await db.scalar(
-        select(func.coalesce(func.sum(
-            cast(Message.meta["cost_usd"].astext, Float)
-            + func.coalesce(cast(Message.meta["detail_cost_usd"].astext, Float), 0.0)), 0.0))
-        .join(Chat, Chat.id == Message.chat_id)
-        .where(Chat.user_id == user_id, Message.role == "assistant",
-               Message.created_at >= start))
-    other = await db.scalar(select(func.coalesce(func.sum(LlmSpend.cost_usd), 0.0))
+    total = await db.scalar(select(func.coalesce(func.sum(LlmSpend.cost_usd), 0.0))
                             .where(LlmSpend.user_id == user_id, LlmSpend.created_at >= start))
-    return float(total or 0.0) + float(other or 0.0)
-
+    return float(total or 0.0)
 
 
 def message_cost():

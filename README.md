@@ -15,25 +15,38 @@ from an official or public source and rendered by the backend, never written fro
 
 ## Local development
 
-Requirements: Docker, [uv](https://docs.astral.sh/uv/), Node.js 20+.
+Install Docker Compose, Python 3.12 or newer through [uv](https://docs.astral.sh/uv/),
+and Node.js 20 or newer with npm.
 
 ```bash
-cp .env.example .env      # configure an LLM provider and its API key
-make api                  # starts Postgres (pgvector), runs migrations, serves http://localhost:8000
+cp .env.example .env      # first-time setup, then fill in the settings below
+make setup                # install the Python and web lockfiles
+make corpus               # migrate Postgres and load the core statutes from Bedesten
+make api                  # serve http://localhost:8000
 make web                  # serves http://localhost:3000
-make test                 # backend tests
+make test                 # backend tests, with or without a populated statute index
 ```
 
-The API supports Anthropic and OpenAI-compatible chat-completions providers. Set `SECRET_KEY`
-to a random value of at least 32 characters in `.env` so saved provider credentials can be
-encrypted. The first account
-is the administrator and can configure Open WebUI from **Model settings** in the UI. Set the
-Open WebUI base URL ending in `/api` (for example, `http://localhost:8080/api`), an API key, and
-the model IDs shown by your instance. The key is encrypted in the database and never returned
-by the settings API. Open WebUI's API key must have chat-completions access enabled. Compatible
-answers are shown only when they cite a source ID and include an exact quote found in that source.
-For headless setup, the equivalent provider, endpoint, key, and model defaults can be set in
-`.env`. For metered compatible providers, set the optional input and output price-per-million-token
-variables so the per-user budget can account for their usage.
+Set `SECRET_KEY` in `.env` to a cryptographically random value of at least 32 characters.
+Set `INVITE_CODE` to register the first account, which becomes the administrator. Clear it
+and restart the API when registration should close. Use `COOKIE_SECURE=true` when serving
+the API over HTTPS. An alternate web API URL goes in `apps/web/.env.local` as
+`NEXT_PUBLIC_API_URL` before starting or building the web app.
+
+`make corpus` uses the public legislation service and downloads the local embedding model on
+first use. Run it again to refresh the index. `GET /health` reports database and pgvector
+status. `GET /ready` returns HTTP 503 until the required core laws are indexed and lists
+missing law numbers. To populate the optional local decision archive, follow the ingestion
+commands in [Architecture](docs/ARCHITECTURE.md#running-locally).
+
+The API supports Anthropic and OpenAI-compatible chat-completions providers. For Open WebUI,
+an administrator can set **Model settings** to a base URL ending in `/api` such as
+`http://localhost:8080/api`, a key with chat-completions access, and the instance's model IDs.
+The settings API stores the key encrypted and exposes only whether it is configured. Headless
+settings are in `.env`. Set the input and output rates for a metered compatible provider that
+does not return a cost. The daily budget uses a spend ledger that survives chat deletion.
+
+OpenAI-compatible responses can refer to retrieved source IDs. The backend checks supplied
+quotes against the cited document and flags unsupported claims where it can verify them.
 
 See `NOTICE` for third-party data and code attributions.

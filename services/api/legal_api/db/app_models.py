@@ -112,8 +112,7 @@ class MessageEvidence(Base):
 
 
 class LlmSpend(Base):
-    """Model spend outside chat answers (a petition rewritten with a button, a sample petition
-    read, a style learnt from edits), so the daily budget counts all of a lawyer's use."""
+    """Model spend per account and purpose, independent of retained content."""
 
     __tablename__ = "llm_spend"
 

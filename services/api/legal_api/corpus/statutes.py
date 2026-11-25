@@ -158,6 +158,8 @@ async def sync(numbers: list[str]) -> None:
     try:
         for number in numbers:
             ref, articles = await fetch_law(statutes, number)
+            if not articles:
+                raise ValueError(f"law {number} returned no articles; keeping the current index")
             vectors = embed_passages([f"{a.section}\n{a.heading}\n{a.text}"[:2000]
                                       for a in articles])
             now = datetime.now(UTC)
