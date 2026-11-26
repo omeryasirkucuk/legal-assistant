@@ -49,6 +49,11 @@ an administrator can set **Model settings** to a base URL ending in `/api` such 
 The settings API stores the key encrypted and exposes only whether it is configured. Headless
 settings are in `.env`. Set the input and output rates for a metered compatible provider that
 does not return a cost. The daily budget uses a spend ledger that survives chat deletion.
+When OpenRouter supplies a smaller affordable token limit, the app can retry before streaming.
+The default writer can use the existing main model on the same route when needed. Other
+credit or credential failures show a provider availability message. Short questions reserve
+fewer output tokens during analysis. If the writer is unavailable after a calculation runs,
+the app still shows and saves the computed result with its evidence.
 
 New answers show a source chip when the cited passage matches the stored original. For
 OpenAI-compatible writers, the passage must also appear in the supplied excerpt. Missing and unmatched
@@ -58,7 +63,9 @@ Previous chats display their original citations with a legacy verification label
 
 ## Calculations and document updates in chat
 
-Ask for a calculation in the existing chat. Attach the relevant files or open the chat in a
+Ask for a calculation in the existing chat. A hypothetical severance or notice question
+can use a stated tenure and gross pay, with the assumed dismissal date shown in the calculation. During a model outage, a clearly
+stated monthly tenure, gross pay in TL and hypothetical dismissal can still produce the existing statutory calculation. Attach the relevant files or open the chat in a
 case file. The assistant can read document locations, look up statutes and judgments, and
 build a calculation using arithmetic, dates, conditions and multiple results. The saved
 calculation keeps the inputs, quoted passages, applicable date, reasoning, operations and

@@ -38,3 +38,43 @@ def test_missing_ceiling_does_not_generate_a_purported_gross_or_net_amount():
     assert words["ceiling_missing"].format(end="01.03.2027") in text
     assert words["severance"].split("{")[0] not in text
     assert words["stamp"].split("{")[0] not in text
+
+
+def test_stated_twelve_months_uses_applicable_ceiling_without_inventing_a_start_date():
+    from legal_api.calc.severance import compute_months
+    from legal_api.calc.severance_text import render
+
+    result = compute_months(12, date(2026, 11, 26), Decimal(100000))
+    assert result.start is None
+    assert result.severance == Decimal("73729.87")
+    assert result.notice == Decimal("93333.33")
+    shown = render(result, today_scenario=True)
+    assert "12 tam ay" in shown and "26.11.2026" in shown
+    assert "73.729,87 TL" in shown and "93.333,33 TL" in shown
+
+
+def test_completed_calculation_keeps_evidence_when_the_writer_is_unavailable():
+    from legal_api.agent.pipeline import _available_calculations
+    from legal_api.agent.sources import Source
+    from legal_api.grounding.evidence import EvidenceLedger
+
+    ledger = EvidenceLedger()
+    calculation = ledger.add_calculation(source_id="test", citation="Hesap", text="Hesap 1.200 TL.")
+    fallback = _available_calculations([Source(calculation, "unverified writer draft")])
+    assert fallback is not None
+    assert f"Hesap 1.200 TL. [[{calculation.key}]]" in fallback.text
+    assert "unverified" not in fallback.text
+    assert _available_calculations([]) is None
+
+
+def test_model_free_estimate_requires_a_clear_duration_pay_and_scenario():
+    from legal_api.calc.severance import stated_dismissal_estimate
+
+    question = ("bir hesaba ihtiyacım var. 12 aylık çalıştığım yerden atılsam kıdem ve ihbar "
+                "alacağım nolur. maaşım 100 bin TL brüt")
+    assert stated_dismissal_estimate(question) == {
+        "start_date": "P12M", "end_date": "today", "gross_monthly": "100000", "extras_monthly": 0}
+    for unclear in (question.replace("atılsam", "atıldım"), question + ", prim 10 bin TL",
+                    question + ", fesih 01.12.2026", question.replace("12 aylık", "12 veya 13 aylık"),
+                    question + ", 2 gün daha çalıştım"):
+        assert stated_dismissal_estimate(unclear) is None

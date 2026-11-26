@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 · 2026-11-26
+
+- Recover rejected OpenRouter requests with a smaller affordable response budget and use the existing main model when the default writer cannot produce a usable reply. Report unrecoverable provider failures accurately and use a smaller analysis budget for short questions. Return completed calculations with their evidence if the writer is unavailable, and recognize explicit hypothetical severance inputs during an analysis outage. Calculate severance and notice from a stated duration and an explicit date or today scenario.
+
 ## 0.3.1 · 2026-11-26
 
 - Verify numeric corrections against their replacement source and rerun the existing approved method when the legal basis and event dates stay the same.

@@ -1,4 +1,5 @@
 {
+  "fallback_intro": "Model bağlantısı şu anda kısıtlı. Tamamlanan hesap ve dayanağı aşağıda.",
   "citation": "Süre hesabı: {label}",
   "title": "Süre hesabı (sistem tarafından kodla yapılmıştır): {label}",
   "start": "Başlangıç: {start} {weekday}; süre bu günden sonraki gün işlemeye başlar.",
@@ -33,6 +34,9 @@
     "citation": "Kıdem ve ihbar tazminatı hesabı",
     "title": "Kıdem ve ihbar tazminatı hesabı (sistem tarafından kodla yapılmıştır)",
     "service": "Çalışma süresi: {start} - {end}: {years} yıl {months} ay {days} gün.",
+    "service_months": "Bildirilen çalışma süresi: {months} tam ay.",
+    "today_scenario": "Örnek hesapta fesih tarihi bugün ({end}) kabul edildi.",
+    "known_end": "Hesapta esas alınan fesih tarihi: {end}.",
     "monthly": "Esas alınan aylık giydirilmiş brüt ücret (avukatın verdiği): {monthly}.",
     "ceiling": "Fesih tarihindeki kıdem tazminatı tavanı: {ceiling}. Kıdem tazminatında esas alınan aylık ücret: {base}.",
     "ceiling_missing": "{end} tarihindeki kıdem tazminatı tavanı tabloda yok. Brüt ve net kıdem tutarı için o tarihin tavanı gerekiyor.",

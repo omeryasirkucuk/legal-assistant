@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.3.2 · 2026-11-26
+
+- No database migration is required. Restart the API to pick up the response-budget recovery and compact-question handling. Test a hypothetical dismissal with a stated tenure and gross pay, including when model analysis or writing is unavailable.
+
 ## 0.3.1 · 2026-11-26
 
 - Check input-only revisions by replacing a verified amount in chat and confirming that the original rule and the previous result remain viewable. No database migration is needed.

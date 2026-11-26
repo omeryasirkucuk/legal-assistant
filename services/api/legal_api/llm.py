@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+from contextlib import asynccontextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from functools import cache
@@ -233,31 +234,71 @@ def _openai_completion(data: dict) -> Completion:
         usage=CompletionUsage(input_tokens=usage.get("prompt_tokens", 0) or 0,
                               output_tokens=usage.get("completion_tokens", 0) or 0,
                               cost=usage.get("cost")),
-        stop_reason=choice.get("finish_reason"),
+        stop_reason=_stop_reason(choice.get("finish_reason")),
     )
 
 
-async def _openai_create(role: Role, params: dict) -> Completion:
+def _stop_reason(reason: str | None) -> str | None:
+    return "max_tokens" if reason == "length" else reason
+
+
+def _affordable_tokens(response: httpx.Response, requested: int) -> int | None:
+    try:
+        error = response.json()["error"]
+        message = error["message"]
+        metadata = error.get("metadata") or {}
+        if metadata.get("limit_source") == "openrouter_in_flight_budget" or not isinstance(message, str):
+            return None
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return None
+    match = re.search(r"can only afford ([0-9]{1,9})\b", message, re.IGNORECASE)
+    cap = int(match[1]) if match else 0
+    return cap if 0 < cap < requested else None
+
+
+@asynccontextmanager
+async def _openai_response(role: Role, params: dict, *, stream: bool = False):
     route = routed(role)
     model = route or model_for(role)
+    payload = _openai_payload(model, params, stream=stream, route=bool(route))
+    # Respect custom writer choices. The default writer can use the main model on the
+    # same configured route if its budget cannot cover a minimally useful response.
+    alternate = (routed("main") if role == "write" and route and not get_settings().write_route
+                 else None)
+    budget = payload.get("max_tokens")
+    min_tokens = 1024 if role == "write" else 512
     async with openai_client(bool(route)) as client:
-        response = await client.post("chat/completions",
-                                     json=_openai_payload(model, params, route=bool(route)))
-        response.raise_for_status()
-        return _openai_completion(response.json())
+        for attempt in range(3):
+            async with client.stream("POST", "chat/completions", json=payload) as response:
+                if not response.is_success:
+                    await response.aread()
+                if route and response.status_code == 402 and attempt < 2 and isinstance(budget, int):
+                    cap = _affordable_tokens(response, payload["max_tokens"])
+                    if cap and cap >= min_tokens:
+                        payload["max_tokens"] = cap
+                        continue
+                    if cap and alternate and alternate != payload["model"]:
+                        payload["model"] = alternate
+                        payload["max_tokens"] = min(budget, 4000)
+                        continue
+                response.raise_for_status()
+                yield response, payload["model"]
+                return
+
+
+async def _openai_create(role: Role, params: dict) -> Completion:
+    async with _openai_response(role, params) as (response, model):
+        await response.aread()
+        result = _openai_completion(response.json())
+        result.model = result.model or model
+        return result
 
 
 async def _openai_stream(role: Role, params: dict):
-    route = routed(role)
-    model = route or model_for(role)
     text = []
-    response_model = model
     usage = CompletionUsage()
     finish_reason = None
-    async with openai_client(bool(route)) as client, client.stream(
-        "POST", "chat/completions",
-        json=_openai_payload(model, params, stream=True, route=bool(route))) as r:
-        r.raise_for_status()
+    async with _openai_response(role, params, stream=True) as (r, response_model):
         async for line in r.aiter_lines():
             if not line.startswith("data:"):
                 continue
@@ -278,7 +319,8 @@ async def _openai_stream(role: Role, params: dict):
                     yield delta
                 if choice.get("finish_reason"):
                     finish_reason = choice["finish_reason"]
-    yield Completion([TextBlock("text", "".join(text))], response_model, usage, finish_reason)
+    yield Completion([TextBlock("text", "".join(text))], response_model, usage,
+                     _stop_reason(finish_reason))
 
 
 @dataclass
@@ -339,6 +381,8 @@ def unavailable(exc: BaseException) -> bool:
     """The model provider refuses every call until someone acts: no credit left, a key that
     is wrong or revoked. Shown to the lawyer as such, not as a failed answer to retry."""
     status = getattr(exc, "status_code", None)
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
     return status in (401, 402, 403) or (status == 400 and "credit balance" in str(exc))
 
 
