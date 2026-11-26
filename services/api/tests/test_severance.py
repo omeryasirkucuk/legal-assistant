@@ -75,6 +75,7 @@ async def test_model_extracted_months_produce_sourced_calculation_without_fake_d
     monkeypatch.setattr(pipeline.SourceFinder, "article", AsyncMock(return_value=None))
     understanding = {
         "task": "consultation", "shape": "amount", "characterisation": "Kıdem tazminatı",
+        "case_kind": "unexpected", "area": "unexpected",
         "issues": [], "questions": [question], "clarify": [], "statute_hints": [],
         "case_law_query": "", "missing_facts": ["Sözleşme hangi gerekçeyle sona erdi?"],
         "severance": [{"start_date": "", "end_date": "", "service_months": 23,
@@ -105,6 +106,10 @@ async def test_model_extracted_months_produce_sourced_calculation_without_fake_d
     assert answer.text == "Koşullu tutar" and answer.understanding.shape == "amount"
     assert answer.usage.cost_usd == 0
     assert model.await_count == 1
+    assert answer.understanding.case_kind == answer.understanding.area == "other"
+    properties = model.call_args.kwargs["output_config"]["format"]["schema"]["properties"]
+    for field in ("shape", "petition_type", "output_format", "case_kind", "area"):
+        assert properties[field] == {"type": "string"}
 
 
 def test_known_fesih_date_selects_its_period_with_months_only():
@@ -144,3 +149,43 @@ def test_completed_calculation_keeps_evidence_when_the_writer_is_unavailable():
     assert f"Hesap 1.200 TL. [[{calculation.key}]]" in fallback.text
     assert "unverified" not in fallback.text
     assert _available_calculations([]) is None
+
+
+async def test_analysis_recovers_from_provider_grammar_rejection(monkeypatch):
+    import httpx
+    import pytest
+
+    from legal_api import llm
+    from legal_api.agent import understand as analysis
+
+    schema = analysis._SCHEMA
+    empty = {"string": "", "array": [], "boolean": False}
+    data = {key: empty[field["type"]] for key, field in schema["properties"].items()}
+    data.update(task="consultation", shape="amount")
+    request = httpx.Request("POST", "https://example.test/v1/chat/completions")
+    rejected = httpx.Response(400, request=request, json={
+        "error": {"message": "Provider returned error", "metadata": {
+            "raw": '{"error":{"message":"The compiled grammar is too large"}}',
+        }},
+    })
+
+    def completion(payload):
+        return llm.Completion([llm.TextBlock("text", json.dumps(payload))], "test",
+                              llm.CompletionUsage())
+
+    model = AsyncMock(side_effect=[
+        httpx.HTTPStatusError("schema rejected", request=request, response=rejected),
+        completion(data),
+        completion({**data, "severance": [{"gross_monthly": "invalid"}]}),
+    ])
+    monkeypatch.setattr(analysis, "_grammar_rejected", set())
+    monkeypatch.setattr(analysis.llm, "create", model)
+    result = await analysis.understand("Ne kadar alırım?", [], llm.Usage())
+    assert result.shape == "amount"
+    with pytest.raises(ValueError, match="Invalid analysis response structure"):
+        await analysis.understand("Ne kadar alırım?", [], llm.Usage())
+
+    assert model.await_count == 3
+    first, *fallback = model.await_args_list
+    assert "format" in first.kwargs["output_config"]
+    assert all("format" not in call.kwargs["output_config"] for call in fallback)

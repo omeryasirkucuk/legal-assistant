@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.3.6 · 2026-11-26
+
+- Restart the API after updating. No migration is required. Chat failure logs include the pipeline phase and HTTP status without recording provider response bodies.
+
 ## 0.3.5 · 2026-11-26
 
 - Restart the API after updating the backend and prompts. No database migration is required.

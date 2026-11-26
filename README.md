@@ -56,6 +56,10 @@ amounts labelled. The default research pass focuses on the rules that determine 
 A request for precedent or the deep research mode can still expand the search. Follow-up answers
 retain the original request and the facts supplied to clarify it.
 
+The analysis response uses a compact structured schema. The backend validates classification
+labels before routing. If a provider rejects grammar compilation, the backend can use schema-guided
+JSON from the same analysis model and validate it locally. Chat failure logs record the phase and HTTP status without provider bodies.
+
 The API supports Anthropic and OpenAI-compatible chat-completions providers. For Open WebUI,
 an administrator can set **Model settings** to a base URL ending in `/api` such as
 `http://localhost:8080/api`, a key with chat-completions access, and the instance's model IDs.

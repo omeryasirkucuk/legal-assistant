@@ -15,6 +15,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import anthropic
+import httpx
+
 from legal_api import llm
 from legal_api.calc.deadlines import UNITS
 from legal_api.config import get_settings
@@ -33,12 +36,14 @@ MAX_PENALTIES = 6
 PETITION_TYPES = (*petition_types(), "other")
 CASE_KINDS = (*case_kinds(), "other")
 
+# Keep classification labels as strings to limit the compiled grammar size. The prompt
+# lists the accepted labels and understand() validates them before use.
 _SCHEMA = {
     "type": "object",
     "properties": {
         "task": {"type": "string", "enum": list(TASKS)},
         "questions": {"type": "array", "items": {"type": "string"}},
-        "shape": {"type": "string", "enum": list(SHAPES)},
+        "shape": {"type": "string"},
         "characterisation": {"type": "string"},
         "issues": {"type": "array", "items": {
             "type": "object",
@@ -49,10 +54,10 @@ _SCHEMA = {
             "properties": {"law": {"type": "string"}, "article": {"type": "string"}},
             "required": ["law", "article"], "additionalProperties": False}},
         "case_law_query": {"type": "string"},
-        "petition_type": {"type": "string", "enum": list(PETITION_TYPES)},
-        "output_format": {"type": "string", "enum": [*FORMATS, "none"]},
-        "case_kind": {"type": "string", "enum": list(CASE_KINDS)},
-        "area": {"type": "string", "enum": list(AREAS)},
+        "petition_type": {"type": "string"},
+        "output_format": {"type": "string"},
+        "case_kind": {"type": "string"},
+        "area": {"type": "string"},
         "write_now": {"type": "boolean"},
         "calendar": {"type": "boolean"},
         "interest": {"type": "array", "items": {
@@ -155,6 +160,63 @@ def _system() -> str:
     return f"{prompt('understand')}\n<case_kinds>\n{kinds}\n</case_kinds>"
 
 
+# Providers can reject a valid schema while compiling its grammar. Remember that rejection
+# for the configured model so later requests need only one model call.
+_grammar_rejected: set[tuple[bool, str | None, str]] = set()
+
+
+def _grammar_error(exc: anthropic.BadRequestError | httpx.HTTPStatusError) -> bool:
+    if exc.response.status_code != 400:
+        return False
+    try:
+        error = exc.response.json().get("error", {})
+        metadata = error.get("metadata") or {}
+        raw = metadata.get("raw") or ""
+        message = f"{error.get('message', '')} {raw}".lower()
+    except (ValueError, AttributeError):
+        return False
+    return "compiled grammar is too large" in message or "schema is too complex for compilation" in message
+
+
+def _valid_response(value, schema: dict) -> bool:
+    expected = schema["type"]
+    if expected == "object":
+        props = schema["properties"]
+        return (isinstance(value, dict) and value.keys() == props.keys()
+                and all(_valid_response(value[key], shape) for key, shape in props.items()))
+    if expected == "array":
+        return isinstance(value, list) and all(_valid_response(item, schema["items"]) for item in value)
+    types = {"string": (str,), "integer": (int,), "number": (int, float), "boolean": (bool,)}
+    return type(value) in types[expected] and ("enum" not in schema or value in schema["enum"])
+
+
+async def _completion(content: str, history: list[dict], usage: llm.Usage, system: str,
+                      max_tokens: int):
+    config = {"effort": get_settings().answer_effort}
+    request = {"max_tokens": max_tokens,
+               "messages": [*history, {"role": "user", "content": content}]}
+    route = (llm.openai_for("cheap"), llm.routed("cheap"), llm.model_for("cheap"))
+    if route not in _grammar_rejected:
+        try:
+            return await llm.create(
+                "cheap", usage, "understand", system=system, **request,
+                output_config={**config, "format": {"type": "json_schema", "schema": _SCHEMA}})
+        except (anthropic.BadRequestError, httpx.HTTPStatusError) as exc:
+            if not _grammar_error(exc):
+                raise
+            _grammar_rejected.add(route)
+    schema = json.dumps(_SCHEMA, ensure_ascii=False, separators=(",", ":"))
+    system += f"\nYalnızca bu şemaya uygun bir JSON nesnesi döndür. Markdown veya açıklama yazma.\n{schema}"
+    response = await llm.create("cheap", usage, "understand", system=system, **request,
+                                output_config=config)
+    text = next((b.text for b in response.content if b.type == "text"), "").strip()
+    if text.startswith("```json\n") and text.endswith("```"):
+        text = text.removeprefix("```json\n").removesuffix("```").strip()
+    if not _valid_response(json.loads(text), _SCHEMA):
+        raise ValueError("Invalid analysis response structure")
+    return llm.Completion([llm.TextBlock("text", text)], response.model, response.usage)
+
+
 async def understand(message: str, history: list[dict], usage: llm.Usage,
                      laws: dict[str, str] | None = None) -> Understanding:
     """`laws`: the indexed laws (number -> title), so named articles carry the right law
@@ -165,12 +227,8 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
     if laws:
         listing = "\n".join(f"{n}: {t}" for n, t in sorted(laws.items()))
         content = f"<indexed_laws>\n{listing}\n</indexed_laws>\n\n{content}"
-    response = await llm.create(
-        "cheap", usage, "understand", max_tokens=1800 if len(message) <= 1000 else 4000,
-        system=_system(),
-        messages=[*history, {"role": "user", "content": content}],
-        output_config={"effort": get_settings().answer_effort,
-                       "format": {"type": "json_schema", "schema": _SCHEMA}})
+    response = await _completion(content, history, usage, _system(),
+                                 1800 if len(message) <= 1000 else 4000)
     text = next((b.text for b in response.content if b.type == "text"), None)
     if text is None:
         return Understanding()

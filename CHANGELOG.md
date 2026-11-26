@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.6 · 2026-11-26
+
+- Reduce the analysis response grammar to restore chat answers when a provider rejects a complex schema. If a provider rejects grammar compilation, retry with schema-guided JSON and validate it in the backend.
+- Preserve current-period estimates when a request refers to past employment without identifying a different date.
+
 ## 0.3.5 · 2026-11-26
 
 - Format amount-focused answers around the result, the assumptions that affect it and the relevant gross and net figures. Retain the original question when writing a follow-up.
