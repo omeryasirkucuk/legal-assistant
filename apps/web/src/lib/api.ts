@@ -243,6 +243,8 @@ export const api = {
     call<Draft>(`/drafts/${id}/adjust`, json({ action, selection: selection || null })),
   draftFileUrl: (id: string, format?: DraftFormat) =>
     `${API_URL}/drafts/${id}/file${format ? `?format=${format}` : ""}`,
+  changePassword: (current_password: string, new_password: string) =>
+    call<void>("/auth/password", put({ current_password, new_password })),
   login: (email: string, password: string) => call<User>("/auth/login", json({ email, password })),
   register: (name: string, email: string, password: string, invite_code: string) =>
     call<User>("/auth/register", json({ name, email, password, invite_code })),

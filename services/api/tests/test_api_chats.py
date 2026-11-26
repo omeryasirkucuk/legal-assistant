@@ -127,3 +127,32 @@ async def test_an_unanswered_last_question_is_dropped():
                                  .bindparams(c=chat.id))).all()
         assert left == []
     await engine.dispose()
+
+
+async def test_change_password_keeps_current_session_and_invalidates_other_sessions():
+    email = _email("password-test")
+    old, new = "original-test-secret", "new-test-secret"
+    change = {"current_password": old, "new_password": new}
+    async with await _client() as owner, await _client() as other, await _client() as guest:
+        # Reserve the first-user administrator role on a fresh database, so this test
+        # exercises password changes for a regular account.
+        await owner.post("/auth/register", json={"email": _email("password-admin"),
+                                                 "password": old, "name": "First",
+                                                 "invite_code": "test-invite"})
+        registered = await owner.post("/auth/register", json={"email": email, "password": old,
+                                                               "name": "User",
+                                                               "invite_code": "test-invite"})
+        assert registered.status_code == 201 and not registered.json()["is_admin"]
+        assert (await other.post("/auth/login", json={"email": email, "password": old})).status_code == 200
+        assert (await guest.put("/auth/password", json=change)).status_code == 401
+        assert (await owner.put("/auth/password", json={**change, "current_password": "wrong"})).status_code == 403
+        assert (await owner.put("/auth/password", json={**change, "new_password": "short"})).status_code == 422
+        assert (await owner.put("/auth/password", json={**change, "new_password": old})).status_code == 409
+
+        response = await owner.put("/auth/password", json=change)
+        assert response.status_code == 204
+        assert response.content == b""
+        assert (await owner.get("/auth/me")).status_code == 200
+        assert (await other.get("/auth/me")).status_code == 401
+        assert (await other.post("/auth/login", json={"email": email, "password": old})).status_code == 401
+        assert (await other.post("/auth/login", json={"email": email, "password": new})).status_code == 200

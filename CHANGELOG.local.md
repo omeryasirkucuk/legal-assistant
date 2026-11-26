@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.6.0 · 2026-11-27
+
+- Run the database migration before starting the updated API. Existing sessions remain valid until the user changes their password or the session expires.
+
 ## 0.5.0 · 2026-11-27
 
 - Rebuild the web app and API for the administrator panel. The panel reads the existing model spend ledger and roles. No database migration is required.

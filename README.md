@@ -63,6 +63,12 @@ citations show a warning alongside the complete answer. When the decision model 
 the app also checks cited claims against those specific sources and marks uncertain support.
 Previous chats display their original citations with a legacy verification label.
 
+## Change your password
+
+Open **Parola değiştir** from your name at the bottom of the sidebar. Enter your current
+password and confirm a new password of 8 to 256 characters. The browser you use to save the
+change stays signed in. Other sessions for the same account expire.
+
 ## Account administration
 
 Administrators open **Yönetim paneli** from their name at the bottom of the sidebar. It

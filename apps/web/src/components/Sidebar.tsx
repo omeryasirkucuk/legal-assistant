@@ -31,6 +31,7 @@ type Props = {
   onLogout: () => void;
   onSettings: () => void;
   onAdmin: () => void;
+  onPassword: () => void;
   onStyle: () => void;
   onFiles: () => void;
   filesOpen?: boolean;
@@ -112,7 +113,7 @@ export function Sidebar(props: Props) {
 
   const menuEl = menu && (
     <UserMenu user={user} today={today} onStyle={props.onStyle}
-      onSettings={props.onSettings} onAdmin={props.onAdmin}
+      onSettings={props.onSettings} onAdmin={props.onAdmin} onPassword={props.onPassword}
       onLogout={props.onLogout} onClose={() => setMenu(false)}
       className={collapsed ? "bottom-2 left-14" : "bottom-16 left-2"} />
   );

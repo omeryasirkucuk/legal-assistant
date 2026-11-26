@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 · 2026-11-27
+
+- Added self-service password changes to the account menu for all users. Changing a password signs out other sessions for the same account.
+
 ## 0.5.0 · 2026-11-27
 
 - Added an administrator panel for registered accounts, daily and lifetime model spend, and role changes with last-administrator protection.

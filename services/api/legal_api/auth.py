@@ -1,7 +1,7 @@
 """Password hashing, signed session cookies and the current-user dependency.
 
 Passwords use scrypt from the standard library (no native build step on any OS). Sessions
-are a signed, time-limited cookie holding the user id.
+are signed, time-limited cookies tied to the account’s current session version.
 """
 
 from __future__ import annotations
@@ -42,8 +42,10 @@ def _signer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(get_settings().secret_key, salt="session")
 
 
-def session_token(user_id: uuid.UUID) -> str:
-    return _signer().dumps(str(user_id))
+def session_token(user_id: uuid.UUID, version: int = 0) -> str:
+    # Keep version-zero cookies compatible with existing sessions and rolling deploys.
+    payload = f"{user_id}:{version}" if version else str(user_id)
+    return _signer().dumps(payload)
 
 
 async def current_user(
@@ -52,11 +54,16 @@ async def current_user(
 ) -> User:
     if session:
         try:
-            user_id = uuid.UUID(_signer().loads(session, max_age=MAX_AGE_S))
-        except (BadSignature, ValueError):
-            user_id = None
-        if user_id and (user := await db.get(User, user_id)):
-            return user
+            payload = _signer().loads(session, max_age=MAX_AGE_S)
+            identifier, separator, value = payload.partition(":")
+            user_id = uuid.UUID(identifier)
+            version = int(value) if separator else 0
+        except (BadSignature, ValueError, AttributeError):
+            pass
+        else:
+            user = await db.get(User, user_id)
+            if user is not None and user.session_version == version:
+                return user
     raise HTTPException(status.HTTP_401_UNAUTHORIZED)
 
 

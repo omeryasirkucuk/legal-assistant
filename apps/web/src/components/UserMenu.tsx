@@ -3,7 +3,7 @@
 // The account menu, opened from the user's row (or their initials on the collapsed rail):
 // who is signed in, today's use, the writing style, model settings for admins, sign out.
 import { useEffect, useRef } from "react";
-import { LogOut, PenLine, Settings, Users } from "lucide-react";
+import { KeyRound, LogOut, PenLine, Settings, Users } from "lucide-react";
 import type { TodayStats, User } from "@/lib/api";
 import { formatUsd } from "@/lib/format";
 import { t } from "@/lib/i18n";
@@ -18,12 +18,13 @@ type Props = {
   onStyle: () => void;
   onSettings: () => void;
   onAdmin: () => void;
+  onPassword: () => void;
   onLogout: () => void;
   onClose: () => void;
   className?: string;
 };
 
-export function UserMenu({ user, today, onStyle, onSettings, onAdmin, onLogout, onClose, className = "" }: Props) {
+export function UserMenu({ user, today, onStyle, onSettings, onAdmin, onPassword, onLogout, onClose, className = "" }: Props) {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,6 +56,9 @@ export function UserMenu({ user, today, onStyle, onSettings, onAdmin, onLogout, 
       <div className="border-t border-rule pt-1.5">
         <button role="menuitem" onClick={pick(onStyle)} className={item}>
           <PenLine size={16} className="text-muted" /> {t("myPetitions")}
+        </button>
+        <button role="menuitem" onClick={pick(onPassword)} className={item}>
+          <KeyRound size={16} className="text-muted" /> {t("changePassword")}
         </button>
         {user.is_admin && (
           <>

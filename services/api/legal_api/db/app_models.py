@@ -36,6 +36,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True)
     name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String)
+    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 

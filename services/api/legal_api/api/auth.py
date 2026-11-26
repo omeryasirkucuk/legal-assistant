@@ -1,7 +1,8 @@
-"""Register, log in, log out, who am I."""
+"""Register, log in, log out, change a password, and who am I."""
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -33,6 +34,11 @@ class Registration(Credentials):
     invite_code: str = Field(default="", max_length=200)
 
 
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=256)
+
+
 class UserOut(BaseModel):
     id: str
     email: str
@@ -47,7 +53,7 @@ def _out(user: User) -> UserOut:
 
 
 def _set_cookie(response: Response, user: User) -> None:
-    response.set_cookie(COOKIE, session_token(user.id), max_age=MAX_AGE_S, httponly=True,
+    response.set_cookie(COOKIE, session_token(user.id, user.session_version), max_age=MAX_AGE_S, httponly=True,
                         samesite="lax", secure=get_settings().cookie_secure)
 
 
@@ -77,6 +83,24 @@ async def login(body: Credentials, response: Response, db: DB) -> UserOut:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
     _set_cookie(response, user)
     return _out(user)
+
+
+@router.put("/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(body: PasswordChange, response: Response, user: CurrentUser, db: DB):
+    version = user.session_version
+    # Serialize changes to the same account and recheck the password and session after waiting.
+    await db.refresh(user, attribute_names=["password_hash", "session_version"], with_for_update=True)
+    if user.session_version != version:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED)
+    if not await asyncio.to_thread(check_password, body.current_password, user.password_hash):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "incorrect current password")
+    if body.current_password == body.new_password:
+        raise HTTPException(status.HTTP_409_CONFLICT, "choose a different password")
+
+    user.password_hash = await asyncio.to_thread(hash_password, body.new_password)
+    user.session_version += 1
+    await db.commit()
+    _set_cookie(response, user)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

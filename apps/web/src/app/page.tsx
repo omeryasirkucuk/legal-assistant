@@ -10,6 +10,7 @@ import { SourceDrawer } from "@/components/SourceDrawer";
 import { WorkspaceResult } from "@/components/WorkspaceResult";
 import { DraftFile } from "@/components/DraftFile";
 import { DraftPanel } from "@/components/DraftPanel";
+import { PasswordPanel } from "@/components/PasswordPanel";
 import { AdminPanel } from "@/components/AdminPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { StylePanel } from "@/components/StylePanel";
@@ -59,6 +60,7 @@ export default function ChatApp() {
   const [drawer, setDrawer] = useState<Drawer | null>(null);
   const [source, setSource] = useState<SourceText | null>(null);
   const sourceRequest = useRef(0);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [styleOpen, setStyleOpen] = useState(false);
@@ -344,6 +346,7 @@ export default function ChatApp() {
         onLogout={() => api.logout().then(() => router.replace("/login"))}
         onSettings={nav(() => setSettingsOpen(true))}
         onAdmin={nav(() => setAdminOpen(true))}
+        onPassword={nav(() => setPasswordOpen(true))}
         onStyle={nav(() => setStyleOpen(true))}
         onFiles={nav(openFiles)}
         filesOpen={view === "files"}
@@ -488,6 +491,7 @@ export default function ChatApp() {
         <DraftPanel key={openDraft.id} draft={openDraft} onClose={() => setOpenDraft(null)}
           onExpand={() => setDraftPage(true)} onChange={changeDraft} />
       )}
+      {passwordOpen && <PasswordPanel onClose={() => setPasswordOpen(false)} />}
       {adminOpen && user.is_admin && (
         <AdminPanel ownId={user.id} onClose={() => setAdminOpen(false)}
           onDemoted={() => { setUser({ ...user, is_admin: false }); setAdminOpen(false); }} />
