@@ -76,3 +76,45 @@ async def test_salary_correction_researches_the_existing_question(monkeypatch):
     monkeypatch.setattr(turn, "answer_events", answer)
     events = [e async for e in turn.turn_events(correction, [], previous, {})]
     assert events[-1].type == "final"
+
+
+@pytest.mark.parametrize("kind", ["followup", "new"])
+async def test_matter_facts_and_documents_follow_the_active_topic(monkeypatch, kind):
+    from types import SimpleNamespace
+
+    from legal_api.workspace.session import Context
+
+    opening = "Ev olarak kiraya verdim."
+    recent = "İşyeri olsaydı?"
+    previous = turn.Previous(recent, {"case_turns": [opening, recent],
+                                      "case_file_ids": ["contract", "deleted"]}, "Varsayımsal sonuç")
+    history = [{"role": "user", "content": recent}, {"role": "assistant", "content": previous.short}]
+    doc = SimpleNamespace(id="contract", name="Kira.txt", media_type="text/plain", text="Madde 8")
+    other = SimpleNamespace(id="other", name="Başka dosya", text="Unrelated")
+    context = Context([doc, other])
+    message = "Gerçek sözleşmeye dönelim" if kind == "followup" else "Yeni bir miras dosyası"
+
+    async def classify(_message, _question, _answer, _usage, earlier, _files):
+        assert earlier == [opening, recent]
+        return kind
+
+    async def answer(question, turns, result, **kwargs):
+        active = kind == "followup"
+        assert question == message
+        assert (opening in [t["content"] for t in turns]) is active
+        assert [f.text for f in kwargs["attachments"] or []] == (["Madde 8"] if active else [])
+        result["result"] = SimpleNamespace(trace={})
+        yield turn.Event("final", {})
+
+    monkeypatch.setattr(turn, "route", classify)
+    monkeypatch.setattr(turn, "answer_events", answer)
+    holder = {}
+    _ = [e async for e in turn.turn_events(message, history, previous, holder, workspace=context)]
+    assert holder["result"].case_turns == ([opening, recent, message] if kind == "followup" else [message])
+
+
+def test_memory_bounds_preserve_opening_and_latest_correction():
+    messages = ["İlk olay", *(f"Açıklama {i}" for i in range(14)), "Son düzeltme"]
+    kept = turn.case_turns(turn.Previous(messages[-1], {"case_turns": messages[:-1]}, ""), [])
+    assert len(kept) == 10
+    assert kept[0] == messages[0] and kept[-1] == messages[-1]

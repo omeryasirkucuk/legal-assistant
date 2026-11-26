@@ -6,6 +6,8 @@ from an official or public source and rendered by the backend, never written fro
 
 Standalone greetings and thanks receive a short reply. A later follow-up or formatting request can still use the last substantive answer and its sources. A new independent question starts fresh. Citation concerns remain available under each answer. Open a numbered reference in the details to inspect the source behind a flagged statement.
 
+For a related follow-up the planner can use up to ten prior user messages (bounded excerpts of long messages, keeping the opening request) and the five most recently referenced file IDs from the active topic. It resolves references into a research question and can request one clarification when the intended person, document or action is ambiguous. A combined request can run a calculation and an explicit precedent search in the same answer. Documents supply case facts; legal conclusions still use retrieved sources.
+
 ## Layout
 
 | Path | Purpose |

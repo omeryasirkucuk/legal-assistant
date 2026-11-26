@@ -193,3 +193,30 @@ async def test_analysis_recovers_from_provider_grammar_rejection(monkeypatch):
     first, *fallback = model.await_args_list
     assert "format" in first.kwargs["output_config"]
     assert all("format" not in call.kwargs["output_config"] for call in fallback)
+
+
+async def test_ambiguous_reference_asks_before_research(monkeypatch):
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from legal_api.agent import pipeline
+    from legal_api.agent.understand import Understanding
+
+    @asynccontextmanager
+    async def connection():
+        yield object()
+
+    pool = SimpleNamespace(acquire=connection, close=AsyncMock())
+    ask = "Ödeme emrini mi yoksa fesih bildirimini mi kastediyorsunuz?"
+    analysis = Understanding(task="clarification", blocking_question=ask)
+    monkeypatch.setattr(pipeline.asyncpg, "create_pool", AsyncMock(return_value=pool))
+    monkeypatch.setattr(pipeline, "indexed_laws", AsyncMock(return_value={}))
+    monkeypatch.setattr(pipeline, "understand", AsyncMock(return_value=analysis))
+    search = AsyncMock()
+    monkeypatch.setattr(pipeline, "research", search)
+    holder = {}
+    events = [e async for e in pipeline.answer_events("Son gün ne?", result=holder)]
+    search.assert_not_awaited()
+    assert holder["result"].checked is None
+    assert events[-1].type == "final" and events[-1].data["text"] == ask

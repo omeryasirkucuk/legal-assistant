@@ -61,3 +61,7 @@ async def test_amount_research_keeps_explicit_precedent_search(monkeypatch):
     assert not related_statutes.await_count
     assert precedents.await_count == 1
     assert precedents.await_args.args[0] == "fesih ve tazminat"
+    understand.requested_precedents = True
+    await research.research(None, Finder(), "Hem hesap hem emsal", understand, llm.Usage(),
+                            lambda *_args, **_kwargs: None)
+    assert precedents.await_args.kwargs["precedents"] is True

@@ -187,9 +187,9 @@ async def research(db: asyncpg.Pool, finder: SourceFinder, question: str, u: Und
     decisions: list[Source] = []
     # Decisions are searched whenever practice matters, and always when the lawyer asks for
     # decisions themselves (a request for precedents once got none: nothing was searched).
-    asked_for_cases = u.task == "search"
+    asked_for_cases = u.task == "search" or u.requested_precedents
     fast_petition = u.task == "drafting" and power.name == "fast"   # no decisions (D50)
-    if not fast_petition and (u.case_law_query or asked_for_cases or power.always_decisions
+    if (not fast_petition or asked_for_cases) and (u.case_law_query or asked_for_cases or power.always_decisions
                               or (u.task == "consultation" and not focused)):
         progress("caselaw", "active")
         decisions = await finder.decisions_for(

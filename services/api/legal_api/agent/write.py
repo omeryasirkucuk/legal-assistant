@@ -69,6 +69,8 @@ def _request(message: str, u: Understanding, instruction: str | None,
              previous: str | None) -> str:
     parts = [f"<task>{u.task}</task>", f"<shape>{u.shape}</shape>",
              f"<message>{message}</message>"]
+    if u.research_request:
+        parts.append(f"<interpreted_request>{u.research_request}</interpreted_request>")
     if u.questions:
         parts.append("<questions>" + " | ".join(u.questions) + "</questions>")
     if u.characterisation:

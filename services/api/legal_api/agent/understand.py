@@ -27,7 +27,7 @@ from legal_api.drafting.sample_profile import AREAS
 from legal_api.drafting.types import petition_types
 from legal_api.prompts import prompt
 
-TASKS = ("lookup", "consultation", "drafting", "search", "review", "workspace")
+TASKS = ("lookup", "consultation", "drafting", "search", "review", "workspace", "clarification")
 SHAPES = ("single", "amount", "answers", "routes", "plan", "draft", "list")
 MAX_ISSUES = 8
 MAX_HINTS = 10
@@ -42,6 +42,9 @@ _SCHEMA = {
     "type": "object",
     "properties": {
         "task": {"type": "string", "enum": list(TASKS)},
+        "requested_precedents": {"type": "boolean"},
+        "research_request": {"type": "string"},
+        "blocking_question": {"type": "string"},
         "questions": {"type": "array", "items": {"type": "string"}},
         "shape": {"type": "string"},
         "characterisation": {"type": "string"},
@@ -116,7 +119,7 @@ _SCHEMA = {
                            "options": {"type": "array", "items": {"type": "string"}}},
             "required": ["question", "options"], "additionalProperties": False}},
     },
-    "required": ["task", "questions", "shape", "characterisation", "issues", "statute_hints",
+    "required": ["task", "requested_precedents", "research_request", "blocking_question", "questions", "shape", "characterisation", "issues", "statute_hints",
                  "case_law_query", "petition_type", "output_format", "case_kind", "area",
                  "write_now", "calendar", "deadlines", "penalties", "court_costs", "severance", "interest", "missing_facts",
                  "clarify"],
@@ -127,6 +130,9 @@ _SCHEMA = {
 @dataclass
 class Understanding:
     task: str = "lookup"
+    requested_precedents: bool = False
+    research_request: str = ""
+    blocking_question: str = ""
     characterisation: str = ""
     issues: list[tuple[str, str]] = field(default_factory=list)      # (name, search phrase)
     statute_hints: list[tuple[str, str]] = field(default_factory=list)  # (law, article)
@@ -228,13 +234,16 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
         listing = "\n".join(f"{n}: {t}" for n, t in sorted(laws.items()))
         content = f"<indexed_laws>\n{listing}\n</indexed_laws>\n\n{content}"
     response = await _completion(content, history, usage, _system(),
-                                 1800 if len(message) <= 1000 else 4000)
+                                 2600 if len(message) <= 1000 else 4500)
     text = next((b.text for b in response.content if b.type == "text"), None)
     if text is None:
         return Understanding()
     data = json.loads(text)
     return Understanding(
         task=data["task"] if data["task"] in TASKS else "lookup",
+        requested_precedents=data.get("requested_precedents") is True,
+        research_request=data.get("research_request", "").strip()[:2000],
+        blocking_question=data.get("blocking_question", "").strip()[:500],
         characterisation=data["characterisation"].strip(),
         issues=[(i["name"].strip(), i["search_phrase"].strip())
                 for i in data["issues"] if i["search_phrase"].strip()][:MAX_ISSUES],

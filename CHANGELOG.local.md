@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.5.0 · 2026-11-27
+
+- Restart the API to load the planner, routing and writing changes. Chat context uses existing message metadata and needs no migration. Older chats use recent messages and recover attachments from the preceding question when available.
+
+
 ## 0.4.0 · 2026-11-27
 
 - Restart the API and rebuild the web client. No migration is needed. Run the chat intent regression tests with `uv run --locked pytest tests/test_turn_intent.py tests/test_compose.py` from `services/api`.

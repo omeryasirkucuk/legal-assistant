@@ -25,7 +25,7 @@ from legal_api.locale import chat_turns
 Route = Literal["new", "reformat", "followup", "greeting", "thanks", "help", "contextual"]
 
 INSTRUCTIONS = ("A lawyer is chatting with a legal research assistant. Decide what the new "
-                "message asks for, given the previous question and the previous answer.")
+                "message asks for, in the active matter. Resolve references using earlier_user_messages when provided. A request that adds a new deliverable or corrects facts is a followup even if it also asks for a summary.")
 CRITERIA = {
     "greeting": "Only greets the assistant. No question, case fact or work request.",
     "thanks": "Only expresses gratitude. No additional request or case fact.",
@@ -50,11 +50,16 @@ def direct_intent(message: str) -> str | None:
 
 
 async def route(message: str, previous_question: str | None, previous_answer: str | None,
-                usage: llm.Usage) -> Route:
+                usage: llm.Usage, earlier_requests: list[str] | None = None,
+                uploaded_names: list[str] | None = None) -> Route:
     if not previous_question or not previous_answer:
         return "new"
     state = {"previous_question": previous_question[:6000],
              "previous_answer": previous_answer[:6000], "new_message": message}
+    if uploaded_names:
+        state["new_documents"] = uploaded_names
+    if earlier_requests:
+        state["earlier_user_messages"] = earlier_requests
     if decisions.enabled():
         async with decisions.client() as client:
             picked = await decisions.choose(client, state, INSTRUCTIONS, CRITERIA, usage, "route")

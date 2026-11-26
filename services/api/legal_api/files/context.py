@@ -25,6 +25,7 @@ class Attachment:
     media_type: str
     text: str
     image: bytes | None = None      # only for images the model can view
+    file_id: str | None = None
 
 
 def _doc(a: Attachment, chars: int) -> str:

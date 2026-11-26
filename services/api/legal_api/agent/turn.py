@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -17,7 +19,8 @@ from legal_api.agent.sources import Source
 from legal_api.agent.understand import Understanding
 from legal_api.agent.write import Written
 from legal_api.drafting.brief import StyleBook
-from legal_api.files.context import Attachment
+from legal_api.files.context import IMAGE_TYPES, MAX_IMAGE_BYTES, Attachment
+from legal_api.files.store import read as read_file
 from legal_api.grounding.evidence import EvidenceLedger
 from legal_api.locale import chat_turns
 from legal_api.matters.agenda import Agenda
@@ -44,6 +47,27 @@ class Previous:
     evidence: list[EvidenceCopy] = field(default_factory=list)
 
 
+def case_turns(previous: Previous | None, history: list[dict]) -> list[str]:
+    """Bounded verbatim user context. Keep the opening request and newest distinct turns."""
+    stored = (previous.answer or {}).get("case_turns", []) if previous else []
+    candidates = [*stored, *(t["content"] for t in history if t["role"] == "user")]
+    if previous:
+        candidates.append(previous.question)
+    return _bounded_turns(candidates)
+
+
+def _bounded_turns(messages: list[str]) -> list[str]:
+    turns: list[str] = []
+    for message in messages:
+        if not isinstance(message, str) or not message.strip():
+            continue
+        excerpt = message if len(message) <= 1400 else message[:900] + " […] " + message[-490:]
+        if excerpt in turns:
+            turns.remove(excerpt)
+        turns.append(excerpt)
+    return turns[:1] + turns[-9:] if len(turns) > 10 else turns
+
+
 async def turn_events(message: str, history: list[dict], previous: Previous | None,
                       result: dict, style: StyleBook | None = None, power: Power = POWERS["balanced"],
                       attachments: list[Attachment] | None = None,
@@ -58,11 +82,13 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
     uploaded = bool(attachments) if explicit_files is None else explicit_files
     workspace_reply = previous is not None and (previous.answer or {}).get("task") == "workspace"
     kind = None if uploaded else direct_intent(message)
-    if kind is None and uploaded:
-        kind = "followup" if just_asked else "new"
-    elif kind is None:
+    earlier = case_turns(previous, history)
+    if kind is None:
         kind = await route(message, previous.question if previous else None,
-                           previous.short if previous else None, usage)
+                           previous.short if previous else None, usage, earlier,
+                           [a.name for a in attachments or []] if uploaded else [])
+    if uploaded and (kind in chat_turns() or kind == "reformat"):
+        kind = "contextual"
     if kind in chat_turns():
         reply = chat_turns()[kind]["reply"]
         res = WrittenResult(message, Understanding(task="direct"),
@@ -78,6 +104,31 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
     if workspace_reply and kind in {"reformat", "followup"}:
         kind = "contextual"
     just_asked = just_asked and kind in {"followup", "contextual"}
+    continuing = kind in {"followup", "contextual", "reformat"}
+    active = earlier if continuing else []
+    if continuing and previous and not history:
+        history = [{"role": "user", "content": previous.question},
+                   {"role": "assistant", "content": previous.short}]
+    current_ids = [a.file_id for a in attachments or [] if a.file_id]
+    remembered = (previous.answer or {}).get("case_file_ids", []) if continuing and previous else []
+    case_files = list(dict.fromkeys([*remembered, *current_ids]))[-5:]
+    if remembered and workspace and kind != "reformat":
+        attachments = list(attachments or [])
+        # Resolve only files still accessible to this user through the active chat or matter.
+        by_id = {str(f.id): f for f in workspace.files}
+        for file_id in case_files:
+            f = by_id.get(file_id)
+            if f is None or file_id in current_ids:
+                continue
+            image = None
+            if f.media_type in IMAGE_TYPES and f.size <= MAX_IMAGE_BYTES:
+                image = await asyncio.to_thread(read_file, f)
+            if image or f.text:
+                attachments.append(Attachment(f.name, f.media_type, f.text, image, file_id))
+    recent = {t["content"] for t in history if t["role"] == "user"}
+    older = [text for text in active if text not in recent]
+    if older:
+        history = [{"role": "user", "content": text} for text in older] + history
     if kind == "reformat" and previous and previous.short:
         sources = [Source(e, e.text) for e in previous.evidence]
         events = rewrite_events(message, previous.question, previous.short, sources, usage,
@@ -88,22 +139,22 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
         events = answer_events(f"{previous.question}\n\n{message}", history, result,
                                usage=usage, style=style, power=power, attachments=attachments,
                                just_asked=True, agenda=agenda, workspace=workspace)
-    elif kind == "followup" and previous:
-        context = history or [{"role": "user", "content": previous.question},
-                              {"role": "assistant", "content": previous.short}]
-        events = answer_events(message, context, result,
-                               search_text=(f"<previous_question>{previous.question}</previous_question>\n"
-                                            f"<current_request>{message}</current_request>"), usage=usage,
-                               style=style, power=power, attachments=attachments,
-                               just_asked=just_asked, agenda=agenda, workspace=workspace)
     else:
-        context = history if uploaded or kind == "contextual" else []
-        events = answer_events(message, context, result, usage=usage, style=style,
-                               power=power, attachments=attachments, just_asked=just_asked,
-                               agenda=agenda, workspace=workspace)
+        request = None
+        if continuing and previous:
+            notes = json.dumps(active[:-1], ensure_ascii=False)
+            request = (f"<earlier_user_messages>{notes}</earlier_user_messages>\n"
+                       f"<previous_question>{previous.question}</previous_question>\n"
+                       f"<current_request>{message}</current_request>")
+        events = answer_events(message, history if continuing else [], result, search_text=request,
+                               usage=usage, style=style, power=power, attachments=attachments,
+                               just_asked=just_asked, agenda=agenda, workspace=workspace)
     yield Event("route", {"kind": kind})
     yield step_event("understand", "done")
     async for event in events:
         yield event
-    if "result" in result and kind == "new" and not uploaded:
+    if "result" in result:
+        result["result"].case_file_ids = case_files
+        result["result"].case_turns = _bounded_turns([*active, message])
+    if "result" in result and kind == "new":
         result["result"].trace["starts_topic"] = True

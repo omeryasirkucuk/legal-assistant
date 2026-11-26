@@ -83,12 +83,16 @@ async def previous_turn(db: AsyncSession, chat: Chat) -> Previous | None:
                              .order_by(Message.created_at.desc()).limit(1))
     if answer is None:
         return None
-    question = await db.scalar(select(Message.content).where(
+    question = await db.scalar(select(Message).where(
         Message.chat_id == chat.id, Message.role == "user",
         Message.created_at < answer.created_at).order_by(Message.created_at.desc()).limit(1))
     evidence = (await db.scalars(select(MessageEvidence)
                                  .where(MessageEvidence.message_id == answer.id))).all()
-    return Previous(question or "", (answer.meta or {}).get("answer"),
+    structure = dict((answer.meta or {}).get("answer") or {})
+    if question and "case_file_ids" not in structure:
+        structure["case_file_ids"] = [f["id"] for f in (question.meta or {}).get("attachments", [])
+                                      if f.get("id")]
+    return Previous(question.content if question else "", structure,
                     _as_history(answer.content),
                     [EvidenceCopy(e.key, e.kind, e.citation, e.url, e.text, e.fetched_at)
                      for e in evidence])

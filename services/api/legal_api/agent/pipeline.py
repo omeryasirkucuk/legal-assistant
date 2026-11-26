@@ -60,6 +60,8 @@ class WrittenResult:
     asked: bool = False      # the turn asked for facts instead of drafting
     workspace: dict | None = None
     workspace_files: list[bytes] = field(default_factory=list)
+    case_turns: list[str] = field(default_factory=list)
+    case_file_ids: list[str] = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -78,13 +80,15 @@ class WrittenResult:
 
     @property
     def checked(self) -> dict | None:
-        if self.understanding.task in {"workspace", "direct"}:
+        if self.understanding.task in {"workspace", "direct", "clarification"}:
             return None
         return {"issues": [], "claims": self.written.flagged, "citation_check": "source_passages"}
 
     def structure(self) -> dict:
         return {"format": "written", "task": self.understanding.task,
                 "shape": self.understanding.shape, "clarify": self.understanding.clarify,
+                **({"case_file_ids": self.case_file_ids} if self.case_file_ids else {}),
+                **({"case_turns": self.case_turns} if self.case_turns else {}),
                 **({"asked": True} if self.asked else {}),
                 "segments": [{"text": s.text, "keys": list(s.keys)}
                              for s in self.written.segments]}
@@ -124,6 +128,20 @@ async def answer_events(question: str, history: list[dict] | None = None,
         u = await understand(for_understanding(question, attachments),
                              history or [], usage, laws)
         mark("understand_s")
+        if u.task == "clarification" and u.blocking_question:
+            mark("total_s")
+            yield step_event("analyse", "done", issues=0)
+            text = u.blocking_question
+            res = WrittenResult(question, u, Written([Segment(text)], text, []), ledger, usage,
+                                timings, u.trace())
+            if result is not None:
+                result["result"] = res
+            yield Event("delta", {"text": text})
+            yield Event("final", {"text": text, "clarify": u.clarify,
+                                  "cost_usd": round(usage.cost_usd, 4), "timings": timings})
+            return
+        if u.task == "clarification":
+            u.task = "consultation"
         if u.task == "workspace":
             yield step_event("analyse", "done", issues=len(u.issues))
             yield step_event("calculate")
@@ -166,7 +184,8 @@ async def answer_events(question: str, history: list[dict] | None = None,
             found = Research(trace={"calendar_only": True})
         else:
             task = asyncio.create_task(
-                research(db, finder, search_text or question, u, usage, progress, power))
+                research(db, finder, u.research_request or search_text or question,
+                         u, usage, progress, power))
             while not task.done() or not queue.empty():
                 getter = asyncio.create_task(queue.get())
                 done, _ = await asyncio.wait({getter, task}, return_when=asyncio.FIRST_COMPLETED)

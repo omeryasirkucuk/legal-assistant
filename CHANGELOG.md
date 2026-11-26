@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0 · 2026-11-27
+
+- Carry the opening request, recent user corrections and accessible documents across related turns. Resolve follow-ups into explicit research requests, retain combined calculation and precedent requests, and ask for the missing reference before researching an ambiguous question.
+
+
 ## 0.4.0 · 2026-11-27
 
 - Handle standalone greetings, acknowledgments and capability questions directly. Classify topic switches and preserve the last substantive answer for corrections and reformats. Keep the latest message separate from earlier facts when extracting updated calculation inputs. Present citation checks more compactly.

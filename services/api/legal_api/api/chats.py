@@ -145,6 +145,9 @@ async def stats_today(user: CurrentUser, db: DB) -> dict:
 
 
 def _message_meta(metadata: dict) -> dict:
+    answer = metadata.get("answer") or {}
+    if "case_turns" in answer or "case_file_ids" in answer:
+        metadata = {**metadata, "answer": {k: v for k, v in answer.items() if k not in {"case_turns", "case_file_ids"}}}
     snapshot = metadata.get("workspace")
     if not snapshot:
         return metadata
@@ -274,7 +277,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
         f.chat_id, f.message_id = chat.id, question.id
     await db.commit()
     attachments = [Attachment(f.name, f.media_type, f.text,
-                              read_file(f) if f.media_type.startswith("image/") else None)
+                              read_file(f) if f.media_type.startswith("image/") else None, str(f.id))
                    for f in files]
     in_file = []
     # In a case file, its parties, court, notes and documents come with every question.
