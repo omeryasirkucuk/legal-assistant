@@ -261,10 +261,12 @@ async def _openai_response(role: Role, params: dict, *, stream: bool = False):
     route = routed(role)
     model = route or model_for(role)
     payload = _openai_payload(model, params, stream=stream, route=bool(route))
-    # Respect custom writer choices. The default writer can use the main model on the
-    # same configured route if its budget cannot cover a minimally useful response.
-    alternate = (routed("main") if role == "write" and route and not get_settings().write_route
-                 else None)
+    alternate = None
+    if role == "write" and route:
+        settings = get_settings()
+        alternate = settings.write_fallback_route
+        if not alternate and not settings.write_route:
+            alternate = routed("main")
     budget = payload.get("max_tokens")
     min_tokens = 1024 if role == "write" else 512
     async with openai_client(bool(route)) as client:

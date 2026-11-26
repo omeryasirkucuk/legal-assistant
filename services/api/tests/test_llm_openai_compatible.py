@@ -137,10 +137,15 @@ def test_a_marker_cites_only_the_sentence_before_it():
     assert len(cited) == 1 and cited[0].text == "The debtor may object in seven days"
 
 
-async def test_openrouter_recovers_before_streaming_when_writer_cannot_afford_enough_tokens(monkeypatch):
+@pytest.mark.parametrize(("configured_writer", "fallback"), [("", ""), ("writer", "main")])
+async def test_openrouter_recovers_before_streaming_when_writer_cannot_afford_enough_tokens(
+        monkeypatch, configured_writer, fallback):
     settings = _settings()
+    settings.write_route = configured_writer
+    settings.write_fallback_route = fallback
     monkeypatch.setattr(llm, "get_settings", lambda: settings)
-    monkeypatch.setattr(llm, "routed", lambda role: {"write": "writer", "main": "main"}.get(role))
+    default_main = "unused-default" if configured_writer else "main"
+    monkeypatch.setattr(llm, "routed", lambda role: {"write": "writer", "main": default_main}.get(role))
     requests = []
 
     def respond(request: httpx.Request) -> httpx.Response:

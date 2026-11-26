@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     # decision service's key and URL; every other role stays as configured. Hosts that may
     # train on prompts are excluded.
     write_route: str = ""
+    # Optional alternate on the same OpenRouter route when the writer's credit budget
+    # cannot cover a useful response. An explicit writer opts into this separately.
+    write_fallback_route: str = ""
     # Petitions (except at "deep") are written by this OpenRouter model (D47-D48: on the same
     # case it wrote a usable petition for a tenth of Sonnet's cost). Empty, or without an
     # OpenRouter key, they are written like answers.
