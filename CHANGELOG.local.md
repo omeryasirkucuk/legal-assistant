@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.3.5 · 2026-11-26
+
+- Restart the API after updating the backend and prompts. No database migration is required.
+- Run `uv run --locked pytest tests/test_severance.py tests/test_write_clean.py tests/test_screen.py` from `services/api` to reproduce the amount answer, citation checks and focused research with mocked model responses.
+
 ## 0.3.4 · 2026-11-26
 
 - The backend and model prompts changed. Restart the API after updating. This release requires no database migration.

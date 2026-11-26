@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from functools import cache
 from itertools import batched
@@ -22,6 +22,7 @@ from legal_api.agent.atoms import CitationStream, Segment, openai_segments_from,
 from legal_api.agent.power import POWERS, Power
 from legal_api.agent.sources import Source
 from legal_api.agent.understand import Understanding
+from legal_api.grounding.normalize import tr_fold
 from legal_api.grounding.numbers import digits_for_quantities, numbers_in, unsupported_numbers
 from legal_api.locale import reference_terms
 from legal_api.prompts import prompt
@@ -120,13 +121,35 @@ def _citation_patterns() -> list[re.Pattern]:
 def without_citations(text: str) -> str:
     """Text with article, law, case and date references removed: their numbers identify a
     source, they are not quantities to check ("m. 29/1", "Law No. 6098", "E. 2019/1483")."""
-    for pattern in _citation_patterns():
-        text = pattern.sub(" ", text)
-    return _MARKDOWN.sub(" ", text)
+    return _mask_citations(text)
 
 
-def _referenced_sources(segment: Segment, sources: list[Source]) -> list[Source]:
-    return [s for s in sources if s.evidence.key in segment.keys]
+def _mask_citations(text: str) -> str:
+    for pattern in [*_citation_patterns(), _MARKDOWN]:
+        text = pattern.sub(lambda match: " " * len(match[0]), text)
+    return text
+
+
+def _claim_bodies(segments: list[Segment]) -> Iterator[str]:
+    # Match legal references before splitting at the writer's citation boundaries.
+    masked = _mask_citations("".join(s.text for s in segments))
+    offset = 0
+    for segment in segments:
+        end = offset + len(segment.text)
+        yield masked[offset:end]
+        offset = end
+
+
+def _without_source_names(text: str, sources: list[Source]) -> str:
+    words = tr_fold(text)
+    for source in sources:
+        label = tr_fold(without_citations(source.evidence.citation))
+        # Punctuation in displayed source titles can differ from the ledger.
+        parts = re.findall(r"\w+", label)
+        if parts:
+            pattern = r"\b" + r"[^\w]+".join(map(re.escape, parts)) + r"\b"
+            words = re.sub(pattern, " ", words)
+    return words
 
 
 async def check(segments: list[Segment], sources: list[Source], message: str,
@@ -134,14 +157,11 @@ async def check(segments: list[Segment], sources: list[Source], message: str,
     """Check citation matches, quantities and, when enabled, support from cited sources."""
     to_judge: dict[tuple[str, ...], list[Segment]] = {}
     flagged: list[dict] = []
-    for seg in segments:
+    for seg, body in zip(segments, _claim_bodies(segments), strict=True):
         if seg.unverified:
             flagged.append(_flag(seg, "", "citation_unmatched"))
-        body = without_citations(seg.text)
-        # A piece cut off by citation marks ("315).**", "the fastest route.") cannot be judged
-        # on its own; its numbers are still checked below.
+        relied = [s for s in sources if s.evidence.key in seg.keys]
         judged = len(re.findall(r"[^\W\d_]{2,}", body)) >= MIN_JUDGED_WORDS
-        relied = _referenced_sources(seg, sources)
         if numbers_in(body):
             available = relied or sources
             missing = unsupported_numbers(body, [message, *seg.quotes,
@@ -150,6 +170,9 @@ async def check(segments: list[Segment], sources: list[Source], message: str,
                 flagged.append(_flag(seg, ", ".join(f"{n:g}" for n in sorted(missing))))
                 continue
         if relied and judged:
+            remaining = set(re.findall(r"\w+", _without_source_names(body, relied)))
+            if remaining <= set(reference_terms()["joiners"]):
+                continue
             keys = tuple(s.evidence.key for s in relied)
             to_judge.setdefault(keys, []).append(seg)
     if to_judge and decisions.enabled():

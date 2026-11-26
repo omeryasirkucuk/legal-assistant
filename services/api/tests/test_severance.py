@@ -65,6 +65,8 @@ async def test_model_extracted_months_produce_sourced_calculation_without_fake_d
             return SimpleNamespace(date=lambda: date(2026, 11, 26))
 
     question = "23 ay bir şirkette çalıştım. son brüt maaşım 200 bin sence ne kadar tazminat alırım"
+    update = "İşveren beni çıkardı. Brüt ücrete düzenli ödemeler dahil."
+    conversation = f"{question}\n{update}"
     monkeypatch.setattr(sources, "datetime", Clock)
     pool = SimpleNamespace(acquire=Connection, close=AsyncMock())
     monkeypatch.setattr(pipeline.asyncpg, "create_pool", AsyncMock(return_value=pool))
@@ -72,7 +74,7 @@ async def test_model_extracted_months_produce_sourced_calculation_without_fake_d
     monkeypatch.setattr(pipeline, "research", AsyncMock(return_value=Research()))
     monkeypatch.setattr(pipeline.SourceFinder, "article", AsyncMock(return_value=None))
     understanding = {
-        "task": "consultation", "shape": "single", "characterisation": "Kıdem tazminatı",
+        "task": "consultation", "shape": "amount", "characterisation": "Kıdem tazminatı",
         "issues": [], "questions": [question], "clarify": [], "statute_hints": [],
         "case_law_query": "", "missing_facts": ["Sözleşme hangi gerekçeyle sona erdi?"],
         "severance": [{"start_date": "", "end_date": "", "service_months": 23,
@@ -84,18 +86,23 @@ async def test_model_extracted_months_produce_sourced_calculation_without_fake_d
     monkeypatch.setattr(pipeline.llm, "create", model)
 
     async def writer(message, u, evidence, _usage, *_args, **_kwargs):
-        assert message == question and u.missing_facts == understanding["missing_facts"]
+        assert message == conversation and u.missing_facts == understanding["missing_facts"]
         calculation, ceiling = evidence
         assert calculation.evidence.kind == "calculation"
         assert "23 tam ay" in calculation.document and "26.11.2026 esas alındı" in calculation.document
         assert "141.315,58 TL" in calculation.document and "140.242,99 TL" in calculation.document
+        assert "421.315,58 TL" in calculation.document
         assert "01.07.2026–31.12.2026" in ceiling.document
         assert "73.729,87 TL" in ceiling.document and "csgb.gov.tr" in ceiling.evidence.url
         yield Written([Segment("Koşullu tutar")], "Koşullu tutar", [])
 
     monkeypatch.setattr(pipeline, "write", writer)
-    answer = await pipeline.answer(question)
-    assert answer.text == "Koşullu tutar"
+    holder = {}
+    async for _ in pipeline.answer_events(update, result=holder, search_text=conversation):
+        pass
+    answer = holder["result"]
+    assert answer.question == update
+    assert answer.text == "Koşullu tutar" and answer.understanding.shape == "amount"
     assert answer.usage.cost_usd == 0
     assert model.await_count == 1
 

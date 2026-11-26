@@ -46,6 +46,7 @@
     "under_one_year": "Çalışma süresi bir yıldan az olduğu için kıdem tazminatı doğmaz.",
     "stamp": "Damga vergisi (binde 7,59): {stamp}. Net kıdem tazminatı: {net}. Kıdem tazminatı tavanı aşmadığı ölçüde gelir vergisinden istisnadır.",
     "notice": "İhbar süresi: {weeks} hafta. İhbar tazminatı (brüt): ({monthly} / 30) × {days} gün = {notice}. Gelir vergisi, yıl içindeki önceki kazançlara göre ayrıca hesaplanır.",
+    "gross_total": "İki kaleme de hak kazanılması hâlinde toplam brüt: {total}.",
     "condition": "Tutarlar ayrı ayrı, ilgili tazminata hak kazanıldığı koşuluyla hesaplandı."
   },
   "interest": {

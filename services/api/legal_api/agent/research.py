@@ -61,11 +61,12 @@ class Candidates:
     per_issue: list[list[int]]       # each issue's best results, best first
 
 
-async def candidates(db: asyncpg.Pool, question: str, u: Understanding) -> Candidates:
+async def candidates(db: asyncpg.Pool, question: str, u: Understanding, *,
+                     per_query: int = PER_QUERY) -> Candidates:
     """Fused search results plus the named articles."""
     queries = [question, *(phrase for _, phrase in u.issues)]
     async with db.acquire() as conn:
-        lists = [await search_statutes(conn, q, limit=PER_QUERY) for q in queries]
+        lists = [await search_statutes(conn, q, limit=per_query) for q in queries]
         hinted = [await get_article(conn, law, art) for law, art in u.statute_hints]
     by_id = {h.id: h for hits in lists for h in hits}
     scores = fuse([[h.id for h in hits] for hits in lists])
@@ -162,15 +163,17 @@ async def research(db: asyncpg.Pool, finder: SourceFinder, question: str, u: Und
                    usage: llm.Usage, progress, power: Power = POWERS["balanced"]) -> Research:
     """`progress(step, state, **counts)` reports each step for the UI."""
     progress("search", "active")
-    found = await candidates(db, question, u)
+    focused = u.shape == "amount" and not power.always_decisions
+    found = await candidates(db, question, u, per_query=6 if focused else PER_QUERY)
     hits = found.hits
     progress("search", "done", count=len(hits))
     progress("screen", "active")
     screened = await screen(screening_question(question, u), hits, usage, NEEDED)
     answering, kept = select([(s.hit, s.p_answers) for s in screened], found,
                              power.max_articles)
-    kept += await nearby(db, screening_question(question, u), kept, {h.id for h in hits}, usage)
-    kept += await siblings(db, kept)
+    if not focused:
+        kept += await nearby(db, screening_question(question, u), kept, {h.id for h in hits}, usage)
+        kept += await siblings(db, kept)
     progress("screen", "done", count=len(kept))
     progress("references", "active")
     # Judged against the question with its characterisation: a follow-up ("is there a
@@ -186,8 +189,8 @@ async def research(db: asyncpg.Pool, finder: SourceFinder, question: str, u: Und
     # decisions themselves (a request for precedents once got none: nothing was searched).
     asked_for_cases = u.task == "search"
     fast_petition = u.task == "drafting" and power.name == "fast"   # no decisions (D50)
-    if not fast_petition and (u.case_law_query or u.task == "consultation" or asked_for_cases
-                              or power.always_decisions):
+    if not fast_petition and (u.case_law_query or asked_for_cases or power.always_decisions
+                              or (u.task == "consultation" and not focused)):
         progress("caselaw", "active")
         decisions = await finder.decisions_for(
             u.case_law_query or u.characterisation, ask, usage,

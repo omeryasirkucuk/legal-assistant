@@ -51,6 +51,11 @@ conditional amount, links to the official ceiling for the period, and asks for t
 to confirm entitlement or the applicable date. The built-in ceiling table covers 2022–2026.
 A period outside that coverage yields no gross or net severance estimate.
 
+Amount-focused answers lead with the supported result and its assumptions, with gross and net
+amounts labelled. The default research pass focuses on the rules that determine the result.
+A request for precedent or the deep research mode can still expand the search. Follow-up answers
+retain the original request and the facts supplied to clarify it.
+
 The API supports Anthropic and OpenAI-compatible chat-completions providers. For Open WebUI,
 an administrator can set **Model settings** to a base URL ending in `/api` such as
 `http://localhost:8080/api`, a key with chat-completions access, and the instance's model IDs.

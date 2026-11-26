@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.5 · 2026-11-26
+
+- Format amount-focused answers around the result, the assumptions that affect it and the relevant gross and net figures. Retain the original question when writing a follow-up.
+- Narrow default research for amount questions while preserving legal sources, explicitly requested precedent and deep research.
+- Check formatted Turkish amounts as whole values. Keep paired references and citation-only fragments from generating false warnings.
+- Include the verified combined gross amount in severance and notice evidence when both payments are due.
+
 ## 0.3.4 · 2026-11-26
 
 - Pass model-extracted service duration and gross pay to the severance calculator even when employment dates are incomplete. Explain date assumptions and cite the applicable official ceiling period.

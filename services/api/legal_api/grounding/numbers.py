@@ -14,7 +14,11 @@ from functools import cache
 from legal_api.grounding.normalize import tr_fold
 from legal_api.locale import number_units, number_words
 
-_TOKEN = re.compile(r"\d+/\d+|\d+(?:[.,]\d+)?|\w+")
+_GROUPED_DECIMAL = r"[1-9]\d{0,2}(?:\.\d{3})+(?:,\d+)?(?!\d|[.,]\d)"
+_TOKEN = re.compile(rf"\d+/\d+|{_GROUPED_DECIMAL}|\d+(?:[.,]\d+)?|\w+")
+_PAIRED_REFERENT = re.compile(
+    r"\bher\s+iki\b(?!\s+(?:iş\s+)?(?:gün|hafta|ay|yıl|saat|dakika|saniye)(?:da|de|ta|te)\b)"
+)
 # A fraction in words (one quarter): the denominator word with the locative ending, then the
 # numerator word with any ending ("from one quarter", "to three quarters").
 _LOCATIVE = ("te", "ta", "de", "da")
@@ -106,7 +110,8 @@ def numbers_in(text: str) -> set[float]:
     fractions, in digits or words, count as their value (1/4 and one quarter in words -> 0.25)."""
     found: set[float] = set()
     number = _Number()
-    tokens = _TOKEN.findall(tr_fold(text))
+    # “Her iki” refers back to a pair, without asserting a quantity or a legal threshold.
+    tokens = _TOKEN.findall(_PAIRED_REFERENT.sub(" ", tr_fold(text)))
     skip = False
     for i, token in enumerate(tokens):
         if skip:
@@ -129,6 +134,8 @@ def numbers_in(text: str) -> set[float]:
             continue
         if token[0].isdigit():
             number.flush(found)
+            if re.fullmatch(_GROUPED_DECIMAL, token):
+                token = token.replace(".", "")
             found.add(float(token.replace(",", ".")))
             continue
         values = _values(token)

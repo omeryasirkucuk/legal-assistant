@@ -7,6 +7,7 @@ from legal_api.agent.atoms import Segment
 from legal_api.agent.sources import Source
 from legal_api.agent.write import clean
 from legal_api.grounding.evidence import EvidenceLedger
+from legal_api.grounding.numbers import numbers_in
 
 
 def test_raw_document_keys_cannot_create_citations():
@@ -55,3 +56,43 @@ async def test_support_check_batches_claims_on_the_same_sources(monkeypatch):
     assert len(flags) == 1
     assert flags[0]["reason"] == "support_low"
     assert flags[0]["sentence"] == segments[2].text.strip()
+
+
+async def test_verifier_distinguishes_amounts_and_citation_fragments(monkeypatch):
+    @asynccontextmanager
+    async def client():
+        yield object()
+
+    ledger = EvidenceLedger()
+    calculation = "Kıdem tazminatı 141.315,58 TL, ihbar tazminatı 280.000,00 TL."
+    calc = ledger.add_calculation(source_id="calc", citation="Kıdem ve ihbar tazminatı hesabı",
+                                  text=calculation)
+    legal = ledger.add_calculation(source_id="law", citation="1475 sayılı İş Kanunu, m. 14",
+                                   text="Hesap yöntemini düzenleyen madde.")
+    segments = [
+        Segment("Her iki tazminata hak kazanılırsa kıdem tutarı 141.315,58 TL olur.\n\n",
+                (calc.key,)),
+        Segment("| Dayanak | 1475 sayılı İş Kanunu m. ", (legal.key,)),
+        Segment("14 ve Kıdem ve ihbar tazminatı hesabı", (legal.key, calc.key)),
+        Segment(" |\n\n"),
+        Segment("İhbar tazminatı 280.000,58 TL olur.", (calc.key,)),
+    ]
+
+    async def verdict(_client, state, questions, _usage, _purpose):
+        assert list(questions) == ["claim_0"]
+        assert state["claims"]["claim_0"]["text"].startswith("Her iki tazminata")
+        return {"claim_0": 0.96}
+
+    judge = AsyncMock(side_effect=verdict)
+    monkeypatch.setattr(write.decisions, "enabled", lambda: True)
+    monkeypatch.setattr(write.decisions, "client", client)
+    monkeypatch.setattr(write.decisions, "yes_probabilities", judge)
+    sources = [Source(calc, calculation), Source(legal, legal.text)]
+    flags = await write.check(segments, sources, "", llm.Usage())
+
+    assert judge.await_count == 1
+    assert [flag["sentence"] for flag in flags] == [segments[-1].text]
+
+
+def test_recurring_period_still_counts_as_a_quantity():
+    assert numbers_in("Her iki ayda bir bildirim yapılır.") == {2}

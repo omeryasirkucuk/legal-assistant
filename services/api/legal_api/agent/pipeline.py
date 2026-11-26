@@ -218,7 +218,7 @@ async def answer_events(question: str, history: list[dict] | None = None,
         written: Written | None = None
         yield step_event("write")
         try:
-            async for item in write(question, u, found.sources, usage, instruction,
+            async for item in write(search_text or question, u, found.sources, usage, instruction,
                                     max_tokens=max_tokens, power=power,
                                     context=for_writer(attachments)):
                 if isinstance(item, str):

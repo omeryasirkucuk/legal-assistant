@@ -44,6 +44,8 @@ def render(r: Severance, *, assumed_end: bool = False) -> str:
                                        net=money(r.severance - r.stamp_duty)))
     lines.append(t["notice"].format(weeks=r.notice_weeks, monthly=money(r.monthly),
                                     days=r.notice_weeks * 7, notice=money(r.notice)))
+    if r.severance is not None and r.severance > 0:
+        lines.append(t["gross_total"].format(total=money(r.severance + r.notice)))
     lines.append(t["condition"])
     return "\n".join(lines)
 

@@ -31,3 +31,33 @@ def test_probabilities_split_candidates(monkeypatch):
     assert not by_label["65"].answers and not by_label["65"].rejected
     assert by_label["156"].rejected
     assert not by_label["9"].answers and not by_label["9"].rejected  # service failure: review
+
+
+async def test_amount_research_keeps_explicit_precedent_search(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from legal_api.agent import research
+    from legal_api.agent.understand import Understanding
+
+    candidates = AsyncMock(return_value=research.Candidates([], set(), []))
+    monkeypatch.setattr(research, "candidates", candidates)
+    monkeypatch.setattr(research, "screen", AsyncMock(return_value=[]))
+    related_statutes = AsyncMock(return_value=[])
+    monkeypatch.setattr(research, "nearby", related_statutes)
+    monkeypatch.setattr(research, "siblings", related_statutes)
+    monkeypatch.setattr(research, "follow_references", AsyncMock(return_value=[]))
+    precedents = AsyncMock(return_value=[])
+
+    class Finder:
+        decisions_for = precedents
+
+    understand = Understanding(task="consultation", shape="amount")
+    for query in ("", "fesih ve tazminat"):
+        understand.case_law_query = query
+        await research.research(None, Finder(), "Hesapla", understand, llm.Usage(),
+                                lambda *_args, **_kwargs: None)
+        assert candidates.call_args.kwargs["per_query"] < research.PER_QUERY
+
+    assert not related_statutes.await_count
+    assert precedents.await_count == 1
+    assert precedents.await_args.args[0] == "fesih ve tazminat"
