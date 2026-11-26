@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
@@ -18,6 +18,8 @@ const serif = Source_Serif_4({
 export const metadata: Metadata = {
   title: "Legal Assistant",
 };
+
+export const viewport: Viewport = { interactiveWidget: "resizes-content" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

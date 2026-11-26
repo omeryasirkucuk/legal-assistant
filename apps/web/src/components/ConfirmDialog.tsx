@@ -33,12 +33,12 @@ function ConfirmDialog({ message, action, onAnswer }: {
   }, [onAnswer]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/25 px-3 pt-[20vh] sm:px-4"
+    <div className="viewport-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-y-contain bg-ink/25 px-3 pb-4 pt-[min(20dvh,8rem)] sm:px-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onAnswer(false); }}>
       <div role="alertdialog" aria-modal="true" aria-describedby="confirm-message"
         className="w-full max-w-sm rounded-2xl border border-rule bg-paper p-5 shadow-xl">
-        <p id="confirm-message" className="text-[15px] leading-relaxed text-ink">{message}</p>
-        <div className="mt-5 flex justify-end gap-2">
+        <p id="confirm-message" className="text-[15px] leading-relaxed text-ink wrap-anywhere">{message}</p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button ref={cancel} onClick={() => onAnswer(false)}
             className="rounded-lg px-3 py-2 text-sm text-muted hover:bg-sheet hover:text-ink">{t("cancel")}</button>
           <button onClick={() => onAnswer(true)}

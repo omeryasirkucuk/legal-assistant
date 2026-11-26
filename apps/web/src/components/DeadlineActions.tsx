@@ -9,7 +9,7 @@ export function DeadlineActions({ onDone, onDelete, onCancel }: {
   onDone: () => void; onDelete: () => void; onCancel: () => void;
 }) {
   return (
-    <div className="mt-2 flex items-center gap-1.5">
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
       <button onClick={onDone} autoFocus
         className="flex items-center gap-1 rounded-md bg-verified px-2 py-1 text-xs font-medium text-white hover:brightness-95">
         <Check size={12} strokeWidth={3} /> {t("deadlineMarkDone")}

@@ -56,7 +56,7 @@ export function CalendarReminders({ version, onOpen }: { version: number; onOpen
   }
 
   return (
-    <section aria-label={t("calendarReminderNow")} className="sticky top-[53px] z-10 px-4 py-2 md:top-0">
+    <section aria-label={t("calendarReminderNow")} className="chat-reminder sticky top-0 z-10 px-4 py-2">
       <div className="mx-auto flex max-w-[58rem] items-start gap-2 rounded-xl border border-cite/25 bg-sheet p-3 shadow-sm">
         <Bell size={17} className="mt-0.5 shrink-0 text-cite" />
         <div className="min-w-0 flex-1" aria-live="polite">

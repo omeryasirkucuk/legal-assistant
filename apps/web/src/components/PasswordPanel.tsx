@@ -51,7 +51,7 @@ export function PasswordPanel({ onClose }: { onClose: () => void }) {
     <dialog ref={dialog} onCancel={(event) => { if (saving) event.preventDefault(); else onClose(); }}
       onClick={(event) => { if (!saving && event.target === event.currentTarget) onClose(); }}
       aria-labelledby="password-title"
-      className="m-auto max-h-[90dvh] w-[min(92vw,28rem)] max-w-none overflow-auto rounded-xl border border-rule bg-paper p-0 text-ink shadow-xl backdrop:bg-black/35">
+      className="m-auto max-h-[calc(var(--app-viewport-height)-2rem)] w-[min(92vw,28rem)] max-w-none overflow-y-auto overscroll-y-contain rounded-xl border border-rule bg-paper p-0 text-ink shadow-xl backdrop:bg-black/35">
       <section>
         <header className="flex items-center justify-between gap-4 border-b border-rule px-5 py-4">
           <h2 id="password-title" className="font-serif text-2xl">{t("changePassword")}</h2>

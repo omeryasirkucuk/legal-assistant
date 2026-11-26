@@ -49,6 +49,12 @@ export function AssistantAnswer(props: Props) {
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
+          table: ({ children }) => (
+            <div className="answer-scroll" tabIndex={0} role="region" aria-label={t("answerTable")}>
+              <table>{children}</table>
+            </div>
+          ),
+          pre: ({ children }) => <pre className="answer-scroll" tabIndex={0}>{children}</pre>,
           a: ({ href, children }) => {
             const key = href?.startsWith("#cite-") ? href.slice(6) : null;
             if (key && byKey.has(key)) {
@@ -71,7 +77,7 @@ export function AssistantAnswer(props: Props) {
   );
 
   return (
-    <div className="grid gap-x-10 @4xl:grid-cols-[minmax(0,42rem)_15rem]">
+    <div className="grid grid-cols-1 gap-x-10 @4xl:grid-cols-[minmax(0,42rem)_15rem]">
       <div className="min-w-0">
         {refused ? (
           <p className="text-muted">{t("refused")}</p>
@@ -129,7 +135,7 @@ export function SourceNote({ n, evidence, onOpen }: { n: number; evidence: Evide
     <li>
       <button onClick={() => onOpen(evidence.key)} className="group flex gap-2 text-left">
         <span className="mt-0.5 font-sans text-xs font-semibold text-cite">{n}</span>
-        <span className="text-[0.8125rem] leading-snug text-muted group-hover:text-ink">
+        <span className="wrap-anywhere text-[0.8125rem] leading-snug text-muted group-hover:text-ink">
           {evidence.citation}
         </span>
       </button>

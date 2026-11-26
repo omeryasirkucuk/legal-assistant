@@ -108,6 +108,17 @@ location and notes. The external app controls notification delivery for imported
 For local upgrades to 0.8.0, run `make setup` and `make migrate` before restarting the API
 and rebuilding the frontend. For Folonto production, follow the [deployment runbook](docs/DEPLOYMENT.md).
 
+## Mobile and tablet use
+
+Below 1024 CSS pixels at the default text size, open the navigation drawer from the top bar
+to reach chats, cases, the calendar, files and account settings. The message composer stays
+above the on-screen keyboard. Swipe across wide tables and code blocks inside a chat, or
+across the formatting toolbar in the petition editor on a narrow screen.
+
+In the compact calendar, select a day to read and edit its entries below the month grid.
+File actions are available from each item's menu in both list and grid views. Administrators
+can create and copy an invitation from the account menu on mobile.
+
 ## Calculations and document updates in chat
 
 Ask for a calculation in the existing chat. A hypothetical severance or notice question

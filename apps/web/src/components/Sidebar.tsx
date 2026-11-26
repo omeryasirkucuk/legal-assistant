@@ -115,7 +115,7 @@ export function Sidebar(props: Props) {
     <UserMenu user={user} today={today} onStyle={props.onStyle}
       onSettings={props.onSettings} onAdmin={props.onAdmin} onPassword={props.onPassword}
       onLogout={props.onLogout} onClose={() => setMenu(false)}
-      className={collapsed ? "bottom-2 left-14" : "bottom-16 left-2"} />
+      className={wide && collapsed ? "bottom-2 left-14" : "bottom-16 left-2"} />
   );
 
   if (collapsed && wide) {
@@ -146,7 +146,7 @@ export function Sidebar(props: Props) {
 
   const shell = wide
     ? "relative h-full w-72 shrink-0 border-r border-rule"
-    : `fixed inset-y-0 left-0 z-40 w-[min(20rem,86vw)] shadow-xl transition-transform duration-200 motion-reduce:transition-none ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`;
+    : `fixed inset-y-0 left-0 z-40 viewport-overlay w-[min(20rem,86vw)] overflow-y-auto overscroll-y-contain shadow-xl transition-transform duration-200 motion-reduce:transition-none ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`;
 
   return (
     <>
@@ -162,18 +162,18 @@ export function Sidebar(props: Props) {
       </div>
       <div className="space-y-0.5 px-2">
         <button onClick={onNew}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 max-md:py-2.5 text-sm font-medium text-ink hover:bg-sheet">
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 max-lg:py-2.5 text-sm font-medium text-ink hover:bg-sheet">
           <SquarePen size={17} className="text-muted" /> {t("newChat")}
         </button>
         <button onClick={props.onCalendar} aria-current={props.calendarOpen ? "page" : undefined}
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 max-md:py-2.5 text-sm text-ink ${props.calendarOpen ? "bg-sheet shadow-sm" : "hover:bg-sheet"}`}>
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 max-lg:py-2.5 text-sm text-ink ${props.calendarOpen ? "bg-sheet shadow-sm" : "hover:bg-sheet"}`}>
           <CalendarDays size={17} className="text-muted" /> {t("calendar")}
         </button>
         <button onClick={props.onFiles} aria-current={props.filesOpen ? "page" : undefined}
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 max-md:py-2.5 text-sm text-ink ${props.filesOpen ? "bg-sheet shadow-sm" : "hover:bg-sheet"}`}>
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 max-lg:py-2.5 text-sm text-ink ${props.filesOpen ? "bg-sheet shadow-sm" : "hover:bg-sheet"}`}>
           <FolderOpen size={17} className="text-muted" /> {t("myFiles")}
         </button>
-        <label className="flex w-full items-center gap-3 rounded-lg px-3 py-2 max-md:py-2.5 text-sm text-ink focus-within:bg-sheet hover:bg-sheet">
+        <label className="flex w-full items-center gap-3 rounded-lg px-3 py-2 max-lg:py-2.5 text-sm text-ink focus-within:bg-sheet hover:bg-sheet">
           <Search size={17} className="shrink-0 text-muted" />
           <input ref={searchBox} value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder={t("searchChats")} aria-label={t("searchDesk")} title={t("searchDesk")}
@@ -186,7 +186,7 @@ export function Sidebar(props: Props) {
         </label>
       </div>
 
-      <nav className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+      <nav className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-3">
         {hits ? (
           <SearchResults hits={hits} onOpenMatter={props.onOpenMatter} onOpenChat={onSelect} />
         ) : (
@@ -206,7 +206,7 @@ export function Sidebar(props: Props) {
             ) : openMatters.map((m) => (
               <button key={m.id} onClick={() => props.onOpenMatter(m.id)}
                 aria-current={m.id === activeMatterId ? "page" : undefined}
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 max-md:py-2 text-left ${m.id === activeMatterId ? "bg-sheet shadow-sm" : "hover:bg-sheet/70"}`}>
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 max-lg:py-2 text-left ${m.id === activeMatterId ? "bg-sheet shadow-sm" : "hover:bg-sheet/70"}`}>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-ink">{m.client}</span>
                   {m.subject && <span className="block truncate text-xs text-faint">{m.subject}</span>}
@@ -224,7 +224,7 @@ export function Sidebar(props: Props) {
                 <div key={c.id}
                   className={`group flex items-center rounded-lg ${c.id === activeId ? "bg-sheet shadow-sm" : "hover:bg-sheet/70"}`}>
                   <button onClick={() => onSelect(c.id)} aria-current={c.id === activeId ? "page" : undefined}
-                    className="min-w-0 flex-1 truncate px-3 py-1.5 text-left text-sm text-ink max-md:py-2.5">
+                    className="min-w-0 flex-1 truncate px-3 py-1.5 text-left text-sm text-ink max-lg:py-2.5">
                     {c.title}
                   </button>
                   <button onClick={() => onDelete(c.id)} aria-label={t("deleteChat")} title={t("deleteChat")}
@@ -239,7 +239,7 @@ export function Sidebar(props: Props) {
         )}
       </nav>
 
-      <div className="border-t border-rule p-2">
+      <div className="shrink-0 border-t border-rule p-2">
         <button onClick={() => setMenu((m) => !m)} onMouseDown={(e) => e.stopPropagation()}
           aria-label={t("userMenu")} aria-expanded={menu}
           className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-sheet">

@@ -41,12 +41,12 @@ export function AnswerChoices({ items, picks, onPicks, onWithout, onClose }: {
     }
   }
 
-  const step = "flex h-6 w-6 items-center justify-center rounded-md text-faint hover:bg-sheet hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
+  const step = "flex h-8 w-8 items-center md:h-6 md:w-6 justify-center rounded-md text-faint hover:bg-sheet hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
 
   return (
     <section aria-label={t("choicesLabel")} className="rounded-t-2xl border-b border-rule bg-paper/70 px-4 pb-3 pt-2.5">
-      <div className="flex items-center gap-2">
-        <p className="min-w-0 flex-1 text-[14px] font-medium leading-snug text-ink">
+      <div className="flex items-start gap-2">
+        <p className="min-w-0 flex-1 wrap-anywhere text-[14px] font-medium leading-snug text-ink">
           {item?.question}
         </p>
         {many && (
@@ -70,17 +70,17 @@ export function AnswerChoices({ items, picks, onPicks, onWithout, onClose }: {
           const on = picks[item.question] === option;
           return (
             <button key={option} role="radio" aria-checked={on} onClick={() => choose(option)}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[13px] transition-colors ${
+              className={`inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-lg border px-3 py-1 text-left text-[13px] wrap-anywhere transition-colors ${
                 on ? "border-ink bg-ink text-white" : "border-rule bg-sheet text-ink hover:border-faint"
               }`}>
-              {on && <Check size={13} strokeWidth={2.5} />}
-              {option}
+              {on && <Check size={13} strokeWidth={2.5} className="shrink-0" />}
+              <span className="min-w-0">{option}</span>
             </button>
           );
         })}
         {onWithout && (
           <button onClick={onWithout}
-            className="ml-auto h-8 rounded-lg px-2 text-[13px] text-muted underline-offset-2 hover:text-ink hover:underline">
+            className="ml-auto min-h-8 rounded-lg px-2 text-[13px] text-muted underline-offset-2 hover:text-ink hover:underline">
             {t("writeWithoutButton")}
           </button>
         )}

@@ -24,10 +24,10 @@ export function WorkspaceResult({ chatId, messageId, result }: Props) {
   const hasChanges = result.changes.length > 0 || result.edits.some((edit) => edit.changes.length);
   if (!hasChanges && downloads.length === 0) return null;
   return (
-    <div className="space-y-2 text-sm">
+    <div className="space-y-2 text-sm wrap-anywhere">
       {downloads.map((download) => (
         <a key={download.key} href={api.workspaceOutput(chatId, messageId, download.key)}
-          className="block w-fit font-medium text-cite underline decoration-cite/40 underline-offset-2">
+          className="block w-fit max-w-full font-medium text-cite underline decoration-cite/40 underline-offset-2">
           {download.name}
         </a>
       ))}

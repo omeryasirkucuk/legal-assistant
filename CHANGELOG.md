@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 · 2026-11-27
+
+- Adapt sign-in, navigation, chat, calendar, case files, document editing and account panels to phones and tablets. Keep wide answers and file menus within the viewport.
+- Make the administrator invitation form usable on narrow screens.
+
 ## 0.8.0 · 2026-11-27
 
 - Generate unique, single-use registration codes tied to the recipient's email address from the admin panel.

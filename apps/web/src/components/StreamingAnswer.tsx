@@ -73,7 +73,7 @@ export function StreamingAnswer({ pending, onOpenSource }: {
   const number = (key: string) => order.indexOf(key) + 1;
 
   return (
-    <div className="grid gap-x-10 @4xl:grid-cols-[minmax(0,42rem)_15rem]">
+    <div className="grid grid-cols-1 gap-x-10 @4xl:grid-cols-[minmax(0,42rem)_15rem]">
       <div className="min-w-0">
         <AnswerProgress steps={pending.steps} startedAt={pending.startedAt} />
         {pending.plan.length > 0 && (

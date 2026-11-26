@@ -121,7 +121,7 @@ export function SampleLibrary({ types, samples, onChanged }: {
                     {r.state === "reading" ? t("sampleReading") : r.note}
                   </span>
                   {r.state === "similar" && (
-                    <span className="mt-1 flex gap-2">
+                    <span className="mt-1 flex flex-wrap gap-2">
                       <button onClick={() => decide(r, { replace: r.similarId })}
                         className="rounded bg-cite px-2 py-0.5 text-white">{t("sampleReplace")}</button>
                       <button onClick={() => decide(r, { keep: true })}
@@ -141,9 +141,9 @@ export function SampleLibrary({ types, samples, onChanged }: {
           <h4 className="px-2 text-xs font-medium text-muted">{kindName(g.id)} ({g.items.length})</h4>
           <ul className="mt-1 space-y-0.5">
             {g.items.map((s) => (
-              <li key={s.id} className="group flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-paper">
+              <li key={s.id} className="group flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 hover:bg-paper">
                 <FileText size={16} className="shrink-0 text-cite" />
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 flex-1 max-sm:basis-[calc(100%-2rem)]">
                   <span className="block truncate text-sm text-ink">{s.title}</span>
                   <span className="block truncate text-xs text-faint">
                     {s.area === "other" ? t("otherAreaShort") : t(`area_${s.area}` as MessageKey)}
@@ -153,12 +153,12 @@ export function SampleLibrary({ types, samples, onChanged }: {
                 </span>
                 <select value={s.petition_type ?? ""} onChange={(e) => retype(s, e.target.value)}
                   aria-label={t("sampleTypeLabel")}
-                  className="max-w-[9rem] rounded border border-transparent bg-transparent py-0.5 text-xs text-muted hover:border-rule focus-visible:border-cite">
+                  className="max-w-[min(9rem,100%)] rounded border border-transparent bg-transparent py-0.5 text-xs text-muted hover:border-rule focus-visible:border-cite">
                   <option value="">{t("petitionKindUnknown")}</option>
                   {types.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                 </select>
                 <button onClick={() => api.deleteSample(s.id).then(onChanged)}
-                  className="text-xs text-faint opacity-0 hover:text-danger group-hover:opacity-100 focus-visible:opacity-100">
+                  className="text-xs text-faint opacity-0 hover:text-danger group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100">
                   {t("sampleRemove")}
                 </button>
               </li>

@@ -48,7 +48,7 @@ export function UsageMeter({ today, onOpenFiles }: { today: TodayStats | null; o
         <Ring share={share} /> %{Math.round(share * 100)}
       </button>
       {open && (
-        <div className="absolute bottom-full right-0 z-30 mb-2 w-72 rounded-xl border border-rule bg-sheet p-4 text-sm shadow-xl">
+        <div className="absolute bottom-full right-0 z-30 mb-2 max-h-[calc(var(--app-viewport-height)*0.55)] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-y-contain rounded-xl border border-rule bg-sheet p-4 text-sm shadow-xl">
           <p className="font-medium text-ink">{t("usageAnswers", { answers: today.answers })}</p>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper">
             <div className="h-full rounded-full bg-cite" style={{ width: `${Math.min(100, share * 100)}%` }} />

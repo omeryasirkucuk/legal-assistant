@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.8.1 · 2026-11-27
+
+- Rebuild the web client for the mobile layout update. Upgrading from 0.8.0 uses the existing database schema.
+
 ## 0.8.0 · 2026-11-27
 
 - Run `make setup` and `make migrate` before restarting the API and rebuilding the web client. The migration adds the invitation table.

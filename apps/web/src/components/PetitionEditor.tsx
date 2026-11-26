@@ -45,7 +45,7 @@ function Tool({ label, active, disabled, onClick, children }: {
   return (
     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} disabled={disabled}
       aria-label={t(label)} title={t(label)} aria-pressed={active}
-      className={`flex h-8 w-8 items-center justify-center rounded-md pointer-coarse:h-10 pointer-coarse:w-10 disabled:opacity-30 ${
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md pointer-coarse:h-10 pointer-coarse:w-10 disabled:opacity-30 ${
         active ? "bg-ink text-white" : "text-ink hover:bg-paper"}`}>
       {children}
     </button>
@@ -53,7 +53,7 @@ function Tool({ label, active, disabled, onClick, children }: {
 }
 
 function Divider() {
-  return <span className="mx-1 h-5 w-px bg-rule" aria-hidden />;
+  return <span className="mx-1 h-5 w-px shrink-0 bg-rule" aria-hidden />;
 }
 
 function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
@@ -62,13 +62,13 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
   const align = (a: string) => editor.isActive({ textAlign: a });
   return (
     <div role="toolbar" aria-label={t("editorToolbar")}
-      className="flex flex-wrap items-center gap-0.5 border-b border-rule bg-sheet px-3 py-1.5">
+      className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-rule bg-sheet px-2 py-1.5 sm:flex-wrap sm:px-3">
       <Tool label="editorUndo" disabled={disabled || !editor.can().undo()} onClick={() => c().undo().run()}><Undo2 size={16} /></Tool>
       <Tool label="editorRedo" disabled={disabled || !editor.can().redo()} onClick={() => c().redo().run()}><Redo2 size={16} /></Tool>
       <Divider />
       <select value={SIZES.includes(size) ? size : BODY_SIZE} disabled={disabled} aria-label={t("editorSize")} title={t("editorSize")}
         onChange={(e) => (e.target.value === BODY_SIZE ? c().unsetFontSize().run() : c().setFontSize(`${e.target.value}pt`).run())}
-        className="h-8 rounded-md border border-rule bg-sheet px-1.5 text-sm tabular-nums text-ink outline-none focus:border-cite">
+        className="h-8 shrink-0 rounded-md border border-rule bg-sheet px-1.5 text-sm tabular-nums text-ink outline-none focus:border-cite">
         {SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
       <Divider />
@@ -110,7 +110,7 @@ export function PetitionEditor({ doc, disabled = false, onChange, onReady }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Toolbar editor={editor} disabled={disabled} />
-      <div className="min-h-0 flex-1 overflow-y-auto bg-desk px-2 py-3 sm:px-4 sm:py-6">
+      <div className="min-h-32 flex-1 overflow-y-auto overscroll-y-contain bg-desk px-2 py-3 sm:px-4 sm:py-6">
         <EditorContent editor={editor} />
       </div>
     </div>

@@ -43,7 +43,7 @@ export function PeriodPicker({ year, month, onPick }: {
       : current ? "text-cite hover:bg-paper" : "text-ink hover:bg-paper"}`;
 
   const part = (which: Open) =>
-    `rounded-md px-1.5 py-0.5 font-serif text-xl capitalize text-ink hover:bg-sheet ${open === which ? "bg-sheet" : ""}`;
+    `min-h-10 rounded-md px-1.5 py-0.5 font-serif text-xl capitalize text-ink hover:bg-sheet ${open === which ? "bg-sheet" : ""}`;
 
   return (
     <div ref={box} className="relative flex min-w-[10rem] items-baseline">
@@ -53,7 +53,7 @@ export function PeriodPicker({ year, month, onPick }: {
         className={`${part("year")} tabular-nums`}>{year}</button>
 
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-2 w-64 rounded-xl border border-rule bg-sheet p-2 shadow-lg">
+        <div className="absolute left-0 top-full z-20 mt-2 max-h-[45dvh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-y-contain rounded-xl border border-rule bg-sheet p-2 shadow-lg">
           {open === "year" && (
             <div className="mb-1 flex items-center justify-between px-1">
               <button onClick={() => setPage(page - 12)} aria-label={t("calendarEarlierYears")}

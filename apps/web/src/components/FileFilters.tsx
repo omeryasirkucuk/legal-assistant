@@ -26,7 +26,7 @@ export function FileFilters({ files, picks, onChange }: {
   files: StoredFile[]; picks: Picks; onChange: (picks: Picks) => void;
 }) {
   return (
-    <div className="mx-7 mt-4 grid grid-cols-3 gap-2">
+    <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(8.5rem,100%),1fr))] gap-2">
       {FACETS.map(({ facet, label }) => {
         // Counts follow the other choices, so a number always means "this many would show".
         const counts = new Map<string, number>();
@@ -41,7 +41,7 @@ export function FileFilters({ files, picks, onChange }: {
             <span className="mb-1 block text-xs text-muted">{t(label)}</span>
             <span className="relative block">
               <select value={picks[facet]} onChange={(e) => onChange({ ...picks, [facet]: e.target.value })}
-                className={`w-full appearance-none truncate rounded-lg border bg-sheet py-1.5 pl-2.5 pr-7 text-sm outline-none focus-visible:border-cite ${picks[facet] ? "border-cite text-ink" : "border-rule text-muted"}`}>
+                className={`min-h-10 w-full appearance-none truncate rounded-lg border bg-sheet py-1.5 pl-2.5 pr-7 text-sm outline-none focus-visible:border-cite ${picks[facet] ? "border-cite text-ink" : "border-rule text-muted"}`}>
                 <option value="">{t("filterAny")}</option>
                 {options.map(([value, n]) => (
                   <option key={value} value={value}>{valueName(facet, value)} ({n})</option>

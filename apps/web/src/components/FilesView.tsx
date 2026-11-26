@@ -255,13 +255,13 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
         </div>
       )}
 
-      <div className="flex flex-wrap items-end justify-between gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-3 sm:gap-6">
         <div className="max-w-xl">
           <h1 className="font-serif text-[2rem] leading-tight text-ink">{t("myFiles")}</h1>
           <p className="mt-1 text-[15px] leading-relaxed text-muted">{t("filesIntro")}</p>
         </div>
         {usage && (
-          <div className="w-56">
+          <div className="w-full max-w-56">
             <div className="h-1.5 overflow-hidden rounded-full bg-rule">
               <div className="h-full rounded-full bg-verified" style={{ width: `${Math.max(0.5, Math.min(100, share * 100))}%` }} />
             </div>
@@ -278,11 +278,11 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
             const id = d ? d.id : null;
             const last = i === path.length;
             return (
-              <span key={id ?? "top"} className="flex items-center gap-1">
-                {i > 0 && <ChevronRight size={14} className="text-faint" />}
+              <span key={id ?? "top"} className="flex min-w-0 max-w-full items-center gap-1">
+                {i > 0 && <ChevronRight size={14} className="shrink-0 text-faint" />}
                 <button onClick={() => setHere(id)} {...dropTarget((items) => move(items, id))}
                   aria-current={last ? "page" : undefined}
-                  className={`rounded-md px-1.5 py-0.5 ${last ? "font-medium text-ink" : "text-muted hover:bg-sheet hover:text-ink"}`}>
+                  className={`min-w-0 rounded-md px-1.5 py-1 text-left wrap-anywhere ${last ? "font-medium text-ink" : "text-muted hover:bg-sheet hover:text-ink"}`}>
                   {d ? d.name : t("myFiles")}
                 </button>
               </span>
@@ -290,18 +290,18 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
           })}
         </nav>
         <button onClick={newFolder}
-          className="flex items-center gap-1.5 rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-sheet">
+          className="flex items-center gap-1.5 min-h-10 rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-sheet">
           <FolderPlus size={15} /> {t("folderNew")}
         </button>
         <button onClick={() => input.current?.click()}
-          className="flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-sm text-white hover:brightness-110">
+          className="flex items-center gap-1.5 min-h-10 rounded-lg bg-ink px-3 py-1.5 text-sm text-white hover:brightness-110">
           <Upload size={15} /> {uploading ? t("filesAdding", { n: uploading }) : t("filesAdd")}
         </button>
         <input ref={input} type="file" multiple hidden onChange={(e) => { if (e.target.files) add(e.target.files); e.target.value = ""; }} />
         <div role="radiogroup" aria-label={t("filesLayout")} className="ml-auto flex rounded-lg bg-desk p-0.5">
           {([["list", List, "filesAsList"], ["grid", LayoutGrid, "filesAsIcons"]] as const).map(([l, Icon, key]) => (
             <button key={l} role="radio" aria-checked={layout === l} onClick={() => setLayout(l)} aria-label={t(key)} title={t(key)}
-              className={`rounded-md p-1.5 ${layout === l ? "bg-sheet text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
+              className={`rounded-md p-2.5 ${layout === l ? "bg-sheet text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
               <Icon size={16} />
             </button>
           ))}
@@ -309,16 +309,16 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
       </div>
       {notice && <p className="mt-3 text-sm text-danger">{notice}</p>}
 
-      <div role="tablist" className="mt-5 flex gap-1 border-b border-rule">
+      <div role="tablist" className="mt-5 flex flex-wrap gap-1 border-b border-rule">
         {(["all", "upload", "generated"] as Filter[]).map((f) => (
           <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm ${filter === f ? "border-cite text-ink" : "border-transparent text-muted hover:text-ink"}`}>
+            className={`-mb-px min-h-10 border-b-2 px-2 py-2 sm:px-3 text-sm ${filter === f ? "border-cite text-ink" : "border-transparent text-muted hover:text-ink"}`}>
             {t(f === "all" ? "filesAll" : f === "upload" ? "filesUploaded" : "filesGenerated")}
           </button>
         ))}
       </div>
       {files && files.length > 0 && (
-        <div className="-mx-7 max-w-3xl"><FileFilters files={inTab} picks={picks} onChange={setPicks} /></div>
+        <div className="max-w-3xl"><FileFilters files={inTab} picks={picks} onChange={setPicks} /></div>
       )}
       {filtering && <p className="mt-3 text-xs text-faint">{t("filesFilteringAll")}</p>}
 
@@ -344,7 +344,7 @@ export function FilesView({ onOpenChat, onEdit, matters }: {
           {shownFiles.map((f) => <FileRow key={f.id} {...fileProps(f)} />)}
         </ul>
       ) : (
-        <ul className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
+        <ul className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(min(8rem,100%),1fr))] gap-2">
           {shownFolders.map((d) => <FolderTile key={d.id} {...folderProps(d)} />)}
           {shownFiles.map((f) => <FileTile key={f.id} {...fileProps(f)} />)}
         </ul>

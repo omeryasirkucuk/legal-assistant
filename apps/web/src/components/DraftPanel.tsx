@@ -71,14 +71,14 @@ export function DraftPanel({ draft, onClose, onChange, onExpand, page = false }:
   const status = busy ? t("draftWorking") : failed ? t("draftAdjustFailed") : t("draftSelectionHint");
 
   return (
-    <aside className={`flex h-full w-full shrink-0 flex-col bg-paper ${page ? "" : "max-w-2xl border-l border-rule max-xl:fixed max-xl:inset-y-0 max-xl:right-0 max-xl:z-30 max-xl:shadow-2xl"}`}>
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-rule px-3 py-2.5 sm:flex-nowrap sm:px-5 sm:py-3">
+    <aside className={`editor-panel flex w-full flex-col overflow-y-auto bg-paper ${page ? "min-h-0 flex-1" : "h-full max-w-2xl shrink-0 border-l border-rule max-xl:fixed max-xl:top-0 max-xl:right-0 max-xl:h-[var(--app-viewport-height)] max-xl:z-30 max-xl:shadow-2xl"}`}>
+      <header className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-2 border-b border-rule px-3 py-2.5 sm:flex-nowrap sm:px-5 sm:py-3">
         {page && (
-          <button onClick={onClose} aria-label={t("back")} className="rounded-md p-1 text-muted hover:bg-sheet hover:text-ink">
+          <button onClick={onClose} aria-label={t("back")} className="shrink-0 rounded-md p-2 text-muted hover:bg-sheet hover:text-ink">
             <ArrowLeft size={18} />
           </button>
         )}
-        <h2 className="min-w-0 flex-1 truncate font-serif text-lg text-ink max-sm:basis-[calc(100%-3rem)]">{draft.title || t("draft")}</h2>
+        <h2 className="min-w-0 flex-1 truncate font-serif text-lg text-ink max-sm:basis-[calc(100%-3.25rem)]">{draft.title || t("draft")}</h2>
         <span aria-live="polite" className={`flex items-center gap-1.5 text-sm max-sm:order-3 ${autosave.state === "error" ? "text-danger" : "text-faint"}`}>
           {autosave.state === "saving" && <Loader2 size={14} className="animate-spin" />}
           {autosave.state === "saved" && <Check size={14} className="text-verified" />}
@@ -101,12 +101,12 @@ export function DraftPanel({ draft, onClose, onChange, onExpand, page = false }:
           </button>
         )}
         {!page && (
-          <button onClick={onClose} aria-label={t("close")} className="rounded-md p-1 text-faint hover:bg-sheet hover:text-ink pointer-coarse:p-2">
+          <button onClick={onClose} aria-label={t("close")} className="shrink-0 rounded-md p-2 text-faint hover:bg-sheet hover:text-ink">
             <X size={18} />
           </button>
         )}
       </header>
-      <div className="flex flex-wrap items-center gap-2 border-b border-rule px-3 py-2 text-sm sm:px-5">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-rule px-3 py-2 text-sm sm:px-5">
         {ACTIONS.map(([action, label]) => (
           <button key={action} disabled={busy} onClick={() => adjust(action)}
             className="rounded-full border border-rule px-3 py-1 text-ink hover:border-cite hover:text-cite disabled:opacity-50">

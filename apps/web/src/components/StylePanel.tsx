@@ -78,11 +78,11 @@ export function StylePanel({ onClose }: { onClose: () => void }) {
   const prefs = profile?.preferences;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-ink/20"
+    <div className="viewport-overlay fixed inset-0 z-40 flex justify-end bg-ink/20"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <section role="dialog" aria-modal="true" aria-labelledby="style-title"
-        className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-sheet shadow-2xl">
-        <header className="flex items-start justify-between gap-4 px-7 pb-2 pt-7">
+        className="flex h-full w-full max-w-lg flex-col overflow-y-auto overscroll-y-contain bg-sheet shadow-2xl">
+        <header className="flex items-start justify-between gap-3 px-4 pb-2 pt-4 sm:px-7 sm:pt-7">
           <div>
             <h2 id="style-title" className="font-serif text-2xl text-ink">{t("myPetitions")}</h2>
             <p className="mt-2 text-[15px] leading-relaxed text-muted">{t("styleIntro")}</p>
@@ -93,7 +93,7 @@ export function StylePanel({ onClose }: { onClose: () => void }) {
         </header>
 
         {profile && prefs && (
-          <div className="space-y-6 px-7 py-6">
+          <div className="space-y-6 px-4 py-4 sm:px-7 sm:py-6">
             <p className="rounded-lg bg-cite-soft px-4 py-3 text-[15px] leading-relaxed text-ink">
               {t("styleNow", {
                 pages: profile.overall.pages.toLocaleString("tr-TR"),
@@ -109,14 +109,14 @@ export function StylePanel({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        <div className="border-t border-rule px-7 py-6">
+        <div className="border-t border-rule px-4 py-4 sm:px-7 sm:py-6">
           <h3 className="font-serif text-lg text-ink">{t("ownPetitions")}</h3>
           <p className="mt-1 text-sm leading-relaxed text-muted">{t("ownPetitionsHint")}</p>
 
           <SampleLibrary types={types} samples={samples} onChanged={reload} />
         </div>
 
-        <div className="border-t border-rule px-7 py-6">
+        <div className="border-t border-rule px-4 py-4 sm:px-7 sm:py-6">
           <h3 className="font-serif text-lg text-ink">{t("wishes")}</h3>
           <textarea value={wishes} onChange={(e) => { setWishes(e.target.value); setStatus("idle"); }}
             rows={4} placeholder={t("wishesHint")}
@@ -126,21 +126,21 @@ export function StylePanel({ onClose }: { onClose: () => void }) {
             {status === "saved" ? t("saved") : t("saveWishes")}
           </button>
         </div>
-        <div className="border-t border-rule px-7 py-6">
+        <div className="border-t border-rule px-4 py-4 sm:px-7 sm:py-6">
           <h3 className="font-serif text-lg text-ink">{t("learnt")}</h3>
           <p className="mt-1 text-sm leading-relaxed text-muted">{t("learntHint")}</p>
           <ul className="mt-3 space-y-1">
             {learnt.length === 0 && <li className="text-sm text-faint">{t("learntNone")}</li>}
             {learnt.map((m) => (
               <li key={m.id} className="group flex items-start gap-3 rounded-md px-2 py-2 hover:bg-paper">
-                <span className="min-w-0 flex-1 text-sm leading-relaxed text-ink">
+                <span className="min-w-0 flex-1 text-sm leading-relaxed wrap-anywhere text-ink">
                   {m.text}
                   <span className={`ml-2 text-xs ${m.used ? "text-verified" : "text-faint"}`}>
                     {m.used ? t("learntUsed") : t("learntWaiting")}
                   </span>
                 </span>
                 <button onClick={() => api.deleteMemory(m.id).then(reload)}
-                  className="shrink-0 text-xs text-faint opacity-0 hover:text-danger group-hover:opacity-100 focus-visible:opacity-100">
+                  className="shrink-0 text-xs text-faint opacity-0 hover:text-danger group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100">
                   {t("learntRemove")}
                 </button>
               </li>
@@ -148,7 +148,7 @@ export function StylePanel({ onClose }: { onClose: () => void }) {
           </ul>
         </div>
 
-        <div className="border-t border-rule px-7 py-6">
+        <div className="border-t border-rule px-4 py-4 sm:px-7 sm:py-6">
           <button
             onClick={async () => {
               if (reset !== "confirm") return setReset("confirm");

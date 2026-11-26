@@ -25,6 +25,7 @@ import { MatterForm } from "@/components/MatterForm";
 import { MatterView } from "@/components/MatterView";
 import { MobileBar } from "@/components/MobileBar";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useKeyboardViewport } from "@/lib/useKeyboardViewport";
 import type { AskOptions } from "@/lib/stream";
 import {
   api,
@@ -101,7 +102,7 @@ export default function ChatApp() {
   const [draftPage, setDraftPage] = useState(false);   // the draft fills the page instead of the side
   const [today, setToday] = useState<TodayStats | null>(null);
   const visibleChat = useRef<string | null>(null);
-  const bottom = useRef<HTMLDivElement>(null);
+  const workspaceScroll = useRef<HTMLDivElement>(null);
 
   const runs = useChatRuns({
     onTitle: useCallback((id: string, title: string) =>
@@ -134,10 +135,12 @@ export default function ChatApp() {
       .catch((e) => e instanceof ApiError && e.status === 401 && router.replace("/login"));
   }, [router]);
 
+  useKeyboardViewport();
+
   // A chat follows its newest text; the other pages open at their top.
   useEffect(() => {
-    if (view === "chat") bottom.current?.scrollIntoView({ block: "end" });
-    else bottom.current?.closest("main")?.scrollTo({ top: 0 });
+    const scroll = workspaceScroll.current;
+    if (scroll) scroll.scrollTop = view === "chat" ? scroll.scrollHeight : 0;
   }, [view, messages, pending?.question, pending?.lines, pending?.plan]);
 
   const { attach } = runs;
@@ -341,7 +344,7 @@ export default function ChatApp() {
   }} />;
 
   return (
-    <div className="flex h-full">
+    <div className="viewport-height flex">
       <Sidebar
         user={user}
         chats={chats}
@@ -369,19 +372,17 @@ export default function ChatApp() {
         onDrawerClose={closeNav}
       />
 
-      {/* One scrolling area holds the text and, pinned to its bottom, the composer: both use
-          the same column whatever the scrollbar does, and the composer's menus are not cut. */}
       {openDraft && draftPage ? (
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {reminders}
           <DraftPanel key={`page-${openDraft.id}`} draft={openDraft} page onClose={closeDraftPage} onChange={changeDraft} />
         </main>
       ) : (
-      <main className="@container flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <main className="@container flex min-h-0 min-w-0 flex-1 flex-col">
         <MobileBar title={barTitle} onMenu={() => setNavOpen(true)} onNew={newChat} />
-        {reminders}
-        <div className="flex-1">
-          <div className="mx-auto w-full max-w-[64rem] px-4 pb-16 pt-6 sm:px-6 md:pt-10 @4xl:px-12">
+        <div ref={workspaceScroll} data-workspace-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+          {reminders}
+          <div className="mx-auto w-full max-w-[64rem] px-4 pb-6 pt-5 sm:px-6 sm:pb-12 md:pt-10 @4xl:px-12">
             {view === "matter" && matterId && (
               <MatterView key={`${matterId}-${matterVersion}`} matterId={matterId} onOpenChat={openChat}
                 onOpenDraft={openChat} onChanged={refreshMatters} matters={matters} onEventsChanged={remindersChanged}
@@ -398,13 +399,13 @@ export default function ChatApp() {
                 onMove={(m) => moveChat(chatId, m)} />
             )}
             {empty && (
-              <div className="mt-[10vh] max-w-[38rem] md:mt-[18vh]">
+              <div className="mt-[clamp(0rem,7dvh,4rem)] max-w-[38rem] md:mt-[18vh]">
                 <h1 className="font-serif text-3xl text-ink">{t("emptyTitle")}</h1>
                 <p className="mt-3 text-[15px] leading-relaxed text-muted">{t("emptyBody")}</p>
               </div>
             )}
 
-            <div className="space-y-12">
+            <div className="space-y-8 sm:space-y-12">
                 {messages.map((m) =>
                   m.role === "user" ? (
                     <Question key={m.id} text={m.content} attachments={m.meta.attachments} />
@@ -462,34 +463,31 @@ export default function ChatApp() {
                 {t("chatCost", { cost: formatUsd(chatCost) })}
               </p>
             )}
-            <div ref={bottom} className="scroll-mb-48" />
           </div>
         </div>
 
-        {/* Shares the message column's width and left edge; a fade marks where the scrolling
-            text passes under it. */}
+        {/* Keep the composer and its menus outside the message scroller. */}
         {view !== "calendar" && view !== "files" && (
-        <div className="sticky bottom-0 z-10">
-        <div className="mx-auto grid w-full max-w-[64rem] gap-x-10 bg-paper px-3 pb-3 sm:px-6 sm:pb-4 @4xl:grid-cols-[minmax(0,42rem)_15rem] @4xl:px-12">
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-paper to-transparent" />
-            {held && (
-              <MatterSuggest question={held.question} candidates={held.candidates} onWith={(m) => answerHeld(m)} onWithout={() => answerHeld(null)} />
-            )}
-            <Composer
-              followUp={lastAnswer && !pending ? {
-                key: lastAnswer.id, items: lastAnswer.meta.answer?.clarify ?? [],
-                asked: !!lastAnswer.meta.answer?.asked,
-              } : undefined}
-              busy={!!pending && !pending.error}
-              protectedData={user.protected_data}
-              onSubmit={(text, fileIds, power) => ask(text, { fileIds, power })}
-              placeholder={view === "matter" && currentMatter ? t("askInMatter", { client: currentMatter.client }) : undefined}
-              footer={<UsageMeter today={today} onOpenFiles={openFiles} />}
-              onStop={() => chatId && runs.stop(chatId)}
-            />
+        <div className="shrink-0 border-t border-rule/60">
+          <div className="mx-auto grid w-full max-w-[64rem] grid-cols-1 gap-x-10 bg-paper px-3 py-2 sm:px-6 sm:pb-4 @4xl:grid-cols-[minmax(0,42rem)_15rem] @4xl:px-12">
+            <div className="relative">
+              {held && (
+                <MatterSuggest question={held.question} candidates={held.candidates} onWith={(m) => answerHeld(m)} onWithout={() => answerHeld(null)} />
+              )}
+              <Composer
+                followUp={lastAnswer && !pending ? {
+                  key: lastAnswer.id, items: lastAnswer.meta.answer?.clarify ?? [],
+                  asked: !!lastAnswer.meta.answer?.asked,
+                } : undefined}
+                busy={!!pending && !pending.error}
+                protectedData={user.protected_data}
+                onSubmit={(text, fileIds, power) => ask(text, { fileIds, power })}
+                placeholder={view === "matter" && currentMatter ? t("askInMatter", { client: currentMatter.client }) : undefined}
+                footer={<UsageMeter today={today} onOpenFiles={openFiles} />}
+                onStop={() => chatId && runs.stop(chatId)}
+              />
+            </div>
           </div>
-        </div>
         </div>
         )}
       </main>
@@ -528,24 +526,24 @@ function Question({ text, attachments }: { text: string; attachments?: Attachmen
       {attachments && attachments.length > 0 && (
         <ul className="mb-2 flex flex-wrap gap-2">
           {attachments.map((a) => (
-            <li key={a.id}>
+            <li key={a.id} className="min-w-0 max-w-full sm:max-w-[16rem]">
               <a href={api.fileUrl(a.id)} title={a.name}
-                className="flex max-w-[16rem] items-center gap-2 rounded-lg border border-rule bg-sheet px-2 py-1 text-sm text-ink hover:border-faint">
+                className="flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-rule bg-sheet px-2 py-1 text-sm text-ink hover:border-faint">
                 <FileText size={14} className="shrink-0 text-cite" />
-                <span className="truncate">{a.name}</span>
+                <span className="min-w-0 truncate">{a.name}</span>
               </a>
             </li>
           ))}
         </ul>
       )}
-      <p className="whitespace-pre-wrap text-[15px] font-medium leading-relaxed text-ink">{text}</p>
+      <p className="whitespace-pre-wrap wrap-anywhere text-[15px] font-medium leading-relaxed text-ink">{text}</p>
     </div>
   );
 }
 
 function Unanswered({ text, onRetry }: { text: string; onRetry?: () => void }) {
   return (
-    <div className="flex items-center gap-3 text-sm text-danger">
+    <div className="flex flex-wrap items-center gap-3 text-sm text-danger">
       <p>{text}</p>
       {onRetry && (
         <button onClick={onRetry} className="rounded border border-rule px-2 py-1 text-ink hover:bg-paper">

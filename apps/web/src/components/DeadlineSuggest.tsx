@@ -41,10 +41,10 @@ export function DeadlineSuggest({ matterId, messageId, computed, existing, onAdd
         const done = added(o.label, o.due);
         return (
           <button key={`${o.label}${o.due}`} disabled={done || busy !== null} onClick={() => add(o.label, o.due)}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${
+            className={`flex min-w-0 max-w-full flex-wrap items-center gap-2 rounded-lg text-left wrap-anywhere border px-3 py-1.5 text-sm ${
               done ? "border-verified/40 bg-verified-soft text-verified" : "border-rule bg-sheet text-ink hover:border-cite hover:text-cite"}`}>
             {done ? <Check size={14} /> : <CalendarPlus size={14} />}
-            <span>{done ? t("deadlineAdded") : t("deadlineAddToMatter")}: {o.label}, {formatDay(o.due)}</span>
+            <span className="min-w-0">{done ? t("deadlineAdded") : t("deadlineAddToMatter")}: {o.label}, {formatDay(o.due)}</span>
             {o.note && <span className="text-xs text-faint">({o.note})</span>}
           </button>
         );
