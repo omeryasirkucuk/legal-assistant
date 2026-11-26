@@ -1,23 +1,16 @@
-"""The lawyer's calendar as a source: the deadlines they recorded in their cases, read when a
-question is about them ("what is due this week?", "when is the next deadline here?").
-
-It is given to the writer as a cited source like a calculation, so dates and case names in
-the answer are checked against it, and the lawyer can open the list the answer came from.
-In a case's chat only that case's deadlines are given, done ones too, so an answer there
-does not bring in another case's deadline; elsewhere, the open deadlines of open cases.
-"""
+"""Saved deadlines and events as a cited source for calendar questions."""
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from legal_api.agent.sources import Source
-from legal_api.db.matter_models import Matter, MatterDeadline
+from legal_api.db.matter_models import ISTANBUL, CalendarEvent, Matter, MatterDeadline
 from legal_api.grounding.evidence import EvidenceLedger
 from legal_api.locale import calculation_terms, matter_terms
 
@@ -54,8 +47,24 @@ def _listing(lines: list[str]) -> list[str]:
         count=len(lines) - MAX_LINES)]
 
 
+def _event_line(event: CalendarEvent, matter: Matter | None) -> str:
+    t = matter_terms()["agenda"]
+    day = event.due.strftime("%d.%m.%Y")
+    weekday = calculation_terms()["weekdays"][event.due.weekday()]
+    time = event.start_time.strftime("%H:%M") if event.start_time else t["all_day"]
+    if event.end_time:
+        time += "–" + event.end_time.strftime("%H:%M")
+    parts = [f"{day} {weekday} {time}", t["kinds"][event.kind], event.label]
+    if matter is not None:
+        parts.append(matter.client + (f", {matter.case_no}" if matter.case_no else ""))
+    if event.done:
+        parts.append(t["done"])
+    return " · ".join(parts)
+
+
 def render(rows: list[tuple[MatterDeadline, Matter]], today: date,
-           matter: Matter | None = None) -> str:
+           matter: Matter | None = None,
+           events: list[tuple[CalendarEvent, Matter | None]] | None = None) -> str:
     """`rows`: deadlines with their cases, by date; `matter`: the case the chat is in."""
     t = matter_terms()["agenda"]
     weekday = calculation_terms()["weekdays"][today.weekday()]
@@ -67,6 +76,11 @@ def render(rows: list[tuple[MatterDeadline, Matter]], today: date,
     else:
         open_ = [_line(d, m, today) for d, m in rows if not d.done]
         out += [t["open"], *(_listing(open_) or [t["none"]])]
+    if events is not None:
+        lines = [_event_line(event, linked if matter is None else None)
+                 for event, linked in events
+                 if (not event.done if matter is None else event.matter_id == matter.id)]
+        out += ["", t["events"], *(_listing(lines) or [t["none_events"]])]
     return "\n".join(out).strip()
 
 
@@ -98,8 +112,18 @@ class Agenda:
 async def agenda(db: AsyncSession, user_id: uuid.UUID, matter: Matter | None = None,
                  today: date | None = None) -> Agenda:
     rows = await load(db, user_id, matter.id if matter else None)
+    events = (select(CalendarEvent, Matter).outerjoin(
+        Matter, (Matter.id == CalendarEvent.matter_id) & (Matter.user_id == user_id))
+        .where(CalendarEvent.user_id == user_id)
+        .order_by(CalendarEvent.due, CalendarEvent.start_time.nulls_first(), CalendarEvent.id))
+    if matter is not None:
+        events = events.where(CalendarEvent.matter_id == matter.id)
+    else:
+        events = events.where(CalendarEvent.done.is_(False))
+    event_rows = [(event, linked) for event, linked in (await db.execute(events)).all()]
     t = matter_terms()["agenda"]
     citation = (t["citation_matter"].format(client=matter.client) if matter is not None
                 else t["citation"])
-    return Agenda(render(rows, today or date.today(), matter), citation,
+    return Agenda(render(rows, today or datetime.now(ISTANBUL).date(),
+                         matter, event_rows), citation,
                   f"agenda:{matter.id if matter else 'all'}")

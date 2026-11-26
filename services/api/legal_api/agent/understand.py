@@ -131,7 +131,7 @@ class Understanding:
     case_kind: str = "other"                              # for drafting: drafting.cases id
     area: str = "other"                                   # area of law (sample_profile.AREAS)
     write_now: bool = False             # the lawyer asked for the petition without questions
-    calendar: bool = False              # about the deadlines the lawyer recorded (matters/agenda.py)
+    calendar: bool = False              # about the lawyer’s saved calendar (matters/agenda.py)
     gap_trace: dict = field(default_factory=dict)   # how the ask-or-write decision was made
     requests: list[str] = field(default_factory=list)   # a petition's requests, settled first
     deadlines: list[dict] = field(default_factory=list)  # periods to compute (calc/sources.py)

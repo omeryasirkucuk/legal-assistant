@@ -66,33 +66,39 @@ function stepText(s: NoticeStep, law: string): string {
   }
 }
 
-function useBranch(matterId: string): [Branch, (b: Branch) => void] {
+function useBranch(matterId: string, initial?: Branch | ""): [Branch, (b: Branch) => void] {
   const key = `deadlineBranch:${matterId}`;
-  const [branch, setBranch] = useState<Branch>("civil");
+  const [branch, setBranch] = useState<Branch>(initial || "civil");
   useEffect(() => {
+    if (initial) return;
     try {
       const saved = localStorage.getItem(key) as Branch | null;
       if (saved && BRANCHES.some(([b]) => b === saved)) setBranch(saved);
     } catch {}
-  }, [key]);
+  }, [key, initial]);
   return [branch, (b) => {
     setBranch(b);
     try { localStorage.setItem(key, b); } catch {}
   }];
 }
 
-export function DeadlineForm({ matterId, onSaved, onCancel }: {
-  matterId: string; onSaved: () => void; onCancel: () => void;
+export function DeadlineForm({ matterId, initial, onSaved, onCancel }: {
+  matterId: string;
+  initial?: { label: string; due: string; branch: Branch | "" };
+  onSaved: (day: string) => void;
+  onCancel: () => void;
 }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
   const [mode, setMode] = useState<Mode>("notice");
-  const [label, setLabel] = useState("");
+  const [label, setLabel] = useState(initial?.label ?? "");
   const [received, setReceived] = useState(todayIso());
   const [service, setService] = useState<Service>("electronic");
   const [amount, setAmount] = useState("");
   const [unit, setUnit] = useState<PeriodUnit>("week");
-  const [branch, setBranch] = useBranch(matterId);
-  const [due, setDue] = useState("");
-  const [result, setResult] = useState<NoticeResult | null>(null);
+  const [branch, setBranch] = useBranch(matterId, initial?.branch);
+  const [due, setDue] = useState(initial?.due ?? "");
+  const [computed, setComputed] = useState<{ key: string; result: NoticeResult } | null>(null);
   const [presets, setPresets] = useState<DeadlinePreset[]>([]);
   const [preset, setPreset] = useState<DeadlinePreset | null>(null);
   useEffect(() => { api.deadlinePresets().then(setPresets).catch(() => {}); }, []);
@@ -102,7 +108,7 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
   }, [preset, amount, unit]);
 
   function pick(i: string) {
-    const p = presets[Number(i)];
+    const p = i === "" ? null : presets[Number(i)];
     setPreset(p ?? null);
     if (!p) return;
     setLabel(p.label);
@@ -115,25 +121,35 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
   const n = Number(amount);
   const bump = (by: number) => setAmount(String(Math.max(1, (Number.isInteger(n) ? n : 0) + by)));
   const complete = mode === "notice" ? !!received && n >= 1 && Number.isInteger(n) : !!due;
+  const calculationKey = `${received}:${service}:${n}:${unit}:${branch}`;
+  const result = computed?.key === calculationKey ? computed.result : null;
 
   useEffect(() => {
     if (mode !== "notice" || !received || !(n >= 1) || !Number.isInteger(n)) {
-      setResult(null);
+      setComputed(null);
       return;
     }
     let live = true;
     api.calculateDeadline({ received, service, amount: n, unit, branch })
-      .then((r) => { if (live) setResult(r); })
-      .catch(() => { if (live) setResult(null); });
+      .then((result) => { if (live) setComputed({ key: calculationKey, result }); })
+      .catch(() => { if (live) setComputed(null); });
     return () => { live = false; };
-  }, [mode, received, service, n, unit, branch]);
+  }, [mode, received, service, n, unit, branch, calculationKey]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     const day = mode === "notice" ? result?.due : due;
-    if (!label.trim() || !day) return;
-    await api.addDeadline(matterId, label.trim(), day, undefined, branch);
-    onSaved();
+    if (!label.trim() || !day || saving) return;
+    setSaving(true);
+    setError(false);
+    try {
+      await api.addDeadline(matterId, label.trim(), day, undefined, branch);
+      onSaved(day);
+    } catch {
+      setError(true);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const notes = result ? [
@@ -263,9 +279,10 @@ export function DeadlineForm({ matterId, onSaved, onCancel }: {
         </>
       )}
 
+      {error && <p role="alert" className="text-sm text-danger">{t("calendarSaveError")}</p>}
       <div className="flex items-center justify-end gap-3 pt-1">
         <button type="button" onClick={onCancel} className="px-2 py-2 text-sm text-muted hover:text-ink">{t("cancel")}</button>
-        <button type="submit" disabled={!label.trim() || !complete || (mode === "notice" && !result)}
+        <button type="submit" disabled={saving || !label.trim() || !complete || (mode === "notice" && !result)}
           className="rounded-lg bg-ink px-5 py-2 text-sm text-white disabled:opacity-40">{t("add")}</button>
       </div>
     </form>

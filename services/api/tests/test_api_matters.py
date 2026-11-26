@@ -122,3 +122,84 @@ async def test_search_finds_files_and_what_is_in_their_documents(client):
     assert f["mark"] in by_text["documents"][0]["snippet"]
     none = (await client.get("/matters/search", params={"q": f["query_none"]})).json()
     assert none == {"matters": [], "documents": []}
+
+
+async def test_calendar_events_keep_case_links_and_reminder_state(client):
+    from datetime import UTC, datetime
+
+    matter = (await client.post("/matters", json={"client": "Duruşma dosyası"})).json()
+    future = (datetime.now(UTC).date() + timedelta(days=20)).isoformat()
+    hearing = {"kind": "hearing", "label": " Ön inceleme ", "due": future,
+               "matter_id": matter["id"], "start_time": "14:15", "end_time": "15:00",
+               "location": "Salon 3", "reminder_minutes": 30}
+    r = await client.post("/calendar/events", json=hearing)
+    assert r.status_code == 201, r.text
+    event = r.json()
+    assert event["label"] == "Ön inceleme"
+    assert event["remind_at"] == f"{future}T10:45:00Z"
+    assert (await client.get(f"/matters/{matter['id']}")).json()["events"] == [event]
+    ics = await client.get(f"/calendar/events/{event['id']}/ics")
+    assert ics.status_code == 200
+    assert ics.headers["content-type"].startswith("text/calendar")
+    day_stamp = future.replace("-", "")
+    assert f"DTSTART:{day_stamp}T111500Z\r\n" in ics.text
+    assert f"DTEND:{day_stamp}T120000Z\r\n" in ics.text
+    assert f"TRIGGER;VALUE=DATE-TIME:{day_stamp}T104500Z\r\n" in ics.text
+    assert (await client.get("/calendar/reminders")).json() == []
+    prefix = "/calendar/events"
+    event_url = f"{prefix}/{event['id']}"
+    invalid = await client.put(event_url, json={**hearing, "end_time": "13:00"})
+    assert invalid.status_code == 422
+    assert (await client.post(prefix, json={**hearing, "label": "  "})).status_code == 422
+    assert (await client.post(prefix, json={**hearing, "start_time": "14:15+03:00"})).status_code == 422
+
+    day = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+    fields = {"kind": "reminder", "label": "Avukatı ara", "due": day, "reminder_minutes": 0}
+    personal = (await client.post(prefix, json=fields)).json()
+    assert personal["remind_at"] == f"{day}T06:00:00Z"
+    assert personal["matter_id"] is None
+    personal_url = f"{prefix}/{personal['id']}"
+    assert [row["id"] for row in (await client.get("/calendar/reminders")).json()] == [personal["id"]]
+
+    done = (await client.patch(personal_url, json={"done": True})).json()
+    assert done["done"] and (await client.get("/calendar/reminders")).json() == []
+    await client.patch(personal_url, json={"done": False})
+    dismissed = (await client.patch(personal_url, json={"dismiss_reminder_at": personal["remind_at"]})).json()
+    assert dismissed["reminder_dismissed"] and (await client.get("/calendar/reminders")).json() == []
+    renamed = (await client.put(personal_url, json={**fields, "label": "Deniz’i ara"})).json()
+    assert renamed["reminder_dismissed"]
+    rescheduled = (await client.put(personal_url, json={**fields, "start_time": "10:00"})).json()
+    assert not rescheduled["reminder_dismissed"]
+    stale = await client.patch(personal_url, json={"dismiss_reminder_at": personal["remind_at"]})
+    assert not stale.json()["reminder_dismissed"]
+    assert (await client.get("/calendar/reminders")).json()[0]["remind_at"] == f"{day}T07:00:00Z"
+
+    assert (await client.delete(personal_url)).status_code == 204
+    assert (await client.delete(f"/matters/{matter['id']}")).status_code == 204
+    items = (await client.get(prefix)).json()
+    assert len(items) == 1 and items[0]["id"] == event["id"] and items[0]["matter_id"] is None
+
+
+async def test_calendar_events_and_links_are_private(client):
+    matter = (await client.post("/matters", json={"client": "Private"})).json()
+    body = {"kind": "reminder", "label": "Private reminder", "due": "2026-11-23"}
+    event = (await client.post("/calendar/events", json=body)).json()
+    email = f"calendar-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        async with AsyncClient(transport=ASGITransport(app=create_app()), base_url="http://test") as other:
+            r = await other.post("/auth/register", json={"email": email, "password": "secret-pass",
+                                                         "name": "Other", "invite_code": "test-invite"})
+            assert r.status_code == 201
+            assert (await other.get("/calendar/events")).json() == []
+            assert (await other.get("/calendar/reminders")).json() == []
+            assert (await other.post("/calendar/events", json={**body, "matter_id": matter["id"]})).status_code == 404
+            url = f"/calendar/events/{event['id']}"
+            assert (await other.get(f"{url}/ics")).status_code == 404
+            assert (await other.put(url, json=body)).status_code == 404
+            assert (await other.patch(url, json={"done": True})).status_code == 404
+            assert (await other.delete(url)).status_code == 404
+    finally:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            await conn.execute(text("DELETE FROM users WHERE email = :e"), {"e": email})
+        await engine.dispose()

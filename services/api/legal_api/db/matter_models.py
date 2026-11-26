@@ -4,9 +4,10 @@ and petitions, carries the facts every answer in it should know, and keeps its d
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -52,3 +53,27 @@ class MatterDeadline(Base):
     message_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("messages.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+ISTANBUL = ZoneInfo("Europe/Istanbul")
+
+
+class CalendarEvent(Base):
+    __tablename__ = "calendar_events"
+    __table_args__ = (Index("ix_calendar_events_user_due", "user_id", "due"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    matter_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("matters.id", ondelete="SET NULL"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    label: Mapped[str] = mapped_column(String(200))
+    due: Mapped[date] = mapped_column(Date)
+    start_time: Mapped[time | None] = mapped_column(Time)
+    end_time: Mapped[time | None] = mapped_column(Time)
+    location: Mapped[str] = mapped_column(String(300), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    reminder_minutes: Mapped[int | None] = mapped_column(Integer)
+    remind_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reminder_dismissed: Mapped[bool] = mapped_column(Boolean, default=False)

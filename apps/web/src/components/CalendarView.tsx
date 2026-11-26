@@ -1,201 +1,267 @@
 "use client";
 
-// Every open file's deadlines: as a month (the default, a wall calendar with holidays and the
-// judicial recess) or as a list by when they fall: missed, this week, next week, later.
-import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
-import { DeadlineActions } from "@/components/DeadlineActions";
-import { branchName } from "@/components/DeadlineForm";
-import { daysLeftText } from "@/components/DeadlinePanel";
+import { useEffect, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { CalendarEditor } from "@/components/CalendarEditor";
+import { CalendarRow } from "@/components/CalendarRow";
 import { MonthGrid, monthDays } from "@/components/MonthGrid";
 import { PeriodPicker } from "@/components/PeriodPicker";
-import { api, type CalendarItem, type CalendarYear } from "@/lib/api";
-import { daysUntil, parseDay, urgency } from "@/lib/dates";
+import { api, type CalendarYear, type Matter } from "@/lib/api";
+import { type CalendarItem, type CalendarKind, calendarToday, kindColor, kindOptions, kinds, sortCalendar } from "@/lib/calendar";
+import { daysUntil, formatDay, parseDay } from "@/lib/dates";
 import { t, type MessageKey } from "@/lib/i18n";
 
-type Bucket = "overdue" | "thisWeek" | "nextWeek" | "later";
-const BUCKETS: Array<[Bucket, MessageKey]> = [
+type Mode = "month" | "list";
+type Bucket = "overdue" | "past" | "thisWeek" | "nextWeek" | "later" | "done";
+const buckets: Array<[Bucket, MessageKey]> = [
   ["overdue", "calendarOverdue"], ["thisWeek", "calendarThisWeek"],
   ["nextWeek", "calendarNextWeek"], ["later", "calendarLater"],
+  ["past", "calendarPast"], ["done", "calendarDone"],
 ];
 
-function bucketOf(iso: string): Bucket {
-  const days = daysUntil(iso);
-  if (days < 0) return "overdue";
-  const now = new Date();
-  const toSunday = (7 - ((now.getDay() + 6) % 7)) - 1;     // days left in this week (Mon-Sun)
+function bucketOf(item: CalendarItem, now: Date): Bucket {
+  if (item.done) return "done";
+  const days = daysUntil(item.due, now);
+  if (days < 0) return item.kind === "deadline" || item.kind === "reminder" ? "overdue" : "past";
+  const toSunday = 6 - (now.getDay() + 6) % 7;
   return days <= toSunday ? "thisWeek" : days <= toSunday + 7 ? "nextWeek" : "later";
 }
 
-type Mode = "month" | "list";
+const control = "min-w-0 rounded-lg border border-rule bg-sheet px-2.5 py-2 text-sm text-ink focus:border-cite";
 
-function useMode(): [Mode, (m: Mode) => void] {
-  const [mode, setMode] = useState<Mode>("month");
-  useEffect(() => {
-    try {
-      if (localStorage.getItem("calendarMode") === "list") setMode("list");
-    } catch {}
-  }, []);
-  return [mode, (m) => {
-    setMode(m);
-    try {
-      localStorage.setItem("calendarMode", m);
-    } catch {}
-  }];
-}
-
-export function CalendarView({ onOpenMatter }: { onOpenMatter: (id: string) => void }) {
+export function CalendarView({ matters, reminderId, onReminderOpened, onOpenMatter, onChanged }: {
+  matters: Matter[];
+  reminderId: string | null;
+  onReminderOpened: () => void;
+  onOpenMatter: (id: string) => void;
+  onChanged: (kind: CalendarKind) => void;
+}) {
   const [items, setItems] = useState<CalendarItem[] | null>(null);
-  const [mode, setMode] = useMode();
-  const now = new Date();
+  const [loadError, setLoadError] = useState(false);
+  const [version, setVersion] = useState(0);
+  const [mode, setMode] = useState<Mode>("month");
+  const today = calendarToday();
+  const now = parseDay(today);
   const [shown, setShown] = useState({ year: now.getFullYear(), month: now.getMonth() });
+  const [selected, setSelected] = useState(today);
   const [calendars, setCalendars] = useState<Record<number, CalendarYear>>({});
-  const load = useCallback(() => api.calendar().then(setItems).catch(() => setItems([])), []);
-  useEffect(() => { load(); }, [load]);
+  const [failedYears, setFailedYears] = useState<number[]>([]);
+  const [editor, setEditor] = useState<{ day: string; item?: CalendarItem } | null>(null);
+  const [kind, setKind] = useState<CalendarKind | "all">("all");
+  const [status, setStatus] = useState("all");
+  const [matterId, setMatterId] = useState("");
+  const [query, setQuery] = useState("");
 
-  // The holidays of every year the shown month's grid touches.
+  useEffect(() => {
+    try { if (localStorage.getItem("calendarMode") === "list") setMode("list"); } catch {}
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    Promise.all([api.calendar(), api.calendarEvents()])
+      .then(([deadlines, events]) => {
+        if (!live) return;
+        const rows: CalendarItem[] = [...deadlines.map((item) => ({ ...item, kind: "deadline" as const })), ...events];
+        setItems(rows.sort(sortCalendar));
+        setLoadError(false);
+      })
+      .catch(() => { if (live) setLoadError(true); });
+    return () => { live = false; };
+  }, [version]);
+
   useEffect(() => {
     const days = monthDays(shown.year, shown.month);
-    const years = [...new Set([days[0].getFullYear(), days[days.length - 1].getFullYear()])];
-    for (const y of years) {
-      if (calendars[y]) continue;
-      api.holidays(y).then((c) => setCalendars((all) => ({ ...all, [y]: c }))).catch(() => {});
+    const years = [...new Set([days[0].getFullYear(), days[days.length - 1].getFullYear()])]
+      .filter((year) => !calendars[year] && !failedYears.includes(year));
+    if (!years.length) return;
+    let live = true;
+    Promise.allSettled(years.map(api.holidays)).then((results) => {
+      if (!live) return;
+      const loaded = results.flatMap((result) => result.status === "fulfilled" ? [[result.value.year, result.value]] : []);
+      setCalendars((current) => ({ ...current, ...Object.fromEntries(loaded) }));
+      setFailedYears((current) => [...current, ...years.filter((_, i) => results[i].status === "rejected")]);
+    });
+    return () => { live = false; };
+  }, [shown, calendars, failedYears]);
+
+  useEffect(() => {
+    if (!reminderId || !items) return;
+    const item = items.find((row) => row.kind !== "deadline" && row.id === reminderId);
+    if (item) {
+      const date = parseDay(item.due);
+      setShown({ year: date.getFullYear(), month: date.getMonth() });
+      setSelected(item.due);
+      setEditor({ day: item.due, item });
     }
-  }, [shown, calendars]);
+    onReminderOpened();
+  }, [items, reminderId, onReminderOpened]);
 
-  const step = (by: number) => setShown(({ year, month }) => {
-    const d = new Date(year, month + by, 1);
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
-  const title = new Date(shown.year, shown.month, 1).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
-  const isThisMonth = shown.year === now.getFullYear() && shown.month === now.getMonth();
-
-  const [asking, setAsking] = useState<string | null>(null);
-
-  async function toggle(d: CalendarItem) {
-    setAsking(null);
-    await api.editDeadline(d.id, { done: !d.done });
-    load();
+  function selectDay(day: string) {
+    const date = parseDay(day);
+    if (date.getFullYear() !== shown.year || date.getMonth() !== shown.month) {
+      setShown({ year: date.getFullYear(), month: date.getMonth() });
+    }
+    setSelected(day);
   }
 
-  async function remove(d: CalendarItem) {
-    setAsking(null);
-    await api.deleteDeadline(d.id);
-    load();
+  function pickMonth(year: number, month: number) {
+    selectDay(year === now.getFullYear() && month === now.getMonth() ? today
+      : `${year}-${String(month + 1).padStart(2, "0")}-01`);
   }
 
-  const open = (items ?? []).filter((d) => !d.done);
-  const done = (items ?? []).filter((d) => d.done);
+  function step(by: number) {
+    const date = new Date(shown.year, shown.month + by, 1);
+    pickMonth(date.getFullYear(), date.getMonth());
+  }
+
+  const matterById = new Map(matters.map((matter) => [matter.id, matter]));
+  function matterName(item: CalendarItem) {
+    const matter = item.matter_id ? matterById.get(item.matter_id) : null;
+    if (matter) return [matter.client, matter.subject, matter.case_no].filter(Boolean).join(" · ");
+    return item.kind === "deadline" ? [item.client, item.subject].filter(Boolean).join(" · ")
+      : item.matter_id ? t("calendarLinkedMatter") : t("calendarPersonal");
+  }
+
+  const term = query.trim().toLocaleLowerCase("tr");
+  const visible = (items ?? []).filter((item) =>
+    (kind === "all" || item.kind === kind)
+    && (status === "all" || item.done === (status === "done"))
+    && (!matterId || (matterId === "personal" ? !item.matter_id : item.matter_id === matterId))
+    && (!term || [item.label, matterName(item), t(kinds[item.kind]), ...(item.kind === "deadline" ? [] : [item.notes, item.location])]
+      .some((value) => value.toLocaleLowerCase("tr").includes(term)))
+  );
+  const selectedItems = visible.filter((item) => item.due === selected);
+  const daysCalendar = calendars[parseDay(selected).getFullYear()];
+  const holiday = daysCalendar?.holidays.find((h) => h.day === selected);
+  const inRecess = daysCalendar && selected >= daysCalendar.recess_start && selected <= daysCalendar.recess_end;
+  const editItem = (item: CalendarItem) => setEditor({ day: item.due, item });
+  const addItem = () => setEditor({ day: mode === "month" ? selected : today });
+  const row = (item: CalendarItem, showDate = false) => (
+    <CalendarRow key={`${item.kind}-${item.id}`} item={item} matter={matterName(item)} showDate={showDate} onEdit={() => editItem(item)} />
+  );
 
   return (
     <div className="pb-12">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-serif text-[2rem] leading-tight text-ink">{t("calendar")}</h1>
           <p className="mt-1 text-[15px] text-muted">{t("calendarIntro")}</p>
         </div>
-        <div role="radiogroup" aria-label={t("calendarMode")} className="flex rounded-lg bg-desk p-0.5 text-sm">
-          {(["month", "list"] as Mode[]).map((m) => (
-            <button key={m} role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
-              className={`rounded-md px-3 py-1 ${mode === m ? "bg-sheet font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
-              {t(m === "month" ? "calendarMonth" : "calendarList")}
+        <button type="button" onClick={addItem} className="inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white">
+          <Plus size={17} /> {t("calendarAdd")}
+        </button>
+      </header>
+
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-40 flex-1">
+          <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
+          <input type="search" value={query} onChange={(e) => {
+            setQuery(e.target.value);
+            if (e.target.value.trim()) setMode("list");
+          }} aria-label={t("calendarSearch")}
+            placeholder={t("calendarSearch")} className={`w-full pl-8 ${control}`} />
+        </div>
+        <select className={control} aria-label={t("calendarType")} value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
+          <option value="all">{t("calendarAllTypes")}</option>
+          {kindOptions.map((value) => <option key={value} value={value}>{t(kinds[value])}</option>)}
+        </select>
+        <select className={`max-w-48 ${control}`} aria-label={t("calendarMatter")} value={matterId} onChange={(e) => setMatterId(e.target.value)}>
+          <option value="">{t("calendarAllMatters")}</option>
+          <option value="personal">{t("calendarPersonal")}</option>
+          {matters.map((matter) => <option key={matter.id} value={matter.id}>{[matter.client, matter.subject, matter.case_no].filter(Boolean).join(" · ")}</option>)}
+        </select>
+        <select className={control} aria-label={t("calendarStatus")} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="all">{t("calendarAllStatuses")}</option>
+          <option value="open">{t("calendarOpen")}</option>
+          <option value="done">{t("calendarDone")}</option>
+        </select>
+        <div role="group" aria-label={t("calendarMode")} className="ml-auto flex rounded-lg bg-desk p-0.5 text-sm">
+          {(["month", "list"] as Mode[]).map((value) => (
+            <button type="button" key={value} aria-pressed={mode === value} onClick={() => {
+              setMode(value);
+              try { localStorage.setItem("calendarMode", value); } catch {}
+            }} className={`rounded-md px-3 py-1.5 ${mode === value ? "bg-sheet font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
+              {t(value === "month" ? "calendarMonth" : "calendarList")}
             </button>
           ))}
         </div>
       </div>
 
+      {loadError && <p role="alert" className="mt-4 text-sm text-danger">
+        {t("calendarLoadError")} <button type="button" className="underline" onClick={() => setVersion((v) => v + 1)}>{t("calendarRetry")}</button>
+      </p>}
+      {!items && !loadError && <p role="status" className="mt-4 text-sm text-muted">{t("loading")}</p>}
+
       {mode === "month" && (
-        <div className="mt-6 sm:mt-8">
+        <div className="mt-5">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <h2 className="sr-only">{title}</h2>
-            <PeriodPicker year={shown.year} month={shown.month} onPick={(year, month) => setShown({ year, month })} />
-            <button onClick={() => step(-1)} aria-label={t("calendarPrev")}
-              className="rounded-md p-1.5 text-muted hover:bg-sheet hover:text-ink"><ChevronLeft size={17} /></button>
-            <button onClick={() => step(1)} aria-label={t("calendarNext")}
-              className="rounded-md p-1.5 text-muted hover:bg-sheet hover:text-ink"><ChevronRight size={17} /></button>
-            {!isThisMonth && (
-              <button onClick={() => setShown({ year: now.getFullYear(), month: now.getMonth() })}
-                className="ml-1 rounded-md border border-rule px-2.5 py-1 text-sm text-ink hover:bg-sheet">{t("calendarToday")}</button>
-            )}
-            {calendars[shown.year] && !calendars[shown.year].covered && (
+            <PeriodPicker year={shown.year} month={shown.month} onPick={pickMonth} />
+            <button type="button" onClick={() => step(-1)} aria-label={t("calendarPrev")}
+              className="rounded-md p-2 text-muted hover:bg-sheet hover:text-ink"><ChevronLeft size={17} /></button>
+            <button type="button" onClick={() => step(1)} aria-label={t("calendarNext")}
+              className="rounded-md p-2 text-muted hover:bg-sheet hover:text-ink"><ChevronRight size={17} /></button>
+            <button type="button" onClick={() => selectDay(today)} className="rounded-md border border-rule px-2.5 py-1 text-sm text-ink hover:bg-sheet">
+              {t("calendarToday")}
+            </button>
+            {failedYears.includes(shown.year) ? (
+              <button type="button" className="text-xs text-caution underline sm:ml-auto" onClick={() => setFailedYears([])}>{t("calendarHolidayRetry")}</button>
+            ) : calendars[shown.year] && !calendars[shown.year].covered && (
               <span className="text-xs text-caution sm:ml-auto">{t("calendarNotCovered", { year: shown.year })}</span>
             )}
           </div>
-          <MonthGrid year={shown.year} month={shown.month} items={items ?? []} calendars={calendars}
-            onOpenMatter={onOpenMatter} />
+          <MonthGrid year={shown.year} month={shown.month} items={visible} calendars={calendars}
+            today={today} selected={selected} onSelect={selectDay} onEdit={editItem} />
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+            {kindOptions.map((value) => <span key={value} className="flex items-center gap-1.5">
+              <span aria-hidden className={`h-2 w-2 rounded-full border ${kindColor[value]}`} />{t(kinds[value])}
+            </span>)}
+          </div>
+
+          <section className="mt-6 rounded-xl border border-rule bg-sheet px-3 py-2 sm:px-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule py-2">
+              <h2 className="flex items-center gap-2 font-serif text-lg text-ink"><CalendarDays size={17} />{formatDay(selected, "long")}</h2>
+              <button type="button" onClick={addItem} className="inline-flex items-center gap-1 rounded px-2 py-1 text-sm text-cite hover:bg-cite-soft">
+                <Plus size={15} /> {t("calendarAddOnDay")}
+              </button>
+            </div>
+            {(holiday || inRecess) && <div className="flex flex-wrap gap-2 border-b border-rule py-2 text-xs text-caution">
+              {holiday && <span>{holiday.half ? t("halfDay", { name: holiday.name }) : holiday.name}</span>}
+              {inRecess && <span className="text-cite">{t("judicialRecess")}</span>}
+            </div>}
+            {items && (selectedItems.length > 0
+              ? <ul className="divide-y divide-rule py-1">{selectedItems.map((item) => row(item))}</ul>
+              : <p className="px-2 py-4 text-sm text-muted">{t("calendarDayEmpty")}</p>)}
+          </section>
         </div>
       )}
 
-      {mode === "list" && items && open.length === 0 && (
-        <p className="mt-10 text-sm text-faint">{t("calendarEmpty")}</p>
-      )}
-
-      {mode === "list" && BUCKETS.map(([bucket, heading]) => {
-        const list = open.filter((d) => bucketOf(d.due) === bucket);
+      {mode === "list" && items && visible.length === 0 && <p className="mt-8 text-sm text-muted">{t("calendarEmpty")}</p>}
+      {mode === "list" && buckets.map(([bucket, heading]) => {
+        const list = visible.filter((item) => bucketOf(item, now) === bucket);
         if (!list.length) return null;
+        if (bucket === "past" || bucket === "done") list.reverse();
         return (
-          <section key={bucket} className="mt-10">
-            <h2 className={`border-b border-rule pb-2 font-serif text-lg ${bucket === "overdue" ? "text-danger" : "text-ink"}`}>
-              {t(heading)}
-            </h2>
-            <ul className="divide-y divide-rule">
-              {list.map((d) => {
-                const day = parseDay(d.due);
-                const left = daysUntil(d.due);
-                const tone = { overdue: "text-danger", today: "text-caution", soon: "text-caution", later: "text-muted" }[urgency(left)];
-                return (
-                  <li key={d.id} className="group flex items-center gap-3 py-3 sm:gap-5">
-                    <div className="w-12 shrink-0 text-center">
-                      <p className="font-serif text-2xl leading-none text-ink tabular-nums">{day.getDate()}</p>
-                      <p className="mt-1 text-[11px] text-faint">
-                        {day.toLocaleDateString("tr-TR", { month: "short" })} · {day.toLocaleDateString("tr-TR", { weekday: "short" })}
-                      </p>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] text-ink">{d.label}</p>
-                      <button onClick={() => onOpenMatter(d.matter_id)} className="block max-w-full truncate text-left text-sm text-muted hover:text-cite hover:underline">
-                        {d.client}{d.subject && `, ${d.subject}`}
-                      </button>
-                      <p className="text-xs">
-                        <span className={`tabular-nums sm:hidden ${tone}`}>{daysLeftText(left)}</span>
-                        {d.branch && <span className="text-faint max-sm:ml-2">{branchName(d.branch)}</span>}
-                      </p>
-                      {asking === d.id && (
-                        <DeadlineActions onDone={() => toggle(d)} onDelete={() => remove(d)} onCancel={() => setAsking(null)} />
-                      )}
-                    </div>
-                    <span className={`hidden shrink-0 text-sm tabular-nums sm:inline ${tone}`}>{daysLeftText(left)}</span>
-                    <button onClick={() => setAsking(asking === d.id ? null : d.id)} aria-label={t("deadlineDone")}
-                      aria-expanded={asking === d.id}
-                      className="group/tick -m-2 shrink-0 p-2">
-                      <span className={`flex h-5 w-5 items-center justify-center rounded-full border text-transparent group-hover/tick:border-verified group-hover/tick:text-verified ${
-                        asking === d.id ? "border-ink ring-2 ring-ink/10" : "border-faint"}`}>
-                        <Check size={11} strokeWidth={3} />
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+          <section key={bucket} className="mt-6 rounded-xl border border-rule bg-sheet px-3 py-2 sm:px-4">
+            <h2 className={`border-b border-rule px-2 py-2 font-serif text-lg ${bucket === "overdue" ? "text-danger" : "text-ink"}`}>{t(heading)}</h2>
+            <ul className="divide-y divide-rule py-1">{list.map((item) => row(item, true))}</ul>
           </section>
         );
       })}
 
-      {mode === "list" && done.length > 0 && (
-        <details className="mt-10">
-          <summary className="cursor-pointer text-sm text-muted hover:text-ink">{t("deadlinesDone", { n: done.length })}</summary>
-          <ul className="mt-2 divide-y divide-rule">
-            {done.map((d) => (
-              <li key={d.id} className="flex items-center gap-3 py-2 text-sm text-faint sm:gap-4">
-                <span className="w-20 shrink-0 tabular-nums sm:w-24">{parseDay(d.due).toLocaleDateString("tr-TR")}</span>
-                <span className="min-w-0 flex-1 truncate line-through">{d.label}</span>
-                <span className="hidden truncate sm:inline">{d.client}</span>
-                <button onClick={() => toggle(d)} className="text-xs text-muted hover:text-ink">{t("deadlineUndo")}</button>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {editor && <CalendarEditor item={editor.item} day={editor.day} matters={matters}
+        initialKind={kind === "all" ? undefined : kind} matterId={!editor.item && matterId !== "personal" ? matterId : undefined}
+        onClose={() => setEditor(null)} onOpenMatter={onOpenMatter} onChanged={(day, changedKind) => {
+          setEditor(null);
+          selectDay(day);
+          setVersion((v) => v + 1);
+          if (!editor.item) {
+            if (kind !== "all" && kind !== changedKind) setKind("all");
+            setStatus("all");
+            setMatterId("");
+            setQuery("");
+          }
+          onChanged(changedKind);
+        }} />}
     </div>
   );
 }

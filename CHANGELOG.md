@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 · 2026-11-27
+
+- Create, edit, complete and delete hearings, meetings, personal reminders and other events from the calendar. Link entries to cases when needed and manage them from the case page.
+- Add case deadlines directly from the calendar, with an entered date or the existing notice calculator. Browse the month, selected day or grouped list, and filter by type, case and completion status.
+- Show scheduled in-app reminders across signed-in screens, and export individual events and their active alarms as iCalendar files.
+- Include event types, dates and times in calendar answers in chat with the current case scope respected.
+
 ## 0.6.0 · 2026-11-27
 
 - Added self-service password changes to the account menu for all users. Changing a password signs out other sessions for the same account.

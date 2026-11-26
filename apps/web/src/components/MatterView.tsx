@@ -4,10 +4,13 @@
 // deadlines and the lawyer's notes, in one place. The message box below starts a chat in
 // this file (the page handles it); every answer in the file knows its facts.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, FileText, MessageSquare, MoreHorizontal, PenLine, Upload } from "lucide-react";
+import { Download, FileText, MessageSquare, MoreHorizontal, PenLine, Plus, Upload } from "lucide-react";
+import { CalendarEditor } from "@/components/CalendarEditor";
+import { CalendarRow } from "@/components/CalendarRow";
 import { DeadlinePanel } from "@/components/DeadlinePanel";
 import { MatterForm } from "@/components/MatterForm";
-import { api, ApiError, type MatterDetail, type MatterFields } from "@/lib/api";
+import { api, ApiError, type CalendarEvent, type Matter, type MatterDetail, type MatterFields } from "@/lib/api";
+import { calendarToday } from "@/lib/calendar";
 import { formatBytes } from "@/lib/format";
 import { t } from "@/lib/i18n";
 
@@ -27,17 +30,21 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   );
 }
 
-export function MatterView({ matterId, onOpenChat, onOpenDraft, onChanged, onDeleted }: {
+export function MatterView({ matterId, onOpenChat, onOpenDraft, onChanged, onDeleted, matters, onEventsChanged }: {
   matterId: string;
   onOpenChat: (id: string) => void;
   onOpenDraft: (chatId: string) => void;
   onChanged: () => void;        // the file's summary changed (sidebar refreshes)
   onDeleted: () => void;
+  matters: Matter[];
+  onEventsChanged: () => void;
 }) {
   const [m, setM] = useState<MatterDetail | null>(null);
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [eventEditor, setEventEditor] = useState<{ item?: CalendarEvent } | null>(null);
+  const [eventError, setEventError] = useState(false);
   const [notes, setNotes] = useState("");
   const [uploadError, setUploadError] = useState("");
   const picker = useRef<HTMLInputElement>(null);
@@ -123,6 +130,20 @@ export function MatterView({ matterId, onOpenChat, onOpenDraft, onChanged, onDel
 
       <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="min-w-0">
+          <Section title={t("calendarMatterEvents")} action={
+            <button type="button" onClick={() => setEventEditor({})} className="inline-flex items-center gap-1.5 text-sm text-cite hover:underline">
+              <Plus size={15} /> {t("calendarAdd")}
+            </button>}>
+            {eventError && <button type="button" onClick={() => load().then(() => setEventError(false)).catch(() => {})}
+              className="py-2 text-sm text-danger underline">{t("calendarLoadError")} {t("calendarRetry")}</button>}
+            {m.events.length === 0 ? <p className="py-3 text-sm text-faint">{t("calendarMatterEmpty")}</p> : (
+              <ul className="divide-y divide-rule">
+                {m.events.map((event) => <CalendarRow key={event.id} item={event} showDate
+                  onEdit={() => setEventEditor({ item: event })} />)}
+              </ul>
+            )}
+          </Section>
+
           <Section title={t("matterChats")}>
             {m.chats.length === 0 ? (
               <p className="py-3 text-sm text-faint">{t("matterNoChats")}</p>
@@ -187,6 +208,17 @@ export function MatterView({ matterId, onOpenChat, onOpenDraft, onChanged, onDel
           </div>
         </aside>
       </div>
+
+      {eventEditor && <CalendarEditor item={eventEditor.item} day={calendarToday()} matterId={m.id} matters={matters}
+        onClose={() => setEventEditor(null)} onChanged={(_, kind) => {
+          setEventEditor(null);
+          setEventError(false);
+          if (kind === "deadline") onChanged();
+          else {
+            onEventsChanged();
+            load().catch(() => setEventError(true));
+          }
+        }} />}
 
       {editing && (
         <MatterForm initial={{ client: m.client, subject: m.subject, opponent: m.opponent, court: m.court, case_no: m.case_no }}

@@ -1,5 +1,12 @@
 # Local changelog
 
+## 0.7.0 · 2026-11-27
+
+- Run `make setup` and `make migrate`, then restart the API and rebuild the web app. The migration adds `calendar_events` and preserves existing case deadlines.
+- For Folonto production, migrate with the updated API image before recreating the API and web containers. Follow the [deployment runbook](docs/DEPLOYMENT.md).
+- Smoke-test a personal reminder and a case-linked hearing in both calendar views. Verify that an alert becomes visible while signed in, dismissal persists, and rescheduling arms the reminder again.
+- Reminders use Europe/Istanbul time. In-app alerts appear when the app is open or reopened. An exported ICS file is a snapshot and the destination calendar handles its alarms.
+
 ## 0.6.0 · 2026-11-27
 
 - Run the database migration before starting the updated API. Existing sessions remain valid until the user changes their password or the session expires.

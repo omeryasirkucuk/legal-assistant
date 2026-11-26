@@ -11,12 +11,13 @@ from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from legal_api.api.calendar import EventOut
 from legal_api.api.files import FileOut, file_out
 from legal_api.auth import DB, CurrentUser
 from legal_api.calc.calendar import calendar as official_calendar
 from legal_api.calc.notice import Branch
 from legal_api.db.app_models import Chat
-from legal_api.db.matter_models import Matter, MatterDeadline
+from legal_api.db.matter_models import CalendarEvent, Matter, MatterDeadline
 from legal_api.files import store
 from legal_api.matters.search import search_matters
 from legal_api.matters.service import chats_of, deadlines_of, drafts_of, files_of, owned
@@ -99,6 +100,7 @@ class MatterDetail(MatterOut):
     documents: list[FileOut]
     drafts: list[DraftRef]
     deadlines: list[DeadlineOut]
+    events: list[EventOut]
 
 
 class CalendarItem(DeadlineOut):
@@ -174,6 +176,9 @@ async def search(q: str, user: CurrentUser, db: DB) -> dict:
 async def get_matter(matter_id: uuid.UUID, user: CurrentUser, db: DB) -> MatterDetail:
     m = await _matter(db, user, matter_id)
     deadlines = await deadlines_of(db, [m.id])
+    events = (await db.scalars(select(CalendarEvent).where(
+        CalendarEvent.matter_id == m.id, CalendarEvent.user_id == user.id)
+        .order_by(CalendarEvent.due, CalendarEvent.start_time.nulls_first(), CalendarEvent.id))).all()
     chats = await chats_of(db, m.id)
     files = await files_of(db, m.id)
     titles = {c.id: c.title for c in chats}
@@ -184,7 +189,8 @@ async def get_matter(matter_id: uuid.UUID, user: CurrentUser, db: DB) -> MatterD
         drafts=[DraftRef(id=str(d.id), chat_id=str(d.chat_id) if d.chat_id else None,
                          title=d.title, petition_type=d.petition_type, updated_at=d.updated_at)
                 for d in await drafts_of(db, m.id)],
-        deadlines=[_deadline_out(d) for d in deadlines])
+        deadlines=[_deadline_out(d) for d in deadlines],
+        events=[EventOut.model_validate(event) for event in events])
 
 
 @router.patch("/matters/{matter_id}")

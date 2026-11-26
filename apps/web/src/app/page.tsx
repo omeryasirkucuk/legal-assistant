@@ -17,6 +17,7 @@ import { StylePanel } from "@/components/StylePanel";
 import { FilesView } from "@/components/FilesView";
 import { UsageMeter } from "@/components/UsageMeter";
 import { CalendarView } from "@/components/CalendarView";
+import { CalendarReminders } from "@/components/CalendarReminders";
 import { MatterSuggest } from "@/components/MatterSuggest";
 import { ChatMatterBar } from "@/components/ChatMatterBar";
 import { DeadlineSuggest } from "@/components/DeadlineSuggest";
@@ -69,6 +70,10 @@ export default function ChatApp() {
   const closeNav = useCallback(() => setNavOpen(false), []);
   const [confirmDialog, confirm] = useConfirm();
   const [matters, setMatters] = useState<Matter[]>([]);
+  const [reminderId, setReminderId] = useState<string | null>(null);
+  const [reminderVersion, setReminderVersion] = useState(0);
+  const remindersChanged = () => setReminderVersion((value) => value + 1);
+  const clearReminderId = useCallback(() => setReminderId(null), []);
   const [view, setView] = useState<View>("chat");
   const [matterId, setMatterId] = useState<string | null>(null);   // the file being worked in
   const [matterDeadlines, setMatterDeadlines] = useState<Deadline[]>([]);
@@ -180,6 +185,8 @@ export default function ChatApp() {
 
   function openCalendar() {
     setView("calendar");
+    setOpenDraft(null);
+    setDraftPage(false);
     setChatId(null);
     visibleChat.current = null;
     setMessages([]);
@@ -328,6 +335,11 @@ export default function ChatApp() {
   const chatCost = messages.reduce(
     (sum, m) => sum + (m.meta.cost_usd ?? 0) + (m.meta.detail_cost_usd ?? 0), 0);
 
+  const reminders = user && <CalendarReminders key={user.id} version={reminderVersion} onOpen={(id) => {
+    setReminderId(id);
+    openCalendar();
+  }} />;
+
   return (
     <div className="flex h-full">
       <Sidebar
@@ -361,19 +373,25 @@ export default function ChatApp() {
           the same column whatever the scrollbar does, and the composer's menus are not cut. */}
       {openDraft && draftPage ? (
         <main className="flex min-w-0 flex-1 flex-col">
+          {reminders}
           <DraftPanel key={`page-${openDraft.id}`} draft={openDraft} page onClose={closeDraftPage} onChange={changeDraft} />
         </main>
       ) : (
       <main className="@container flex min-w-0 flex-1 flex-col overflow-y-auto">
         <MobileBar title={barTitle} onMenu={() => setNavOpen(true)} onNew={newChat} />
+        {reminders}
         <div className="flex-1">
           <div className="mx-auto w-full max-w-[64rem] px-4 pb-16 pt-6 sm:px-6 md:pt-10 @4xl:px-12">
             {view === "matter" && matterId && (
               <MatterView key={`${matterId}-${matterVersion}`} matterId={matterId} onOpenChat={openChat}
-                onOpenDraft={openChat} onChanged={refreshMatters}
-                onDeleted={() => { refreshMatters(); newChat(); }} />
+                onOpenDraft={openChat} onChanged={refreshMatters} matters={matters} onEventsChanged={remindersChanged}
+                onDeleted={() => { refreshMatters(); remindersChanged(); newChat(); }} />
             )}
-            {view === "calendar" && <CalendarView onOpenMatter={openMatter} />}
+            {view === "calendar" && <CalendarView matters={matters} reminderId={reminderId} onReminderOpened={clearReminderId}
+              onOpenMatter={openMatter} onChanged={(kind) => {
+                if (kind === "deadline") refreshMatters();
+                else remindersChanged();
+              }} />}
             {view === "files" && <FilesView onOpenChat={openChat} onEdit={editDraftPage} matters={matters} />}
             {view === "chat" && chatId && (
               <ChatMatterBar matter={currentMatter} matters={matters} onOpenMatter={openMatter}
