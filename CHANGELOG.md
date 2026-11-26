@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 · 2026-11-27
+
+- Adapt the sign-in pages, mobile navigation, chat and sources, calendar, case files, document editing and previews, and account panels to narrow and short viewports. Wide answer tables and code scroll within the chat.
+- Keep message controls visible when the on-screen keyboard reduces the available space, and keep file action menus within the viewport.
+
 ## 0.7.0 · 2026-11-27
 
 - Create, edit, complete and delete hearings, meetings, personal reminders and other events from the calendar. Link entries to cases when needed and manage them from the case page.

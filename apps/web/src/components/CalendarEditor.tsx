@@ -97,7 +97,7 @@ export function CalendarEditor({ item, day, matters, matterId, initialKind, onCl
   return (
     <dialog ref={dialog} aria-labelledby="calendar-editor-title"
       onCancel={(e) => { e.preventDefault(); if (!busy) onClose(); }}
-      className="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-rule bg-paper p-5 text-ink shadow-xl backdrop:bg-black/35 sm:p-6">
+      className="fixed inset-0 m-auto max-h-[calc(var(--app-viewport-height)-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-rule bg-paper p-4 text-ink shadow-xl backdrop:bg-black/35 sm:p-6">
       <form onSubmit={save} className="space-y-4">
         <header className="flex items-center justify-between gap-3">
           <h2 id="calendar-editor-title" className="font-serif text-2xl">{t(item ? "calendarEdit" : "calendarAdd")}</h2>

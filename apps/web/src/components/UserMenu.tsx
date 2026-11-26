@@ -44,7 +44,7 @@ export function UserMenu({ user, today, onStyle, onSettings, onAdmin, onPassword
 
   return (
     <div ref={box} role="menu" aria-label={t("userMenu")}
-      className={`absolute z-30 w-64 rounded-xl border border-rule bg-sheet p-1.5 shadow-xl ${className}`}>
+      className={`absolute z-30 max-h-[calc(var(--app-viewport-height)-5rem)] w-64 max-lg:max-w-[calc(100%-1rem)] overflow-y-auto overscroll-y-contain rounded-xl border border-rule bg-sheet p-1.5 shadow-xl ${className}`}>
       <div className="px-3 pb-2 pt-1.5">
         <p className="truncate text-sm text-muted">{user.email}</p>
         {today && today.answers > 0 && (

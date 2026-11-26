@@ -69,6 +69,7 @@
   "stop": "Durdur",
   "emptyTitle": "Ne araştırıyorsun?",
   "emptyBody": "Sorunu yaz. İlgili mevzuatı ve içtihadı araştırıp kullanılan kaynakları yanıtın yanında göstereceğim.",
+  "answerTable": "Yanıt tablosu",
   "sources": "Kaynaklar",
   "sourcesFound": "{count} kaynak incelendi",
   "openOfficial": "Resmî kaynakta aç",

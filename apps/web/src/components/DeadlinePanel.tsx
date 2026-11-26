@@ -35,7 +35,7 @@ function NextDeadline({ d, asking, onAsk, onDone, onDelete }: {
           <span className="text-[15px]">{t("dayUnit")} {days < 0 ? t("passed") : t("left")}</span>
         </p>
       )}
-      <p className="mt-3 text-[15px] font-medium leading-snug text-ink">{d.label}</p>
+      <p className="mt-3 text-[15px] font-medium leading-snug text-ink wrap-anywhere">{d.label}</p>
       <p className="text-sm text-muted">{formatDay(d.due, "long")}{d.branch && ` · ${branchName(d.branch)}`}</p>
       {asking ? (
         <DeadlineActions onDone={onDone} onDelete={onDelete} onCancel={() => onAsk(false)} />
@@ -88,7 +88,7 @@ export function DeadlinePanel({ matterId, deadlines, onChanged }: {
               : asking === d.id ? "border-ink ring-2 ring-ink/10" : "border-faint hover:border-ink"}`}>
           {d.done && <Check size={10} strokeWidth={3} />}
         </button>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 wrap-anywhere">
           <span className={`block text-sm leading-snug ${d.done ? "text-faint line-through" : "text-ink"}`}>{d.label}</span>
           <span className={`block text-xs ${d.done ? "text-faint" : TONE[urgency(days)] === "text-ink" ? "text-muted" : TONE[urgency(days)]}`}>
             {formatDay(d.due)}{d.branch && ` · ${branchName(d.branch)}`}{!d.done && ` · ${daysLeftText(days)}`}

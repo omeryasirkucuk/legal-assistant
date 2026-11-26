@@ -98,8 +98,8 @@ export function MatterView({ matterId, onOpenChat, onOpenDraft, onChanged, onDel
 
   return (
     <div className="pb-10">
-      <header className="flex items-start justify-between gap-6">
-        <div className="min-w-0">
+      <header className="flex items-start justify-between gap-3 sm:gap-6">
+        <div className="min-w-0 wrap-anywhere">
           <h1 className="font-serif text-[2rem] leading-tight text-ink">{m.client}</h1>
           {m.subject && <p className="mt-1 text-[17px] text-muted">{m.subject}</p>}
           {meta.length > 0 ? (
@@ -128,7 +128,7 @@ export function MatterView({ matterId, onOpenChat, onOpenDraft, onChanged, onDel
         </div>
       </header>
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="mt-6 grid grid-cols-1 gap-6 sm:mt-10 sm:gap-10 @3xl:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="min-w-0">
           <Section title={t("calendarMatterEvents")} action={
             <button type="button" onClick={() => setEventEditor({})} className="inline-flex items-center gap-1.5 text-sm text-cite hover:underline">
@@ -198,7 +198,7 @@ export function MatterView({ matterId, onOpenChat, onOpenDraft, onChanged, onDel
           </Section>
         </div>
 
-        <aside className="space-y-8 self-start rounded-2xl bg-desk p-5 lg:sticky lg:top-6">
+        <aside className="min-w-0 space-y-8 self-start rounded-2xl bg-desk p-4 sm:p-5 @3xl:sticky @3xl:top-6">
           <DeadlinePanel matterId={m.id} deadlines={m.deadlines} onChanged={() => { load(); onChanged(); }} />
           <div className="border-t border-rule pt-5">
             <label htmlFor="matter-notes" className="text-xs text-muted">{t("matterNotes")}</label>

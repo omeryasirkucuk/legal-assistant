@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.7.1 · 2026-11-27
+
+- Rebuild the web client for the mobile layout update. No new database migration is required when upgrading from 0.7.0.
+
 ## 0.7.0 · 2026-11-27
 
 - Run `make setup` and `make migrate`, then restart the API and rebuild the web app. The migration adds `calendar_events` and preserves existing case deadlines.

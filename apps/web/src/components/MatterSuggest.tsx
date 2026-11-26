@@ -16,7 +16,7 @@ export function MatterSuggest({ question, candidates, onWith, onWithout }: {
   const one = candidates.length === 1 ? candidates[0] : null;
   return (
     <div role="dialog" aria-label={t("matterSuggestTitle")}
-      className="mb-2 rounded-xl border border-rule bg-sheet px-4 py-3 shadow-sm">
+      className="mb-2 max-h-[calc(var(--app-viewport-height)*0.26)] overflow-y-auto overscroll-y-contain rounded-xl wrap-anywhere border border-rule bg-sheet px-4 py-3 shadow-sm">
       <p className="mb-2 line-clamp-2 border-l-2 border-rule pl-2.5 text-sm text-muted">{question}</p>
       <p className="flex items-center gap-2 text-sm text-ink">
         <FolderOpen size={15} className="shrink-0 text-cite" />
@@ -25,7 +25,7 @@ export function MatterSuggest({ question, candidates, onWith, onWithout }: {
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         {candidates.map((m) => (
           <button key={m.id} onClick={() => onWith(m)} autoFocus={m === candidates[0]}
-            className="rounded-lg bg-ink px-3 py-1.5 text-sm text-white hover:brightness-110">
+            className="min-w-0 max-w-full rounded-lg bg-ink px-3 py-1.5 text-sm text-white hover:brightness-110">
             {one ? t("matterSuggestWith") : `${m.client}${m.subject ? `, ${m.subject}` : ""}`}
           </button>
         ))}

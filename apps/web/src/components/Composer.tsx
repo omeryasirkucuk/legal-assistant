@@ -127,31 +127,33 @@ export function Composer({ followUp, busy, onSubmit, onStop, footer, placeholder
         </div>
       )}
       <div className="rounded-2xl border border-rule bg-sheet shadow-[0_1px_2px_rgba(27,36,51,0.06)] focus-within:border-faint">
-        {choices && (
-          <AnswerChoices key={choices.key} items={choices.items} picks={picks} onPicks={setPicks}
-            onWithout={choices.asked ? () => send(t("writeWithout")) : undefined}
-            onClose={() => setClosed(choices.key)} />
-        )}
-        {files.length > 0 && (
-          <ul className="flex flex-wrap gap-2 px-3 pt-3">
-            {files.map((f) => (
-              <li key={f.key} title={f.error ?? f.name}
-                className={`flex max-w-[16rem] items-center gap-2 rounded-lg border px-2 py-1.5 text-sm ${f.error ? "border-danger/40 text-danger" : "border-rule text-ink"}`}>
-                {f.file || f.error ? <FileText size={15} className="shrink-0 text-cite" />
-                  : <Loader2 size={15} className="shrink-0 animate-spin text-faint" />}
-                <span className="min-w-0 truncate">{f.name}</span>
-                {f.file && <span className="shrink-0 text-xs text-faint">{formatBytes(f.file.size)}</span>}
-                <button onClick={() => setFiles((all) => all.filter((x) => x.key !== f.key))}
-                  aria-label={t("removeAttachment")} className="shrink-0 text-faint hover:text-ink">
-                  <X size={14} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {protectedData && files.length > 0 && (
-          <p className="px-4 pt-2 text-xs text-muted">{t("privateAttachments")}</p>
-        )}
+        <div className="max-h-[min(16rem,calc(var(--app-viewport-height)*0.3))] overflow-y-auto overscroll-y-contain">
+          {choices && (
+            <AnswerChoices key={choices.key} items={choices.items} picks={picks} onPicks={setPicks}
+              onWithout={choices.asked ? () => send(t("writeWithout")) : undefined}
+              onClose={() => setClosed(choices.key)} />
+          )}
+          {files.length > 0 && (
+            <ul className="flex flex-wrap gap-2 px-3 pt-3">
+              {files.map((f) => (
+                <li key={f.key} title={f.error ?? f.name}
+                  className={`flex max-w-full items-center sm:max-w-[16rem] gap-2 rounded-lg border px-2 py-1.5 text-sm ${f.error ? "border-danger/40 text-danger" : "border-rule text-ink"}`}>
+                  {f.file || f.error ? <FileText size={15} className="shrink-0 text-cite" />
+                    : <Loader2 size={15} className="shrink-0 animate-spin text-faint" />}
+                  <span className="min-w-0 truncate">{f.name}</span>
+                  {f.file && <span className="shrink-0 text-xs text-faint">{formatBytes(f.file.size)}</span>}
+                  <button onClick={() => setFiles((all) => all.filter((x) => x.key !== f.key))}
+                    aria-label={t("removeAttachment")} className="shrink-0 text-faint hover:text-ink">
+                    <X size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {protectedData && files.length > 0 && (
+            <p className="px-4 pt-2 text-xs text-muted">{t("privateAttachments")}</p>
+          )}
+        </div>
         <textarea
           ref={area}
           value={text}
@@ -175,38 +177,36 @@ export function Composer({ followUp, busy, onSubmit, onStop, footer, placeholder
           }}
           placeholder={placeholder ?? t("askPlaceholder")}
           aria-label={t("messageLabel")}
-          className="block w-full resize-none bg-transparent px-4 pt-3 text-[15px] leading-relaxed outline-none placeholder:text-faint focus-visible:outline-none"
+          className="block max-h-[min(15rem,max(2.75rem,calc(var(--app-viewport-height)*0.24)))] w-full resize-none bg-transparent px-4 pt-3 text-[15px] leading-relaxed outline-none placeholder:text-faint focus-visible:outline-none"
         />
-        <div className="flex items-center gap-1 px-2 pb-2">
+        <div className="relative flex items-center gap-1 px-2 pb-2">
           <button onClick={() => picker.current?.click()} aria-label={t("attach")} title={t("attach")}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-paper hover:text-ink">
+            className="flex h-10 w-10 shrink-0 items-center justify-center md:h-8 md:w-8 rounded-lg text-muted hover:bg-paper hover:text-ink">
             <Paperclip size={17} />
           </button>
           <input ref={picker} type="file" multiple className="sr-only"
             onChange={(e) => { if (e.target.files) add(e.target.files); e.target.value = ""; }} />
 
-          <div className="relative">
-              <button onClick={() => setPowerOpen((o) => !o)} onMouseDown={(e) => e.stopPropagation()}
-                aria-expanded={powerOpen} aria-label={t("power")}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-muted hover:bg-paper hover:text-ink">
-                <Gauge size={15} /> {t(`power_${power}`)} <ChevronDown size={14} />
-              </button>
-              {powerOpen && (
-                <PowerMenu value={power} onPick={(p) => { setPower(p); setPowerOpen(false); }}
-                  onClose={() => setPowerOpen(false)} />
-              )}
-          </div>
+          <button onClick={() => setPowerOpen((o) => !o)} onMouseDown={(e) => e.stopPropagation()}
+            aria-expanded={powerOpen} aria-label={t("power")}
+            className="flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm md:min-h-0 text-muted hover:bg-paper hover:text-ink">
+            <Gauge size={15} /> {t(`power_${power}`)} <ChevronDown size={14} />
+          </button>
+          {powerOpen && (
+            <PowerMenu value={power} onPick={(p) => { setPower(p); setPowerOpen(false); }}
+              onClose={() => setPowerOpen(false)} />
+          )}
 
           <span className="flex-1" />
           {busy ? (
             <button onClick={onStop} aria-label={t("stopAnswer")} title={t("stopAnswer")}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-white">
+              className="flex h-10 w-10 shrink-0 items-center justify-center md:h-8 md:w-8 rounded-full bg-ink text-white">
               <Square size={12} fill="currentColor" />
             </button>
           ) : (
             <button onClick={() => send()} disabled={(!text.trim() && !picked) || uploading}
               aria-label={t("sendMessage")} title={t("sendMessage")}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-cite text-white disabled:bg-rule disabled:text-faint">
+              className="flex h-10 w-10 shrink-0 items-center justify-center md:h-8 md:w-8 rounded-full bg-cite text-white disabled:bg-rule disabled:text-faint">
               <ArrowUp size={17} />
             </button>
           )}
@@ -231,7 +231,7 @@ function PowerMenu({ value, onPick, onClose }: { value: Power; onPick: (p: Power
   }, [onClose]);
   return (
     <div ref={box} role="menu"
-      className="absolute bottom-full left-0 z-30 mb-2 w-72 rounded-xl border border-rule bg-sheet p-1.5 shadow-xl">
+      className="absolute bottom-full left-2 z-30 mb-2 max-h-[min(22rem,calc(var(--app-viewport-height)*0.45))] w-72 max-w-[calc(100%-1rem)] overflow-y-auto overscroll-y-contain rounded-xl border border-rule bg-sheet p-1.5 shadow-xl">
       {POWERS.map((p) => (
         <button key={p} role="menuitemradio" aria-checked={p === value} onClick={() => onPick(p)}
           className="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left hover:bg-paper">

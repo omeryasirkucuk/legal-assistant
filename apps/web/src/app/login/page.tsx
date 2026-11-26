@@ -31,10 +31,10 @@ export default function LoginPage() {
     "mt-1 w-full rounded-md border border-rule bg-sheet px-3 py-2.5 text-[15px] outline-none focus:border-cite";
 
   return (
-    <main className="flex min-h-full items-center justify-center px-4 py-16">
+    <main className="flex min-h-dvh items-center justify-center px-4 py-6 sm:py-16">
       <div className="w-full max-w-sm">
         <p className="font-serif text-2xl leading-snug text-ink">{t("appTagline")}</p>
-        <form action={submit} className="mt-10 space-y-4">
+        <form action={submit} className="mt-6 space-y-4 sm:mt-10">
           <h1 className="text-sm font-semibold text-ink">
             {registering ? t("registerTitle") : t("loginTitle")}
           </h1>
@@ -79,7 +79,7 @@ export default function LoginPage() {
             setRegistering(!registering);
             setError(null);
           }}
-          className="mt-6 text-sm text-cite hover:underline"
+          className="mt-4 inline-flex min-h-11 items-center text-sm text-cite hover:underline"
         >
           {registering ? t("toLogin") : t("toRegister")}
         </button>

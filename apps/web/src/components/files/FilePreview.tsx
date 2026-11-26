@@ -26,24 +26,24 @@ export function FilePreview({ file, onClose, onEdit }: {
 
   const inline = `${api.fileUrl(file.id)}?inline=true`;
   return createPortal(
-    <div className="fixed inset-0 z-50 flex flex-col bg-ink/40" role="dialog" aria-modal="true" aria-label={file.name}
+    <div className="viewport-overlay fixed inset-0 z-50 flex flex-col bg-ink/40" role="dialog" aria-modal="true" aria-label={file.name}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="mx-auto flex h-full w-full max-w-5xl flex-col py-6 px-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-        <header className="flex items-center gap-3 rounded-t-2xl border-b border-rule bg-sheet px-5 py-3">
+      <div className="mx-auto flex h-full w-full max-w-5xl flex-col sm:px-4 sm:py-6" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        <header className="flex shrink-0 items-center gap-1 border-b border-rule bg-sheet px-2 py-2 sm:gap-3 sm:rounded-t-2xl sm:px-5 sm:py-3">
           <h2 className="min-w-0 flex-1 truncate font-serif text-lg text-ink">{file.name}</h2>
           {onEdit && (
-            <button onClick={onEdit}
-              className="flex items-center gap-1.5 rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:border-cite hover:text-cite">
-              <PenLine size={14} /> {t("fileEdit")}
+            <button onClick={onEdit} aria-label={t("fileEdit")}
+              className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-rule px-2.5 sm:px-3 text-sm text-ink hover:border-cite hover:text-cite">
+              <PenLine size={14} /> <span className="hidden sm:inline">{t("fileEdit")}</span>
             </button>
           )}
           <a href={api.fileUrl(file.id)} aria-label={t("fileDownload")} title={t("fileDownload")}
-            className="rounded-md p-1.5 text-muted hover:bg-paper hover:text-ink"><Download size={17} /></a>
-          <button onClick={onClose} aria-label={t("close")} className="rounded-md p-1.5 text-muted hover:bg-paper hover:text-ink">
+            className="shrink-0 rounded-md p-2.5 sm:p-1.5 text-muted hover:bg-paper hover:text-ink"><Download size={17} /></a>
+          <button onClick={onClose} aria-label={t("close")} className="shrink-0 rounded-md p-2.5 sm:p-1.5 text-muted hover:bg-paper hover:text-ink">
             <X size={18} />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-b-2xl bg-desk">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-desk sm:rounded-b-2xl">
           {!preview && <p className="p-8 text-sm text-faint">{t("fileOpening")}</p>}
           {preview?.kind === "pdf" && <iframe src={inline} title={file.name} className="h-full w-full bg-sheet" />}
           {preview?.kind === "image" && (
@@ -51,7 +51,7 @@ export function FilePreview({ file, onClose, onEdit }: {
             <img src={inline} alt={file.name} className="mx-auto max-h-full max-w-full p-6 object-contain" />
           )}
           {preview?.kind === "document" && preview.doc && (
-            <div className="px-4 py-6">
+            <div className="px-2 py-3 sm:px-4 sm:py-6">
               <div className="petition-sheet"
                 dangerouslySetInnerHTML={{ __html: generateHTML(preview.doc as JSONContent, EXTENSIONS) }} />
             </div>

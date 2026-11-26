@@ -38,11 +38,25 @@ body {
   outline-offset: 2px;
 }
 
+:root {
+  --app-viewport-height: var(--keyboard-viewport-height, 100dvh);
+}
+
+/* Dynamic browser chrome and the visual viewport when the touch keyboard is open. */
+.viewport-height {
+  height: var(--app-viewport-height);
+}
+.viewport-overlay {
+  bottom: auto;
+  height: var(--app-viewport-height);
+}
+
 /* Answer body: long-form legal reading. */
 .answer {
   font-family: var(--font-serif);
   font-size: 1.0625rem;
   line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 /* The short answer is what the lawyer reads first: slightly larger, list lines spaced. */
 .answer-short {
@@ -104,8 +118,15 @@ body {
 .answer li + li {
   margin-top: 0.35em;
 }
-.answer table {
+.answer-scroll {
+  max-width: 100%;
   margin-top: 0.9em;
+  overflow-x: auto;
+}
+.answer pre {
+  white-space: pre;
+}
+.answer table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-sans);
@@ -113,6 +134,7 @@ body {
 }
 .answer th,
 .answer td {
+  min-width: 5rem;
   border: 1px solid var(--color-rule);
   padding: 0.4em 0.6em;
   text-align: left;
@@ -138,6 +160,7 @@ body {
   line-height: 1.5;
   color: var(--color-ink);
   outline: none;
+  overflow-wrap: anywhere;
 }
 @media (max-width: 720px) {
   .petition-sheet { padding: 1.25cm; min-height: 0; }
@@ -147,8 +170,11 @@ body {
 }
 /* Phones zoom into any text field set below 16px when it is focused; fields stay at 16px
    there so the page does not jump. */
-@media (pointer: coarse) and (max-width: 767px) {
-  input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px; }
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: max(1em, 16px); }
+}
+@media (max-height: 32rem) {
+  .chat-reminder { position: static; }
 }
 .petition-sheet p { margin: 0 0 6pt; }
 .petition-sheet ul, .petition-sheet ol { margin: 0 0 6pt; padding-left: 1.5em; }

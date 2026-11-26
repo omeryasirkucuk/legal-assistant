@@ -43,7 +43,7 @@ export function PickDialog({ title, choices, current, onPick, onClose }: {
   }, [onClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/25 px-3 py-4 sm:px-4 sm:pt-[14vh]"
+    <div className="viewport-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/25 px-3 py-4 sm:px-4 sm:pt-[14vh]"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-label={title}
         className="w-full max-w-sm rounded-2xl border border-rule bg-paper p-4 shadow-xl">
@@ -52,7 +52,7 @@ export function PickDialog({ title, choices, current, onPick, onClose }: {
           <button onClick={onClose} aria-label={t("close")} className="rounded-md p-1 text-muted hover:bg-sheet hover:text-ink"><X size={16} /></button>
         </div>
         {choices.length === 0 && <p className="px-1 py-2 text-sm text-faint">{t("pickNothing")}</p>}
-        <ul className="max-h-[50vh] overflow-y-auto">
+        <ul className="max-h-[min(50dvh,24rem)] overflow-y-auto">
           {choices.map((c) => {
             const here = c.id === current && c.kind !== "none";
             const Icon = c.kind === "matter" ? Scale : c.kind === "top" ? FolderOpen : FolderIcon;

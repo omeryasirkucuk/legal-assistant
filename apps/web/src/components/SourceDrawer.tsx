@@ -27,12 +27,12 @@ export function SourceDrawer({ evidence, number, source, related, onSelect, onCl
   if (!evidence) return null;
 
   return (
-    <div className="fixed inset-0 z-30 flex justify-end" role="dialog" aria-modal="true" aria-label={evidence.citation}>
-      <button className="flex-1 bg-ink/20" aria-label={t("close")} onClick={onClose} />
+    <div className="viewport-overlay fixed inset-0 z-30 flex justify-end" role="dialog" aria-modal="true" aria-label={evidence.citation}>
+      <button className="hidden flex-1 bg-ink/20 md:block" aria-label={t("close")} onClick={onClose} />
       <section className="flex h-full w-full max-w-2xl flex-col bg-sheet shadow-2xl">
-        <header className="flex items-start gap-4 border-b border-rule px-6 py-5">
+        <header className="flex max-h-[45%] items-start gap-2 overflow-y-auto border-b border-rule px-3 py-3 sm:gap-4 sm:px-6 sm:py-5">
           <span className="mt-0.5 text-sm font-semibold text-cite">{number || ""}</span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 wrap-anywhere">
             <h2 className="text-[15px] font-semibold leading-snug text-ink">{evidence.citation}</h2>
             <div className="mt-1 flex flex-wrap gap-x-4 text-sm text-muted">
               {evidence.url && (
@@ -46,11 +46,11 @@ export function SourceDrawer({ evidence, number, source, related, onSelect, onCl
               )}
             </div>
           </div>
-          <button ref={closeRef} onClick={onClose} className="rounded px-2 text-xl leading-none text-faint hover:text-ink" aria-label={t("close")}>
+          <button ref={closeRef} onClick={onClose} className="min-h-10 min-w-10 shrink-0 rounded px-2 text-xl leading-none text-faint hover:text-ink" aria-label={t("close")}>
             ×
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-4 wrap-anywhere sm:px-6 sm:py-6">
           {evidence.kind === "calculation" && related && related.length > 0 && (
             <ul className="mb-5 space-y-2 border-b border-rule pb-4 text-sm">
               {related.map((item) => (

@@ -96,16 +96,16 @@ export function SettingsPanel({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex justify-end bg-black/25"
+      className="viewport-overlay fixed inset-0 z-40 flex justify-end bg-black/25"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-rule bg-paper shadow-xl"
+        className="flex h-full w-full max-w-xl flex-col overflow-y-auto overscroll-y-contain border-l border-rule bg-paper shadow-xl"
       >
-        <header className="sticky top-0 flex items-start justify-between border-b border-rule bg-paper px-4 py-4 sm:px-6 sm:py-5">
+        <header className="top-0 z-10 flex sm:sticky items-start justify-between border-b border-rule bg-paper px-4 py-4 sm:px-6 sm:py-5">
           <div>
             <h2 id="settings-title" className="font-serif text-2xl text-ink">
               {t("settings")}

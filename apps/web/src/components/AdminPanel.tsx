@@ -57,9 +57,9 @@ export function AdminPanel({ ownId, onClose, onDemoted }: Props) {
   return (
     <dialog ref={dialog} onCancel={onClose} aria-labelledby="admin-title"
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-      className="m-auto max-h-[90dvh] w-[min(94vw,60rem)] max-w-none overflow-auto rounded-xl border border-rule bg-paper p-0 text-ink shadow-xl backdrop:bg-black/35">
+      className="m-auto max-h-[90dvh] w-[min(94vw,60rem)] max-w-none overflow-y-auto overscroll-y-contain rounded-xl border border-rule bg-paper p-0 text-ink shadow-xl backdrop:bg-black/35">
       <section>
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-rule bg-paper px-5 py-4 sm:px-6">
+        <header className="top-0 z-10 md:sticky flex items-start justify-between gap-4 border-b border-rule bg-paper px-3 py-3 sm:px-6 sm:py-4">
           <div>
             <h2 id="admin-title" className="font-serif text-2xl">{t("adminPanel")}</h2>
             <p className="mt-1 text-sm text-muted">{t("adminSpendDescription")}</p>
@@ -69,14 +69,14 @@ export function AdminPanel({ ownId, onClose, onDemoted }: Props) {
             <X size={20} />
           </button>
         </header>
-        <div className="px-5 pb-5 pt-4 sm:px-6">
+        <div className="px-3 pb-4 pt-3 sm:px-6 sm:pb-5 sm:pt-4">
           {error && <p role="alert" className="mb-4 text-sm text-danger">{error}</p>}
           {notice && <p role="status" className="mb-4 text-sm text-verified">{notice}</p>}
           {users === null && !error && <p role="status" className="text-sm text-muted">{t("loading")}</p>}
           {users?.length === 0 && <p className="text-sm text-muted">{t("adminNoUsers")}</p>}
           {users && users.length > 0 && (
             <>
-              <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1.5fr)_minmax(7rem,0.6fr)_minmax(7rem,0.6fr)_minmax(10rem,1fr)] gap-4 border-b border-rule px-3 pb-2 text-sm text-muted sm:grid">
+              <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1.5fr)_minmax(5rem,0.6fr)_minmax(5rem,0.6fr)_minmax(11rem,1fr)] gap-4 border-b border-rule px-3 pb-2 text-sm text-muted md:grid">
                 <span>{t("adminAccount")}</span>
                 <span>{t("adminToday")}</span>
                 <span>{t("adminTotal")}</span>
@@ -85,17 +85,17 @@ export function AdminPanel({ ownId, onClose, onDemoted }: Props) {
               <ul className="divide-y divide-rule">
                 {users.map((account) => (
                   <li key={account.id}
-                    className="grid grid-cols-2 items-center gap-3 py-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(7rem,0.6fr)_minmax(7rem,0.6fr)_minmax(10rem,1fr)] sm:gap-4 sm:px-3">
-                    <div className="col-span-2 min-w-0 sm:col-span-1">
+                    className="grid grid-cols-2 items-center gap-3 py-3 md:grid-cols-[minmax(0,1.5fr)_minmax(5rem,0.6fr)_minmax(5rem,0.6fr)_minmax(11rem,1fr)] md:gap-4 md:px-3">
+                    <div className="col-span-2 min-w-0 md:col-span-1">
                       <p className="break-words text-sm font-medium">{account.name}</p>
                       <p className="break-all text-sm text-muted">{account.email}</p>
                     </div>
                     <div className="text-sm tabular-nums" aria-label={t("adminToday")}>
-                      <p className="text-muted sm:sr-only">{t("adminToday")}</p>
+                      <p className="text-muted md:sr-only">{t("adminToday")}</p>
                       <p>{usd.format(account.today_cost_usd)}</p>
                     </div>
                     <div className="text-sm tabular-nums" aria-label={t("adminTotal")}>
-                      <p className="text-muted sm:sr-only">{t("adminTotal")}</p>
+                      <p className="text-muted md:sr-only">{t("adminTotal")}</p>
                       <p>{usd.format(account.total_cost_usd)}</p>
                     </div>
                     <RoleForm key={String(account.is_admin)} account={account} saving={saving} onSave={saveRole} />
@@ -117,7 +117,7 @@ function RoleForm({ account, saving, onSave }: {
 }) {
   const [isAdmin, setIsAdmin] = useState(account.is_admin);
   return (
-    <form className="col-span-2 flex items-center gap-2 sm:col-span-1"
+    <form className="col-span-2 flex items-center gap-2 md:col-span-1"
       onSubmit={(event) => { event.preventDefault(); void onSave(account, isAdmin); }}>
       <select aria-label={t("adminRoleFor", { name: account.name })} value={String(isAdmin)}
         onChange={(event) => setIsAdmin(event.target.value === "true")} disabled={saving}

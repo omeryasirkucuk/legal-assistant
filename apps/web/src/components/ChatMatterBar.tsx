@@ -26,10 +26,12 @@ export function ChatMatterBar({ matter, matters, onOpenMatter, onMove }: {
   if (matter) {
     return (
       <button onClick={() => onOpenMatter(matter.id)}
-        className="-ml-1 mb-8 flex items-center gap-1 rounded-md px-1 py-0.5 text-sm text-muted hover:text-cite">
-        <ChevronLeft size={15} />
-        <span className="font-medium text-ink">{matter.client}</span>
-        {matter.subject && <span className="text-faint">, {matter.subject}</span>}
+        className="-ml-1 mb-5 flex max-w-full items-center gap-1 text-left wrap-anywhere sm:mb-8 rounded-md px-1 py-0.5 text-sm text-muted hover:text-cite">
+        <ChevronLeft size={15} className="shrink-0" />
+        <span className="min-w-0">
+          <span className="font-medium text-ink">{matter.client}</span>
+          {matter.subject && <span className="text-faint">, {matter.subject}</span>}
+        </span>
       </button>
     );
   }
@@ -42,7 +44,7 @@ export function ChatMatterBar({ matter, matters, onOpenMatter, onMove }: {
         <FolderInput size={15} /> {t("chatToMatter")}
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-full z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-xl border border-rule bg-sheet p-1.5 shadow-xl">
+        <div role="menu" className="absolute right-0 top-full z-20 mt-1 max-h-[min(18rem,45dvh)] w-64 max-w-full overflow-y-auto rounded-xl border border-rule bg-sheet p-1.5 shadow-xl">
           {choices.map((m) => (
             <button key={m.id} role="menuitem" onClick={() => { setOpen(false); onMove(m.id); }}
               className="block w-full rounded-md px-3 py-2 text-left hover:bg-paper">

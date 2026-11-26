@@ -40,7 +40,7 @@ function Segmented<T extends string>({ options, value, onChange, label }: {
     <div role="radiogroup" aria-label={label} className="flex rounded-lg bg-desk p-0.5 text-[13px]">
       {options.map(([v, key]) => (
         <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
-          className={`flex-1 whitespace-nowrap rounded-md px-2 py-1.5 ${value === v ? "bg-sheet font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
+          className={`min-w-0 flex-1 rounded-md px-1 py-2 wrap-anywhere sm:px-2 ${value === v ? "bg-sheet font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
           {t(key)}
         </button>
       ))}
@@ -178,10 +178,10 @@ export function DeadlineForm({ matterId, initial, onSaved, onCancel }: {
   }, [onCancel]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/25 px-3 py-4 sm:px-4 sm:py-[8vh]"
+    <div className="viewport-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/25 px-3 py-4 sm:px-4 sm:py-[8vh]"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
     <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="deadline-form-title"
-      className="w-full max-w-md space-y-4 rounded-2xl border border-rule bg-paper p-5 shadow-xl sm:p-6">
+      className="w-full min-w-0 max-w-md space-y-4 rounded-2xl border border-rule bg-paper p-4 shadow-xl sm:p-6">
       <div className="flex items-baseline justify-between">
         <h2 id="deadline-form-title" className="font-serif text-xl text-ink">{t("deadlineAdd")}</h2>
         <button type="button" onClick={onCancel} aria-label={t("cancel")}
@@ -240,7 +240,7 @@ export function DeadlineForm({ matterId, initial, onSaved, onCancel }: {
                 <Segmented label={t("periodLength")} value={unit} onChange={setUnit} options={UNITS} />
               </div>
             </div>
-            <div className="mt-2 flex gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {PRESETS.map(([a, u, key]) => {
                 const on = n === a && unit === u;
                 return (

@@ -27,7 +27,7 @@ function bucketOf(item: CalendarItem, now: Date): Bucket {
   return days <= toSunday ? "thisWeek" : days <= toSunday + 7 ? "nextWeek" : "later";
 }
 
-const control = "min-w-0 rounded-lg border border-rule bg-sheet px-2.5 py-2 text-sm text-ink focus:border-cite";
+const control = "min-h-10 min-w-0 max-w-full rounded-lg border border-rule bg-sheet px-2.5 py-2 text-sm text-ink focus:border-cite";
 
 export function CalendarView({ matters, reminderId, onReminderOpened, onOpenMatter, onChanged }: {
   matters: Matter[];
@@ -153,7 +153,7 @@ export function CalendarView({ matters, reminderId, onReminderOpened, onOpenMatt
       </header>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-40 flex-1">
+        <div className="relative min-w-0 basis-full sm:min-w-40 sm:flex-1">
           <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
           <input type="search" value={query} onChange={(e) => {
             setQuery(e.target.value);
@@ -180,7 +180,7 @@ export function CalendarView({ matters, reminderId, onReminderOpened, onOpenMatt
             <button type="button" key={value} aria-pressed={mode === value} onClick={() => {
               setMode(value);
               try { localStorage.setItem("calendarMode", value); } catch {}
-            }} className={`rounded-md px-3 py-1.5 ${mode === value ? "bg-sheet font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
+            }} className={`min-h-9 rounded-md px-3 py-1.5 ${mode === value ? "bg-sheet font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
               {t(value === "month" ? "calendarMonth" : "calendarList")}
             </button>
           ))}

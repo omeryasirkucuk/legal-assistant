@@ -22,14 +22,14 @@ export function CalendarRow({ item, matter, showDate, onEdit }: {
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${item.done ? "bg-desk text-faint" : kindColor[item.kind]}`}>
           <Icon size={17} />
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 wrap-anywhere">
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className={`break-words [overflow-wrap:anywhere] ${item.done ? "text-muted line-through" : "font-medium text-ink"}`}>{item.label}</span>
+            <span className={`min-w-0 ${item.done ? "text-muted line-through" : "font-medium text-ink"}`}>{item.label}</span>
             <span className="text-xs text-muted">{t(kinds[item.kind])}</span>
           </span>
           {details.length > 0 && <span className="block text-xs text-muted">{details.join(" · ")}</span>}
           {item.kind !== "deadline" && item.location && (
-            <span className="mt-0.5 flex items-center gap-1 text-xs text-muted"><MapPin size={12} className="shrink-0" /> <span className="truncate">{item.location}</span></span>
+            <span className="mt-0.5 flex items-center gap-1 text-xs text-muted"><MapPin size={12} className="shrink-0" /> <span className="min-w-0 truncate">{item.location}</span></span>
           )}
         </span>
         {item.kind !== "deadline" && item.remind_at && !item.reminder_dismissed && !item.done && (
