@@ -50,7 +50,9 @@ The settings API stores the key encrypted and exposes only whether it is configu
 settings are in `.env`. Set the input and output rates for a metered compatible provider that
 does not return a cost. The daily budget uses a spend ledger that survives chat deletion.
 When OpenRouter supplies a smaller affordable token limit, the app can retry before streaming.
-The default writer can use the existing main model on the same route when needed. Other
+The default writer can use the existing main model on the same route when needed. Set
+`WRITE_ROUTE` to an OpenRouter model ID to change the writer and `WRITE_FALLBACK_ROUTE` to
+explicitly select its alternate for a credit-budget rejection. Other
 credit or credential failures show a provider availability message. Short questions reserve
 fewer output tokens during analysis. If the writer is unavailable after a calculation runs,
 the app still shows and saves the computed result with its evidence.

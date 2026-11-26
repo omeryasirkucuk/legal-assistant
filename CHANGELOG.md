@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3 · 2026-11-26
+
+- Allow an explicitly chosen OpenRouter answer writer to use a separately configured model when the affordable response budget is too small.
+
 ## 0.3.2 · 2026-11-26
 
 - Recover rejected OpenRouter requests with a smaller affordable response budget and use the existing main model when the default writer cannot produce a usable reply. Report unrecoverable provider failures accurately and use a smaller analysis budget for short questions. Return completed calculations with their evidence if the writer is unavailable, and recognize explicit hypothetical severance inputs during an analysis outage. Calculate severance and notice from a stated duration and an explicit date or today scenario.
