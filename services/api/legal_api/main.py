@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
 from legal_api.api import (
+    admin,
     auth,
     chats,
     deadline_calc,
@@ -56,7 +57,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (health, auth, chats, deadline_calc, drafting, files, folders, matters, search,
+    for module in (health, auth, admin, chats, deadline_calc, drafting, files, folders, matters, search,
                    settings):
         app.include_router(module.router)
 

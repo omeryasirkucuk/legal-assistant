@@ -8,6 +8,10 @@ export type Health = {
 };
 
 export type User = { id: string; email: string; name: string; is_admin: boolean; protected_data?: boolean };
+export type AdminUser = Pick<User, "id" | "name" | "email" | "is_admin"> & {
+  today_cost_usd: number;
+  total_cost_usd: number;
+};
 export type LLMSettings = {
   provider: "openai_compatible";
   is_saved: boolean;
@@ -175,6 +179,11 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
 }
 
 export const api = {
+  adminUsers: () => call<AdminUser[]>("/admin/users", { cache: "no-store" }),
+  setUserRole: (id: string, is_admin: boolean) =>
+    call<Pick<AdminUser, "is_admin">>(`/admin/users/${id}/role`, {
+      method: "PATCH", body: JSON.stringify({ is_admin }),
+    }),
   me: () => call<User>("/auth/me"),
   uploadFile: (file: File, folderId?: string | null) => {
     const form = new FormData();

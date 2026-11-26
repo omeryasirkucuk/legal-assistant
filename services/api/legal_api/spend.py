@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from legal_api import llm
 from legal_api.db.app_models import LlmSpend
+
+
+def start_of_utc_day() -> datetime:
+    return datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 async def record_spend(db: AsyncSession, user_id: uuid.UUID, purpose: str,

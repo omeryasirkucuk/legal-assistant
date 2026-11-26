@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.5.0 · 2026-11-27
+
+- Rebuild the web app and API for the administrator panel. The panel reads the existing model spend ledger and roles. No database migration is required.
+
 ## 0.4.0 · 2026-11-27
 
 - Use the Oracle VM Compose runbook to deploy, migrate Postgres and index the core statutes. Configure a private S3 bucket and a separate document key for new production uploads and exports.

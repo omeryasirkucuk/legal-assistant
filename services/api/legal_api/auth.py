@@ -60,5 +60,10 @@ async def current_user(
     raise HTTPException(status.HTTP_401_UNAUTHORIZED)
 
 
+def require_admin(user: User) -> None:
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "administrator access required")
+
+
 CurrentUser = Annotated[User, Depends(current_user)]
 DB = Annotated[AsyncSession, Depends(get_session)]

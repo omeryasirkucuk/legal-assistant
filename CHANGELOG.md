@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 · 2026-11-27
+
+- Added an administrator panel for registered accounts, daily and lifetime model spend, and role changes with last-administrator protection.
+
 ## 0.4.0 · 2026-11-27
 
 - Added ARM production deployment under `legal.folonto.com` and optional encrypted S3 storage for uploads and exports.

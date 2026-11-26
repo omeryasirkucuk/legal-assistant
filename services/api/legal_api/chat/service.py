@@ -14,6 +14,7 @@ from legal_api.agent.turn import EvidenceCopy, Previous
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, LlmSpend, Message, MessageEvidence
 from legal_api.files import store as file_store
+from legal_api.spend import start_of_utc_day
 from legal_api.workspace.documents import WORD_MEDIA_TYPE
 from legal_api.workspace.session import Context
 
@@ -135,9 +136,11 @@ async def save_answer(db: AsyncSession, chat: Chat, result) -> Message:
 
 async def spent_today(db: AsyncSession, user_id: uuid.UUID) -> float:
     """Recorded model spend since 00:00 UTC, independent of chat retention."""
-    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    total = await db.scalar(select(func.coalesce(func.sum(LlmSpend.cost_usd), 0.0))
-                            .where(LlmSpend.user_id == user_id, LlmSpend.created_at >= start))
+    total = await db.scalar(
+        select(func.coalesce(func.sum(LlmSpend.cost_usd), 0.0)).where(
+            LlmSpend.user_id == user_id, LlmSpend.created_at >= start_of_utc_day()
+        )
+    )
     return float(total or 0.0)
 
 
@@ -157,13 +160,12 @@ async def chat_costs(db: AsyncSession, chat_ids: list[uuid.UUID]) -> dict[uuid.U
 
 async def today_stats(db: AsyncSession, user_id: uuid.UUID) -> dict:
     """The user's answers since 00:00 UTC: how many, how long they took, what they cost."""
-    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     seconds = cast(Message.meta["timings"]["total_s"].astext, Float)
     count, average, longest = (await db.execute(
         select(func.count(), func.avg(seconds), func.max(seconds))
         .join(Chat, Chat.id == Message.chat_id)
         .where(Chat.user_id == user_id, Message.role == "assistant",
-               Message.created_at >= start))).one()
+               Message.created_at >= start_of_utc_day()))).one()
     return {"answers": int(count or 0), "average_s": round(float(average or 0), 1),
             "longest_s": round(float(longest or 0), 1),
             # The meter shows what the budget counts: answers and everything else.

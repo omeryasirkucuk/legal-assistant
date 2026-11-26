@@ -63,6 +63,13 @@ citations show a warning alongside the complete answer. When the decision model 
 the app also checks cited claims against those specific sources and marks uncertain support.
 Previous chats display their original citations with a legacy verification label.
 
+## Account administration
+
+Administrators open **Yönetim paneli** from their name at the bottom of the sidebar. It
+lists every registered account with today's and all-time recorded model spend in USD.
+The daily boundary is midnight UTC, as in the API's spending cap. Choose **Yönetici** or
+**Kullanıcı** in a row and save to change the role. At least one administrator must remain.
+
 ## Calculations and document updates in chat
 
 Ask for a calculation in the existing chat. A hypothetical severance or notice question

@@ -3,7 +3,7 @@
 // The account menu, opened from the user's row (or their initials on the collapsed rail):
 // who is signed in, today's use, the writing style, model settings for admins, sign out.
 import { useEffect, useRef } from "react";
-import { LogOut, PenLine, Settings } from "lucide-react";
+import { LogOut, PenLine, Settings, Users } from "lucide-react";
 import type { TodayStats, User } from "@/lib/api";
 import { formatUsd } from "@/lib/format";
 import { t } from "@/lib/i18n";
@@ -17,12 +17,13 @@ type Props = {
   today: TodayStats | null;
   onStyle: () => void;
   onSettings: () => void;
+  onAdmin: () => void;
   onLogout: () => void;
   onClose: () => void;
   className?: string;
 };
 
-export function UserMenu({ user, today, onStyle, onSettings, onLogout, onClose, className = "" }: Props) {
+export function UserMenu({ user, today, onStyle, onSettings, onAdmin, onLogout, onClose, className = "" }: Props) {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,9 +57,14 @@ export function UserMenu({ user, today, onStyle, onSettings, onLogout, onClose, 
           <PenLine size={16} className="text-muted" /> {t("myPetitions")}
         </button>
         {user.is_admin && (
-          <button role="menuitem" onClick={pick(onSettings)} className={item}>
-            <Settings size={16} className="text-muted" /> {t("modelSettings")}
-          </button>
+          <>
+            <button role="menuitem" onClick={pick(onAdmin)} className={item}>
+              <Users size={16} className="text-muted" /> {t("adminPanel")}
+            </button>
+            <button role="menuitem" onClick={pick(onSettings)} className={item}>
+              <Settings size={16} className="text-muted" /> {t("modelSettings")}
+            </button>
+          </>
         )}
       </div>
       <div className="mt-1.5 border-t border-rule pt-1.5">

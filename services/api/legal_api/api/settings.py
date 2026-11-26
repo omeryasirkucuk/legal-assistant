@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from legal_api import llm
-from legal_api.auth import DB, CurrentUser
+from legal_api.auth import DB, CurrentUser, require_admin
 from legal_api.config import get_settings
 from legal_api.db.app_models import LLMConnectionSettings
 from legal_api.privacy.credentials import encrypt_credential
@@ -26,11 +26,6 @@ class LLMSettingsUpdate(BaseModel):
     model_draft: str = Field(min_length=1, max_length=200)
     model_cheap: str = Field(min_length=1, max_length=200)
     model_judge: str = Field(min_length=1, max_length=200)
-
-
-def _admin(user) -> None:
-    if not user.is_admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "administrator access required")
 
 
 def _encrypt(value: str) -> str:
@@ -61,13 +56,13 @@ def _out(row: LLMConnectionSettings | None) -> dict:
 
 @router.get("/llm")
 async def get_llm_settings(user: CurrentUser, db: DB) -> dict:
-    _admin(user)
+    require_admin(user)
     return _out(await db.get(LLMConnectionSettings, 1))
 
 
 @router.put("/llm")
 async def update_llm_settings(body: LLMSettingsUpdate, user: CurrentUser, db: DB) -> dict:
-    _admin(user)
+    require_admin(user)
     if get_settings().protected_data:
         raise HTTPException(status.HTTP_409_CONFLICT, "model is managed by the operator")
     base_url = body.base_url.strip().rstrip("/")
@@ -110,7 +105,7 @@ async def update_llm_settings(body: LLMSettingsUpdate, user: CurrentUser, db: DB
 
 @router.get("/llm/models")
 async def list_llm_models(user: CurrentUser, db: DB) -> list[dict]:
-    _admin(user)
+    require_admin(user)
     if get_settings().protected_data:
         raise HTTPException(status.HTTP_409_CONFLICT, "model is managed by the operator")
     row = await db.get(LLMConnectionSettings, 1)
@@ -147,7 +142,7 @@ async def list_llm_models(user: CurrentUser, db: DB) -> list[dict]:
 
 @router.post("/llm/test")
 async def test_llm_connection(user: CurrentUser, db: DB) -> dict:
-    _admin(user)
+    require_admin(user)
     row = await db.get(LLMConnectionSettings, 1)
     if row is None and not get_settings().protected_data:
         raise HTTPException(status.HTTP_409_CONFLICT, "save a model connection first")
