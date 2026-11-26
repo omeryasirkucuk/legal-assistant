@@ -28,8 +28,9 @@ make test                 # backend tests, with or without a populated statute i
 ```
 
 Set `SECRET_KEY` in `.env` to a cryptographically random value of at least 32 characters.
-Set `INVITE_CODE` to register the first account, which becomes the administrator. Clear it
-and restart the API when registration should close. Use `COOKIE_SECURE=true` when serving
+On an empty database, set a private `INVITE_CODE` to create the first administrator.
+Remove the bootstrap code from the environment after creating that account. For subsequent
+registrations, create an invitation from the admin panel. Use `COOKIE_SECURE=true` when serving
 the API over HTTPS. An alternate web API URL goes in `apps/web/.env.local` as
 `NEXT_PUBLIC_API_URL` before starting or building the web app.
 
@@ -76,6 +77,11 @@ lists every registered account with today's and all-time recorded model spend in
 The daily boundary is midnight UTC, as in the API's spending cap. Choose **Yönetici** or
 **Kullanıcı** in a row and save to change the role. At least one administrator must remain.
 
+Under **Yeni kullanıcı daveti**, enter the recipient's email address and choose
+**Davet kodu oluştur**. Copy the displayed code and share it privately with the recipient.
+They enter it with the same email address on the registration screen. Each code is unique
+and is consumed when registration succeeds.
+
 ## Calendar and reminders
 
 Open **Takvim → Kayıt ekle**, or select a day and choose **Bu güne ekle**.
@@ -99,7 +105,7 @@ Open a saved event and choose **ICS indir** to import a copy with its scheduled 
 into a calendar app that supports iCalendar. The file includes the event's title,
 location and notes. The external app controls notification delivery for imported events.
 
-For local upgrades to 0.7.0, run `make setup` and `make migrate` before restarting the API
+For local upgrades to 0.8.0, run `make setup` and `make migrate` before restarting the API
 and rebuilding the frontend. For Folonto production, follow the [deployment runbook](docs/DEPLOYMENT.md).
 
 ## Calculations and document updates in chat

@@ -135,10 +135,12 @@ copy comes from `locales/tr/common.json`. Existing chats can be given generated 
 
 ## Security and spend controls
 
-Registration requires `INVITE_CODE`; passwords use scrypt; sessions are signed cookies
-(`COOKIE_SECURE=true` behind HTTPS); each user has a daily LLM budget
-(`DAILY_USER_BUDGET_USD`, default 3); Postgres listens on localhost only; provider keys live in
-`.env` (git-ignored) or encrypted in the database.
+The first administrator uses the `INVITE_CODE` bootstrap setting. Later accounts require an
+email-bound, single-use token issued by an administrator. Postgres stores the code hash and
+records redemption in the same transaction as account creation. Passwords use scrypt.
+Sessions use signed cookies (`COOKIE_SECURE=true` behind HTTPS). Each user has a daily LLM
+budget (`DAILY_USER_BUDGET_USD`, default 3). Postgres listens on localhost only. Provider keys
+live in `.env` (git-ignored) or encrypted in the database.
 
 ## Running locally
 

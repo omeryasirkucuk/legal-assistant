@@ -41,6 +41,14 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class RegistrationInvite(Base):
+    __tablename__ = "registration_invites"
+
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class LLMConnectionSettings(Base):
     """Shared provider connection edited by app administrators; credentials are encrypted."""
 

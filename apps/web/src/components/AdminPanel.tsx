@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { api, ApiError, type AdminUser } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -70,6 +70,7 @@ export function AdminPanel({ ownId, onClose, onDemoted }: Props) {
           </button>
         </header>
         <div className="px-5 pb-5 pt-4 sm:px-6">
+          <InviteForm />
           {error && <p role="alert" className="mb-4 text-sm text-danger">{error}</p>}
           {notice && <p role="status" className="mb-4 text-sm text-verified">{notice}</p>}
           {users === null && !error && <p role="status" className="text-sm text-muted">{t("loading")}</p>}
@@ -107,6 +108,74 @@ export function AdminPanel({ ownId, onClose, onDemoted }: Props) {
         </div>
       </section>
     </dialog>
+  );
+}
+
+function InviteForm() {
+  const [invite, setInvite] = useState<{ email: string; code: string } | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("");
+
+  async function create(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const email = String(new FormData(event.currentTarget).get("email"));
+    setCreating(true);
+    setFeedback("");
+    setError("");
+    try {
+      setInvite(await api.createInvite(email));
+    } catch (e) {
+      const key = e instanceof ApiError && e.status === 409 ? "adminInviteRegistered" : "adminInviteError";
+      setError(t(key));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function copy(code: string) {
+    try {
+      await navigator.clipboard.writeText(code);
+      setFeedback(t("adminInviteCopied"));
+    } catch {
+      setFeedback(t("adminInviteCopyError"));
+    }
+  }
+
+  return (
+    <section className="mb-5 border-b border-rule pb-5" aria-labelledby="admin-invite-title">
+      <h3 id="admin-invite-title" className="text-base font-medium">{t("adminInviteTitle")}</h3>
+      <p className="mt-1 text-sm text-muted">{t("adminInviteDescription")}</p>
+      <form onSubmit={create} className="mt-3 flex flex-wrap items-end gap-2">
+        <label className="min-w-40 flex-1 text-sm">
+          {t("email")}
+          <input name="email" required type="email" autoComplete="off" disabled={creating}
+            className="mt-1 block w-full rounded-md border border-rule bg-sheet px-3 py-2" />
+        </label>
+        <button type="submit" disabled={creating}
+          className="rounded-md border border-rule bg-sheet px-3 py-2 text-sm hover:bg-paper disabled:opacity-40">
+          {t(creating ? "loading" : "adminInviteCreate")}
+        </button>
+      </form>
+      {error && <p role="alert" className="mt-2 text-sm text-danger">{error}</p>}
+      {invite && (
+        <div className="mt-3 rounded-md border border-rule bg-sheet p-3">
+          <label className="block break-all text-sm" htmlFor="admin-invite-code">
+            {t("adminInviteFor", { email: invite.email })}
+          </label>
+          <div className="mt-1 flex gap-2">
+            <input id="admin-invite-code" readOnly value={invite.code}
+              onFocus={(event) => event.currentTarget.select()}
+              className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-2 py-2 font-mono text-sm" />
+            <button type="button" onClick={() => void copy(invite.code)}
+              className="rounded-md border border-rule px-3 py-2 text-sm hover:bg-paper">
+              {t("adminInviteCopy")}
+            </button>
+          </div>
+          {feedback && <p role="status" className="mt-2 text-sm text-muted">{feedback}</p>}
+        </div>
+      )}
+    </section>
   );
 }
 

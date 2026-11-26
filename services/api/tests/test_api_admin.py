@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 from uuid import uuid4
 
@@ -6,7 +7,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select
 
 from legal_api.auth import session_token
-from legal_api.db.app_models import LlmSpend, User
+from legal_api.config import get_settings
+from legal_api.db.app_models import LlmSpend, RegistrationInvite, User
 from legal_api.db.session import get_sessionmaker
 from legal_api.main import create_app
 from legal_api.spend import start_of_utc_day
@@ -86,3 +88,78 @@ async def test_the_only_admin_cannot_be_demoted(accounts):
         response = await operator.patch(f"/admin/users/{admin.id}/role", json={"is_admin": False})
         assert response.status_code == 409
         assert (await operator.get("/auth/me")).json()["is_admin"] is True
+
+
+async def test_admin_invites_are_unique_bound_to_email_and_single_use(accounts, monkeypatch):
+    admin, member, _ = accounts
+    email, other_email = (f"{uuid4()}@example.com" for _ in range(2))
+    monkeypatch.setattr(get_settings(), "invite_code", "test-bootstrap")
+    registration = {"email": email, "name": "Invitee", "password": "test-pass-123"}
+
+    try:
+        async with _client(admin) as operator, _client(member) as participant, _client() as guest:
+            path = "/admin/invites"
+            recipient = {"email": email.upper()}
+            assert (await guest.post(path, json=recipient)).status_code == 401
+            assert (await participant.post(path, json=recipient)).status_code == 403
+            assert (await operator.post(path, json={"email": "invalid"})).status_code == 422
+            assert (await operator.post(path, json={"email": member.email})).status_code == 409
+
+            first = await operator.post(path, json=recipient)
+            second = await operator.post(path, json={"email": other_email})
+            assert first.status_code == second.status_code == 201
+            assert first.headers["Cache-Control"] == "no-store"
+            assert first.json()["email"] == email
+            code = first.json()["code"]
+            assert code != second.json()["code"]
+
+            register = "/auth/register"
+            assert (await guest.post(register, json={
+                **registration, "invite_code": "test-bootstrap",
+            })).status_code == 403
+            assert (await guest.post(register, json={
+                **registration, "email": other_email, "invite_code": code,
+            })).status_code == 403
+
+            payload = {**registration, "email": email.upper(), "invite_code": code}
+            async with _client() as concurrent:
+                results = await asyncio.gather(
+                    guest.post(register, json=payload),
+                    concurrent.post(register, json=payload),
+                )
+            assert sorted(r.status_code for r in results) == [201, 403]
+            created = next(r.json() for r in results if r.status_code == 201)
+            assert created["email"] == email and created["is_admin"] is False
+            assert (await guest.post(register, json=payload)).status_code == 403
+
+            other = await guest.post(register, json={
+                **registration, "email": other_email, "invite_code": second.json()["code"],
+            })
+            assert other.status_code == 201
+    finally:
+        async with get_sessionmaker()() as db:
+            await db.execute(delete(RegistrationInvite).where(RegistrationInvite.email.in_([email, other_email])))
+            await db.execute(delete(User).where(User.email.in_([email, other_email])))
+            await db.commit()
+
+
+async def test_bootstrap_creates_only_the_first_admin(monkeypatch):
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as db:
+        if await db.scalar(select(User.id).limit(1)) is not None:
+            pytest.skip("Requires a database without preexisting accounts")
+
+    monkeypatch.setattr(get_settings(), "invite_code", "test-bootstrap")
+    email, other_email = (f"{uuid4()}@example.com" for _ in range(2))
+    payload = {"email": email, "name": "First", "password": "test-pass-123",
+               "invite_code": "test-bootstrap"}
+    try:
+        async with _client() as guest:
+            result = await guest.post("/auth/register", json=payload)
+            assert result.status_code == 201 and result.json()["is_admin"] is True
+            blocked = await guest.post("/auth/register", json={**payload, "email": other_email})
+            assert blocked.status_code == 403
+    finally:
+        async with sessionmaker() as db:
+            await db.execute(delete(User).where(User.email.in_([email, other_email])))
+            await db.commit()

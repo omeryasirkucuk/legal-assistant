@@ -10,8 +10,10 @@ The proxy redirects HTTP to HTTPS. Postgres and the API are reachable within the
 Place the checkout at `/opt/legal-folonto` with Docker and Docker Compose installed. Copy
 `deploy/.env.example` to `deploy/.env` with mode 600. Set a random hex Postgres password,
 an independent random session secret, and an independent 32-byte URL-safe base64 document
-encryption key. Save a recovery copy of the encryption key separately. Use a strong private
-`INVITE_CODE` to enroll users. Clearing it and recreating the API closes registration.
+encryption key. Save a recovery copy of the encryption key separately. For a fresh database,
+use a strong private `INVITE_CODE` to register the first administrator, then remove the
+bootstrap code from the environment. Create single-use, email-bound codes for additional
+users in **Yönetim paneli → Yeni kullanıcı daveti**.
 
 Enable S3 Block Public Access for the bucket. Give the API identity permission to get, put
 and delete only objects under the bucket's `sealed/` prefix. Keep the bucket, associated

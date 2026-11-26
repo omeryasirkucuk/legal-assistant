@@ -190,6 +190,8 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
 }
 
 export const api = {
+  createInvite: (email: string) =>
+    call<{ email: string; code: string }>("/admin/invites", json({ email })),
   adminUsers: () => call<AdminUser[]>("/admin/users", { cache: "no-store" }),
   setUserRole: (id: string, is_admin: boolean) =>
     call<Pick<AdminUser, "is_admin">>(`/admin/users/${id}/role`, {

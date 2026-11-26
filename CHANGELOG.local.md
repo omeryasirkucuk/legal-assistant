@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.8.0 · 2026-11-27
+
+- Run `make setup` and `make migrate` before restarting the API and rebuilding the web client. The migration adds the invitation table.
+- For an existing installation, issue new codes under **Yönetim paneli → Yeni kullanıcı daveti**. Clear any leftover `INVITE_CODE` from the environment.
+
 ## 0.7.0 · 2026-11-27
 
 - Run `make setup` and `make migrate`, then restart the API and rebuild the web app. The migration adds `calendar_events` and preserves existing case deadlines.

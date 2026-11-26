@@ -14,10 +14,10 @@ from legal_api.chat.service import drop_unanswered
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, Message
 from legal_api.main import create_app
+from tests.accounts import register_invited
 
 TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
 
-get_settings().invite_code = "test-invite"
 _created: list[str] = []
 
 
@@ -55,8 +55,7 @@ async def test_answer_spend_survives_chat_deletion(monkeypatch):
     monkeypatch.setattr(chats, "generate_title", title)
     monkeypatch.setattr(chats, "turn_events", answer)
     async with await _client() as c:
-        await c.post("/auth/register", json={"email": _email("test"), "password": "secret-pass",
-                                              "name": "Test", "invite_code": "test-invite"})
+        await register_invited(c, _email("test"), "Test")
         chat_id = (await c.post("/chats", json={"content": "Question"})).json()["id"]
         response = await c.post(f"/chats/{chat_id}/messages", json={"content": "Question"})
         assert "event: saved" in response.text
@@ -73,8 +72,7 @@ async def test_auth_and_chat_lifecycle():
     email = _email("test")
     async with await _client() as c:
         assert (await c.get("/chats")).status_code == 401
-        r = await c.post("/auth/register", json={"email": email, "password": "secret-pass",
-                                                  "name": "Test", "invite_code": "test-invite"})
+        r = await register_invited(c, email, "Test")
         assert r.status_code == 201
         assert (await c.get("/auth/me")).json()["email"] == email
 
@@ -92,15 +90,12 @@ async def test_auth_and_chat_lifecycle():
 async def test_wrong_password_and_foreign_chat_are_rejected():
     email = _email("test")
     async with await _client() as owner:
-        await owner.post("/auth/register", json={"email": email, "password": "secret-pass",
-                                                  "name": "Owner", "invite_code": "test-invite"})
+        await register_invited(owner, email, "Owner")
         chat = (await owner.post("/chats", json={"content": "x"})).json()
     async with await _client() as other:
         assert (await other.post("/auth/login", json={"email": email, "password": "wrong-pass"})
                 ).status_code == 401
-        await other.post("/auth/register", json={
-            "email": _email("o"), "password": "secret-pass",
-            "name": "Other", "invite_code": "test-invite"})
+        await register_invited(other, _email("o"), "Other")
         assert (await other.get(f"/chats/{chat['id']}/messages")).status_code == 404
 
 
@@ -114,8 +109,7 @@ async def test_registration_requires_the_invite_code():
 
 async def test_an_unanswered_last_question_is_dropped():
     async with await _client() as c:
-        await c.post("/auth/register", json={"email": _email("test"), "password": "secret-pass",
-                                              "name": "T", "invite_code": "test-invite"})
+        await register_invited(c, _email("test"), "T")
         chat_id = (await c.post("/chats", json={"content": "x"})).json()["id"]
     engine = create_async_engine(get_settings().database_url)
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
@@ -134,14 +128,7 @@ async def test_change_password_keeps_current_session_and_invalidates_other_sessi
     old, new = "original-test-secret", "new-test-secret"
     change = {"current_password": old, "new_password": new}
     async with await _client() as owner, await _client() as other, await _client() as guest:
-        # Reserve the first-user administrator role on a fresh database, so this test
-        # exercises password changes for a regular account.
-        await owner.post("/auth/register", json={"email": _email("password-admin"),
-                                                 "password": old, "name": "First",
-                                                 "invite_code": "test-invite"})
-        registered = await owner.post("/auth/register", json={"email": email, "password": old,
-                                                               "name": "User",
-                                                               "invite_code": "test-invite"})
+        registered = await register_invited(owner, email, "User", old)
         assert registered.status_code == 201 and not registered.json()["is_admin"]
         assert (await other.post("/auth/login", json={"email": email, "password": old})).status_code == 200
         assert (await guest.put("/auth/password", json=change)).status_code == 401

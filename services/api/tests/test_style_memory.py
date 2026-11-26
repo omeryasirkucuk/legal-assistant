@@ -10,10 +10,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from legal_api.config import get_settings
 from legal_api.drafting import memory, store
 from legal_api.main import create_app
+from tests.accounts import register_invited
 
 TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
-
-get_settings().invite_code = "test-invite"
 
 
 @pytest.fixture
@@ -21,8 +20,7 @@ async def session_and_user():
     email = f"mem-{uuid.uuid4().hex[:8]}@example.com"
     async with AsyncClient(transport=ASGITransport(app=create_app()),
                            base_url="http://test") as c:
-        await c.post("/auth/register", json={"email": email, "password": "secret-pass",
-                                              "name": "M", "invite_code": "test-invite"})
+        await register_invited(c, email, "M")
     engine = create_async_engine(get_settings().database_url)
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         user = (await db.execute(text("SELECT id FROM users WHERE email = :e"),

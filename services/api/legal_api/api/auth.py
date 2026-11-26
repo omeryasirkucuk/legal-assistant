@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+from datetime import UTC, datetime
+from hashlib import sha256
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 
 from legal_api.auth import (
     COOKIE,
@@ -19,7 +21,7 @@ from legal_api.auth import (
     session_token,
 )
 from legal_api.config import get_settings
-from legal_api.db.app_models import User
+from legal_api.db.app_models import RegistrationInvite, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -59,15 +61,26 @@ def _set_cookie(response: Response, user: User) -> None:
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: Registration, response: Response, db: DB) -> UserOut:
-    expected = get_settings().invite_code
-    if not expected or not hmac.compare_digest(body.invite_code.strip(), expected):
+    code = body.invite_code.strip().encode()
+    if not code:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid invite code")
-    # Pick one initial administrator even when two invitations are used concurrently.
+
+    # Serialize registrations so bootstrap and invite redemption are single-use.
     await db.execute(text("SELECT pg_advisory_xact_lock(739128301)"))
     email = body.email.lower()
-    if await db.scalar(select(User).where(User.email == email)):
-        raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
-    is_admin = not bool(await db.scalar(select(func.count()).select_from(User)))
+    is_admin = await db.scalar(select(User.id).limit(1)) is None
+    if is_admin:
+        expected = get_settings().invite_code.encode()
+        if not expected or not hmac.compare_digest(code, expected):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid invite code")
+    else:
+        invite = await db.get(RegistrationInvite, sha256(code).hexdigest())
+        if invite is None or invite.email != email or invite.used_at is not None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid invite code")
+        if await db.scalar(select(User.id).where(User.email == email)) is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
+        invite.used_at = datetime.now(UTC)
+
     user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password),
                 is_admin=is_admin)
     db.add(user)

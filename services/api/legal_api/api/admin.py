@@ -1,13 +1,15 @@
 """Account and model-spend administration."""
 
+import secrets
 import uuid
+from hashlib import sha256
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, StrictBool
+from fastapi import APIRouter, HTTPException, Response, status
+from pydantic import BaseModel, EmailStr, StrictBool
 from sqlalchemy import func, select, text
 
 from legal_api.auth import DB, CurrentUser, require_admin
-from legal_api.db.app_models import LlmSpend, User
+from legal_api.db.app_models import LlmSpend, RegistrationInvite, User
 from legal_api.spend import start_of_utc_day
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -23,6 +25,28 @@ class AccountSummary(AccountRole):
     email: str
     today_cost_usd: float
     total_cost_usd: float
+
+
+class InviteRecipient(BaseModel):
+    email: EmailStr
+
+
+class InviteCode(InviteRecipient):
+    code: str
+
+
+@router.post("/invites", status_code=status.HTTP_201_CREATED)
+async def create_invite(body: InviteRecipient, response: Response, user: CurrentUser, db: DB) -> InviteCode:
+    require_admin(user)
+    email = body.email.lower()
+    if await db.scalar(select(User.id).where(User.email == email)) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
+
+    code = secrets.token_urlsafe(32)
+    db.add(RegistrationInvite(code_hash=sha256(code.encode()).hexdigest(), email=email))
+    await db.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return InviteCode(email=email, code=code)
 
 
 @router.get("/users", response_model=list[AccountSummary])

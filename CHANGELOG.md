@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0 · 2026-11-27
+
+- Generate unique, single-use registration codes tied to the recipient's email address from the admin panel.
+- Reserve the environment's bootstrap code for the first administrator on a fresh database.
+
 ## 0.7.0 · 2026-11-27
 
 - Create, edit, complete and delete hearings, meetings, personal reminders and other events from the calendar. Link entries to cases when needed and manage them from the case page.

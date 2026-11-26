@@ -18,6 +18,7 @@ from legal_api.sources.gateway import Gateway
 from legal_api.workspace.engine import InvalidPlan, Plan, evaluate
 from legal_api.workspace.ground import ground
 from legal_api.workspace.public import PublicResearch, public_query
+from tests.accounts import register_invited
 
 OFFICIAL = (
     "https://cdn.tbmm.gov.tr/KKBSPublicFile/D24/Y3/T1/KanunMetni/"
@@ -126,7 +127,6 @@ async def test_web_scope_and_protected_mode(monkeypatch):
 
 async def test_chat_unknown_case_reformat_update_edit_and_account_isolation(monkeypatch, tmp_path):
     settings = get_settings()
-    monkeypatch.setattr(settings, "invite_code", "local-test-invite")
     monkeypatch.setattr(settings, "storage_dir", tmp_path)
     monkeypatch.setattr(settings, "brave_search_api_key", "test-key")
     monkeypatch.setattr(settings, "data_mode", "development")
@@ -206,10 +206,8 @@ async def test_chat_unknown_case_reformat_update_edit_and_account_isolation(monk
     app = create_app()
 
     async def register(client):
-        result = await client.post("/auth/register", json={
-            "email": f"workspace-{uuid.uuid4()}@example.com", "password": "test-pass-123",
-            "name": "Workspace test", "invite_code": "local-test-invite"})
-        assert result.status_code in (200, 201), result.text
+        await register_invited(client, f"workspace-{uuid.uuid4()}@example.com",
+                               "Workspace test", "test-pass-123")
 
     async with (
         httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,

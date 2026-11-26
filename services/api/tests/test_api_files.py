@@ -16,8 +16,7 @@ from legal_api.db.session import get_sessionmaker
 from legal_api.files import store
 from legal_api.files.store import encrypt_existing
 from legal_api.main import create_app
-
-get_settings().invite_code = "test-invite"
+from tests.accounts import register_invited
 
 SAMPLE = json.loads((Path(__file__).parent / "fixtures" / "tr" / "file_upload.json")
                     .read_text(encoding="utf-8"))
@@ -29,8 +28,7 @@ async def client(tmp_path, monkeypatch):
     email = f"files-{uuid.uuid4().hex[:8]}@example.com"
     async with AsyncClient(transport=ASGITransport(app=create_app()),
                            base_url="http://test") as c:
-        await c.post("/auth/register", json={"email": email, "password": "secret-pass",
-                                              "name": "F", "invite_code": "test-invite"})
+        await register_invited(c, email, "F")
         yield c
     engine = create_async_engine(get_settings().database_url)
     async with engine.begin() as conn:

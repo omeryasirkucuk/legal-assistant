@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # Signs session cookies. Override in .env for anything beyond local development.
     secret_key: str = "dev-only-insecure-secret"
-    # Registration needs this code; empty means registration is closed.
+    # Bootstrap code for the first administrator on an empty database.
     invite_code: str = ""
     # True behind HTTPS (the public deployment); False for plain-http local development.
     cookie_secure: bool = False

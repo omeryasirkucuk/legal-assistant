@@ -39,8 +39,9 @@ viewer and provide extracted text when their contents are needed for an answer.
    model. Review the selected endpoint's sub-processors and any upstream routing separately.
 4. Set `COOKIE_SECURE=true`. Set `WEB_ORIGINS` to a JSON list of the web origins if the API is
    served from another origin on the same site. For a same-origin proxy, set `NEXT_PUBLIC_API_URL=/api` in
-   `apps/web/.env.local` before building and strip the `/api` prefix at the proxy. Close public
-   registration by clearing `INVITE_CODE` after enrollment.
+   `apps/web/.env.local` before building and strip the `/api` prefix at the proxy. Remove
+   `INVITE_CODE` after creating the first administrator. Issue subsequent invitations from the
+   admin panel and share each code privately with its intended recipient.
 5. Take a recoverable backup of the existing deployment in maintenance mode. Stop API writes,
    run `make migrate`, then run the seal operation with `DOCUMENT_ENCRYPTION_KEY` set.
 

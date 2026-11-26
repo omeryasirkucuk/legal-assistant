@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from legal_api.config import get_settings
 from legal_api.locale import matter_terms
 from legal_api.main import create_app
+from tests.accounts import register_invited
 
 FIXTURES = Path(__file__).parent / "fixtures" / "tr"
-get_settings().invite_code = "test-invite"
 
 
 @pytest.fixture
@@ -22,8 +22,7 @@ async def client(tmp_path, monkeypatch):
     email = f"matter-{uuid.uuid4().hex[:8]}@example.com"
     async with AsyncClient(transport=ASGITransport(app=create_app()),
                            base_url="http://test") as c:
-        await c.post("/auth/register", json={"email": email, "password": "secret-pass",
-                                              "name": "M", "invite_code": "test-invite"})
+        await register_invited(c, email, "M")
         yield c
     engine = create_async_engine(get_settings().database_url)
     async with engine.begin() as conn:
@@ -187,8 +186,7 @@ async def test_calendar_events_and_links_are_private(client):
     email = f"calendar-{uuid.uuid4().hex[:8]}@example.com"
     try:
         async with AsyncClient(transport=ASGITransport(app=create_app()), base_url="http://test") as other:
-            r = await other.post("/auth/register", json={"email": email, "password": "secret-pass",
-                                                         "name": "Other", "invite_code": "test-invite"})
+            r = await register_invited(other, email, "Other")
             assert r.status_code == 201
             assert (await other.get("/calendar/events")).json() == []
             assert (await other.get("/calendar/reminders")).json() == []

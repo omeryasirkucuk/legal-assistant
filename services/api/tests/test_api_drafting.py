@@ -13,10 +13,10 @@ from legal_api.config import get_settings
 from legal_api.drafting import store as drafting_store
 from legal_api.drafting.sample_profile import SampleProfile
 from legal_api.main import create_app
+from tests.accounts import register_invited
 
 TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
 
-get_settings().invite_code = "test-invite"
 FORMAL = (Path(__file__).parent / "fixtures" / "tr" / "petition_formal.txt").read_text(
     encoding="utf-8")
 
@@ -43,8 +43,7 @@ async def client():
     email = f"draft-{uuid.uuid4().hex[:8]}@example.com"
     async with AsyncClient(transport=ASGITransport(app=create_app()),
                            base_url="http://test") as c:
-        await c.post("/auth/register", json={"email": email, "password": "secret-pass",
-                                              "name": "D", "invite_code": "test-invite"})
+        await register_invited(c, email, "D")
         yield c
     engine = create_async_engine(get_settings().database_url)
     async with engine.begin() as conn:
