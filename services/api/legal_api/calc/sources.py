@@ -20,12 +20,13 @@ from legal_api.calc.deadlines import UNITS, Deadline, compute
 from legal_api.calc.interest import KINDS as INTEREST_KINDS
 from legal_api.calc.interest import compute as compute_interest
 from legal_api.calc.interest_text import render as render_interest
+from legal_api.calc.severance import Severance, compute_months
 from legal_api.calc.severance import compute as compute_severance
-from legal_api.calc.severance import compute_months
+from legal_api.calc.severance_text import ceiling_text
 from legal_api.calc.severance_text import render as render_severance
 from legal_api.grounding.evidence import EvidenceLedger
 from legal_api.grounding.normalize import tr_fold
-from legal_api.locale import calculation_terms, number_words
+from legal_api.locale import calculation_terms, number_words, severance_data
 
 CIVIL_PROCEDURE = "6100"
 RECESS_ARTICLES = ("103", "104")   # matters handled in the recess; periods it extends
@@ -126,33 +127,58 @@ SEVERANCE_ARTICLES = (("1475", "14"), ("4857", "17"))
 
 async def severance_sources(spec: dict, finder: SourceFinder,
                             ledger: EvidenceLedger) -> list[Source]:
-    """Use stated dates or a stated duration with the applicable end-date scenario."""
-    try:
-        today_scenario = spec["end_date"] == "today"
-        end = (datetime.now(ZoneInfo("Europe/Istanbul")).date() if today_scenario
-               else date.fromisoformat(spec["end_date"]))
-        monthly = Decimal(str(spec["gross_monthly"])) + Decimal(str(spec.get("extras_monthly") or 0))
-        if not monthly.is_finite() or monthly <= 0:
-            return []
-        duration = re.fullmatch(r"P([1-9][0-9]{0,3})M", spec["start_date"])
-        if duration:
-            months = int(duration[1])
-            if months > 1200:
-                return []
-            record = compute_months(months, end, monthly)
-        else:
-            start = date.fromisoformat(spec["start_date"])
-            if end <= start:
-                return []
-            record = compute_severance(start, end, monthly)
-    except (KeyError, TypeError, ValueError, ArithmeticError):
+    """Return the calculation and legal sources for the model-extracted inputs."""
+    calculated = severance_from_spec(spec)
+    if calculated is None:
         return []
-    text = render_severance(record, today_scenario=today_scenario)
+    result, assumed_end = calculated
+    computation = severance_calculation(result, ledger, assumed_end=assumed_end)
+    ceiling = severance_ceiling_source(result, ledger)
     out = [a for law, label in SEVERANCE_ARTICLES if (a := await finder.article(law, label))]
+    return [computation, *([ceiling] if ceiling else []), *out]
+
+
+def severance_from_spec(spec: dict) -> tuple[Severance, bool] | None:
+    try:
+        start = date.fromisoformat(spec["start_date"]) if spec.get("start_date") else None
+        end = date.fromisoformat(spec["end_date"]) if spec.get("end_date") else None
+        gross = Decimal(str(spec["gross_monthly"]))
+        extras = Decimal(str(spec.get("extras_monthly") or 0))
+        months = spec.get("service_months")
+    except (KeyError, ValueError, TypeError, ArithmeticError):
+        return None
+    if not gross.is_finite() or not extras.is_finite() or gross <= 0 or extras < 0:
+        return None
+    monthly = gross + extras
+    if start and end:
+        return (compute_severance(start, end, monthly), False) if start <= end else None
+    if start or type(months) is not int or months <= 0:
+        return None
+    if end is None and spec.get("estimate_current_period") is not True:
+        return None
+    day = end or datetime.now(ZoneInfo("Europe/Istanbul")).date()
+    return compute_months(months, day, monthly), end is None
+
+
+def severance_calculation(result: Severance, ledger: EvidenceLedger, *,
+                          assumed_end: bool) -> Source:
+    text = render_severance(result, assumed_end=assumed_end)
+    service = result.start or result.service.total_months
     evidence = ledger.add_calculation(
-        source_id=f"calc:severance:{record.start}:{record.service}:{end}:{monthly}:{today_scenario}",
+        source_id=f"calc:severance:{service}:{result.end}:{result.monthly}:{assumed_end}",
         citation=calculation_terms()["severance"]["citation"], text=text)
-    return [*out, Source(evidence, text)]
+    return Source(evidence, text)
+
+
+def severance_ceiling_source(result: Severance, ledger: EvidenceLedger) -> Source | None:
+    if result.ceiling_period is None:
+        return None
+    text = ceiling_text(result)
+    evidence = ledger.add_record(
+        kind="official", source_id=f"severance-ceiling:{result.ceiling_period[0]}",
+        citation=calculation_terms()["severance"]["ceiling_source"],
+        url=severance_data()["ceiling_source_url"], text=text)
+    return Source(evidence, text)
 
 
 async def interest_sources(spec: dict, ledger: EvidenceLedger) -> list[Source]:

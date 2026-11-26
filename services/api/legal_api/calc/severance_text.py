@@ -19,33 +19,36 @@ def _day(d: date) -> str:
     return d.strftime("%d.%m.%Y")
 
 
-def render(r: Severance, *, today_scenario: bool = False) -> str:
+def render(r: Severance, *, assumed_end: bool = False) -> str:
     t = calculation_terms()["severance"]
     s = r.service
-    years = Decimal(s.years) + Decimal(s.months) / 12 + Decimal(s.days) / 365
     lines = [t["title"]]
-    if r.start:
+    if r.start is None:
+        lines.append(t["months"].format(months=s.total_months))
+        key = "assumed_end" if assumed_end else "end"
+        lines.append(t[key].format(end=_day(r.end)))
+    else:
         lines.append(t["service"].format(start=_day(r.start), end=_day(r.end), years=s.years,
                                          months=s.months, days=s.days))
-    else:
-        lines.append(t["service_months"].format(months=s.total_months))
-    if today_scenario or not r.start:
-        lines.append(t["today_scenario" if today_scenario else "known_end"].format(end=_day(r.end)))
     lines.append(t["monthly"].format(monthly=money(r.monthly)))
-    if r.ceiling is None:
+    if "under_one_year" in r.warnings:
+        lines.append(t["under_one_year"])
+    elif r.ceiling is None:
         lines.append(t["ceiling_missing"].format(end=_day(r.end)))
     else:
         lines.append(t["ceiling"].format(ceiling=money(r.ceiling), base=money(r.base)))
-    if "under_one_year" in r.warnings:
-        lines.append(t["under_one_year"])
-    elif r.ceiling is not None:
-        lines.append(t["severance"].format(base=money(r.base),
-                                           years_decimal=f"{years:.4f}".replace(".", ","),
+        lines.append(t["severance"].format(base=money(r.base), years=s.years,
+                                           months=s.months, days=s.days,
                                            severance=money(r.severance)))
         lines.append(t["stamp"].format(stamp=money(r.stamp_duty),
                                        net=money(r.severance - r.stamp_duty)))
-    daily = (r.monthly / 30).quantize(Decimal("0.01"))
-    lines.append(t["notice"].format(weeks=r.notice_weeks, daily=money(daily),
+    lines.append(t["notice"].format(weeks=r.notice_weeks, monthly=money(r.monthly),
                                     days=r.notice_weeks * 7, notice=money(r.notice)))
     lines.append(t["condition"])
     return "\n".join(lines)
+
+
+def ceiling_text(r: Severance) -> str:
+    start, end = r.ceiling_period
+    return calculation_terms()["severance"]["official_period"].format(
+        start=_day(start), end=_day(end), ceiling=money(r.ceiling))

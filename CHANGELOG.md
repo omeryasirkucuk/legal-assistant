@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.4 · 2026-11-26
+
+- Pass model-extracted service duration and gross pay to the severance calculator even when employment dates are incomplete. Explain date assumptions and cite the applicable official ceiling period.
+- Give calculation results and their source documents priority in answers. Keep unsupported periods from producing an uncapped severance result.
+- Batch citation support checks for claims using the same sources and give the verifier the surrounding paragraph for each claim.
+- Use model-based input extraction instead of matching question phrases during provider outages. Preserve completed calculations if the writer is unavailable.
+
 ## 0.3.3 · 2026-11-26
 
 - Allow an explicitly chosen OpenRouter answer writer to use a separately configured model when the affordable response budget is too small.

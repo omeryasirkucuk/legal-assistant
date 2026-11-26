@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from legal_api import llm
 from legal_api.calc.deadlines import UNITS
@@ -65,8 +66,11 @@ _SCHEMA = {
             "type": "object",
             "properties": {"start_date": {"type": "string"}, "end_date": {"type": "string"},
                            "gross_monthly": {"type": "number"},
-                           "extras_monthly": {"type": "number"}},
-            "required": ["start_date", "end_date", "gross_monthly", "extras_monthly"],
+                           "extras_monthly": {"type": "number"},
+                           "service_months": {"type": "integer"},
+                           "estimate_current_period": {"type": "boolean"}},
+            "required": ["start_date", "end_date", "gross_monthly", "extras_monthly",
+                         "service_months", "estimate_current_period"],
             "additionalProperties": False}},
         "deadlines": {"type": "array", "items": {
             "type": "object",
@@ -156,7 +160,8 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
     """`laws`: the indexed laws (number -> title), so named articles carry the right law
     number (one run named the enforcement article with the civil procedure law's number)."""
     # The date, so "served today" or "last Monday" become dates for the period calculator.
-    content = f"<today>{date.today().isoformat()}</today>\n\n{message}"
+    today = datetime.now(ZoneInfo("Europe/Istanbul")).date()
+    content = f"<today>{today.isoformat()}</today>\n\n{message}"
     if laws:
         listing = "\n".join(f"{n}: {t}" for n, t in sorted(laws.items()))
         content = f"<indexed_laws>\n{listing}\n</indexed_laws>\n\n{content}"
@@ -194,9 +199,7 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
         penalties=[p for p in data.get("penalties", []) if p.get("law") and p.get("article")]
         [:MAX_PENALTIES],
         interest=[i for i in data.get("interest", []) if i.get("principal") and i.get("start_date")][:3],
-        severance=next((s for s in data.get("severance", [])
-                        if s.get("start_date") and s.get("end_date") and s.get("gross_monthly")),
-                       None),
+        severance=next(iter(data.get("severance") or []), None),
         clarify=[{"question": c["question"].strip(),
                   "options": [o.strip() for o in c["options"] if o.strip()][:4]}
                  for c in data["clarify"] if c["question"].strip() and c["options"]][:3])

@@ -43,6 +43,14 @@ Maintain the dated calculator tables in `locales/tr`. Fee and severance results 
 covering the requested period. Interest calculations report the covered days and identify any
 part of the request outside the table.
 
+The model extracts facts from the conversation and sends structured inputs to the relevant
+calculator. For severance, it can send the reported service in whole months and gross pay.
+If the termination date is missing and the request gives no indication of another period, the
+model can request an explicit estimate for the current date in Türkiye. The answer gives the
+conditional amount, links to the official ceiling for the period, and asks for the facts needed
+to confirm entitlement or the applicable date. The built-in ceiling table covers 2022–2026.
+A period outside that coverage yields no gross or net severance estimate.
+
 The API supports Anthropic and OpenAI-compatible chat-completions providers. For Open WebUI,
 an administrator can set **Model settings** to a base URL ending in `/api` such as
 `http://localhost:8080/api`, a key with chat-completions access, and the instance's model IDs.
@@ -61,6 +69,7 @@ New answers show a source chip when the cited passage matches the stored origina
 OpenAI-compatible writers, the passage must also appear in the supplied excerpt. Missing and unmatched
 citations show a warning alongside the complete answer. When the decision model is configured,
 the app also checks cited claims against those specific sources and marks uncertain support.
+Claims citing the same sources share a request while keeping individual verdicts and paragraph context.
 Previous chats display their original citations with a legacy verification label.
 
 ## Calculations and document updates in chat

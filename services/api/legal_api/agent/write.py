@@ -15,6 +15,7 @@ import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from functools import cache
+from itertools import batched
 
 from legal_api import decisions, llm
 from legal_api.agent.atoms import CitationStream, Segment, openai_segments_from, segments_from
@@ -36,11 +37,13 @@ SUPPORTED = 0.8
 PARTIAL = 0.5
 CHECK_SOURCE_CHARS = 6000
 MAX_PARAGRAPH_CHARS = 2000
+SUPPORT_BATCH_SIZE = 8
 MIN_JUDGED_WORDS = 4    # words a piece needs to be judged on its own
-SUPPORT_CHECK = ("The sentence is part of the paragraph given. Answer yes only if what the "
-                 "sentence states, read in its paragraph, is supported by the source texts, "
-                 "including every number and the cases or persons it applies to. A number "
-                 "applied to a different case than the source says is no.")
+SUPPORT_CHECK = ("Evaluate only this claim and its stated qualification, using its context "
+                 "to resolve references. Treat an explicitly hypothetical fact as a premise, "
+                 "never as legal authority. Accept a conditional application when the sources support the "
+                 "legal rule and the condition is kept explicit. Check dates, quantities "
+                 "and scope. Reject outcomes or rules the supplied sources do not support.")
 
 
 @dataclass
@@ -129,7 +132,7 @@ def _referenced_sources(segment: Segment, sources: list[Source]) -> list[Source]
 async def check(segments: list[Segment], sources: list[Source], message: str,
                 usage: llm.Usage) -> list[dict]:
     """Check citation matches, quantities and, when enabled, support from cited sources."""
-    to_judge: list[tuple[Segment, list[Source]]] = []
+    to_judge: dict[tuple[str, ...], list[Segment]] = {}
     flagged: list[dict] = []
     for seg in segments:
         if seg.unverified:
@@ -147,44 +150,54 @@ async def check(segments: list[Segment], sources: list[Source], message: str,
                 flagged.append(_flag(seg, ", ".join(f"{n:g}" for n in sorted(missing))))
                 continue
         if relied and judged:
-            to_judge.append((seg, relied))
+            keys = tuple(s.evidence.key for s in relied)
+            to_judge.setdefault(keys, []).append(seg)
     if to_judge and decisions.enabled():
         context = _paragraphs(segments)
+        by_key = {s.evidence.key: s for s in sources}
         async with decisions.client() as client:
+            batches = [(keys, batch) for keys, group in to_judge.items()
+                       for batch in batched(group, SUPPORT_BATCH_SIZE)]
             verdicts = await asyncio.gather(*(
-                decisions.yes_probabilities(
-                    client, {"sentence": seg.text.strip(), "paragraph": context[id(seg)],
-                             "sources": "\n\n".join(
-                                 f"{s.evidence.citation}:\n{s.document[:CHECK_SOURCE_CHARS]}"
-                                 for s in relied)},
-                    {"supported": SUPPORT_CHECK}, usage, "check")
-                for seg, relied in to_judge))
-        for (seg, _), v in zip(to_judge, verdicts, strict=True):
-            score = v["supported"]
+                _support_batch(client, batch, [by_key[k] for k in keys], context, usage)
+                for keys, batch in batches))
+        scores = {id(seg): score for (_, batch), verdict in zip(batches, verdicts, strict=True)
+                  for seg, score in zip(batch, verdict, strict=True)}
+        for seg in segments:
+            score = scores.get(id(seg))
             if score is not None and score < SUPPORTED:
                 flagged.append(_flag(seg, "", "support_low", "partial" if score >= PARTIAL
                                      else "not_supported"))
     return flagged
 
 
+async def _support_batch(client, segments: tuple[Segment, ...], sources: list[Source],
+                         context: dict[int, str], usage: llm.Usage) -> list[float | None]:
+    claims = {f"claim_{i}": {"text": seg.text.strip(), "context": context[id(seg)]}
+              for i, seg in enumerate(segments)}
+    state = {"claims": claims, "sources": "\n\n".join(
+        f"{s.evidence.citation}:\n{s.document[:CHECK_SOURCE_CHARS]}" for s in sources)}
+    questions = {key: f"Evaluate only claims.{key}. {SUPPORT_CHECK}" for key in claims}
+    verdict = await decisions.yes_probabilities(client, state, questions, usage, "check")
+    return [verdict[key] for key in claims]
+
+
 def _paragraphs(segments: list[Segment]) -> dict[int, str]:
-    """The paragraph each segment belongs to: citations cut sentences into pieces, and a
-    piece alone ("the period is three days.") cannot be judged."""
+    """Supply nearby text inside the paragraphs a cited segment actually touches."""
     out: dict[int, str] = {}
-    paragraph: list[Segment] = []
-
-    def close() -> None:
-        text = "".join(s.text for s in paragraph).strip()
-        for s in paragraph:
-            out[id(s)] = text[:MAX_PARAGRAPH_CHARS]
-        paragraph.clear()
-
+    full = "".join(seg.text for seg in segments)
+    offset = 0
+    margin = MAX_PARAGRAPH_CHARS // 4
     for seg in segments:
-        parts = seg.text.split("\n\n")
-        paragraph.append(seg)
-        if len(parts) > 1:
-            close()
-    close()
+        end = offset + len(seg.text)
+        claim = seg.text.strip()
+        start_of_claim = end - len(seg.text.lstrip())
+        end_of_claim = offset + len(seg.text.rstrip())
+        before = full[max(0, start_of_claim - margin):start_of_claim].rsplit("\n\n", 1)[-1]
+        after = full[end_of_claim:end_of_claim + margin].split("\n\n", 1)[0]
+        remaining = MAX_PARAGRAPH_CHARS - len(before) - len(after)
+        out[id(seg)] = (before + claim[:remaining] + after).strip()
+        offset = end
     return out
 
 

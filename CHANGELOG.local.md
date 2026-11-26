@@ -1,5 +1,11 @@
 # Local changelog
 
+## 0.3.4 · 2026-11-26
+
+- The backend and model prompts changed. Restart the API after updating. This release requires no database migration.
+- The built-in severance table covers 2022–2026. Update its coverage from the official publication when the next period is announced.
+- Run `uv run --locked pytest tests/test_severance.py tests/test_write_clean.py` from `services/api` to check the calculation and citation batching with model calls mocked.
+
 ## 0.3.3 · 2026-11-26
 
 - Set the writer and optional credit-budget fallback in `.env` with `WRITE_ROUTE` and `WRITE_FALLBACK_ROUTE`. Restart the API after changing either setting.

@@ -30,7 +30,6 @@ from legal_api.agent.understand import Understanding, understand
 from legal_api.agent.write import MAX_TOKENS, Written, write
 from legal_api.calc.court_costs_sources import court_cost_sources
 from legal_api.calc.penalty_sources import penalty_sources
-from legal_api.calc.severance import stated_dismissal_estimate
 from legal_api.calc.sources import deadline_sources, interest_sources, severance_sources
 from legal_api.corpus.ingest import asyncpg_dsn
 from legal_api.drafting.asking import find_gaps, kind_of, question_text, should_ask
@@ -122,18 +121,8 @@ async def answer_events(question: str, history: list[dict] | None = None,
         yield step_event("analyse")
         async with db.acquire() as conn:
             laws = await indexed_laws(conn)
-        local_only = False
-        try:
-            u = await understand(for_understanding(search_text or question, attachments),
-                                 history or [], usage, laws)
-        except (anthropic.APIStatusError, httpx.HTTPStatusError) as exc:
-            if attachments or not llm.unavailable(exc):
-                raise
-            estimate = stated_dismissal_estimate(question)
-            if estimate is None:
-                raise
-            u = Understanding(task="consultation", severance=estimate)
-            local_only = True
+        u = await understand(for_understanding(search_text or question, attachments),
+                             history or [], usage, laws)
         mark("understand_s")
         if u.task == "workspace":
             yield step_event("analyse", "done", issues=len(u.issues))
@@ -172,9 +161,7 @@ async def answer_events(question: str, history: list[dict] | None = None,
             u.clarify = []
             u.requests = gaps.requests
         yield step_event("analyse", "done", issues=len(u.issues))
-        if local_only:
-            found = Research(trace={"calculation_fallback": True})
-        elif _calendar_only(u, agenda):
+        if _calendar_only(u, agenda):
             # "What is due this week?" is answered from the calendar; nothing to search.
             found = Research(trace={"calendar_only": True})
         else:
@@ -207,18 +194,21 @@ async def answer_events(question: str, history: list[dict] | None = None,
             # Periods and amounts are computed in code and given as sources (calc/).
             yield step_event("calculate")
             computed: list[dict] = []
-            found.sources += await deadline_sources(u.deadlines, finder, ledger, computed)
+            calculated = await deadline_sources(u.deadlines, finder, ledger, computed)
             found.trace["deadlines_computed"] = computed
             if u.severance:
-                found.sources += await severance_sources(u.severance, finder, ledger)
+                calculated += await severance_sources(u.severance, finder, ledger)
             for spec in u.interest:
-                found.sources += await interest_sources(spec, ledger)
-            found.sources += _new(found.sources, await penalty_sources(u.penalties, finder, ledger))
+                calculated += await interest_sources(spec, ledger)
+            calculated += await penalty_sources(u.penalties, finder, ledger)
             if u.court_costs:
-                found.sources += _new(found.sources,
-                                      await court_cost_sources(u.court_costs, finder, ledger))
-            count = (len(u.deadlines) + (1 if u.severance else 0) + len(u.interest)
-                     + len(u.penalties) + (1 if u.court_costs else 0))
+                calculated += await court_cost_sources(u.court_costs, finder, ledger)
+            # Keep the full calculation and its direct sources if research found them too.
+            by_key: dict[str, Source] = {}
+            for source in [*calculated, *found.sources]:
+                by_key.setdefault(source.evidence.key, source)
+            found.sources = list(by_key.values())
+            count = len({s.evidence.key for s in calculated if s.evidence.kind == "calculation"})
             found.trace["calculations"] = count
             yield step_event("calculate", "done", count=count)
         mark("research_s")
@@ -227,26 +217,23 @@ async def answer_events(question: str, history: list[dict] | None = None,
                                      "url": e.url})
         written: Written | None = None
         yield step_event("write")
-        if local_only:
+        try:
+            async for item in write(question, u, found.sources, usage, instruction,
+                                    max_tokens=max_tokens, power=power,
+                                    context=for_writer(attachments)):
+                if isinstance(item, str):
+                    # A petition is delivered as a file, not streamed into the chat.
+                    if u.task != "drafting":
+                        yield Event("delta", {"text": item})
+                else:
+                    written = item
+        except (anthropic.APIStatusError, httpx.HTTPStatusError) as exc:
+            if u.task == "drafting" or not llm.unavailable(exc):
+                raise
             written = _available_calculations(found.sources)
-        else:
-            try:
-                async for item in write(question, u, found.sources, usage, instruction,
-                                        max_tokens=max_tokens, power=power,
-                                        context=for_writer(attachments)):
-                    if isinstance(item, str):
-                        # A petition is delivered as a file, not streamed into the chat.
-                        if u.task != "drafting":
-                            yield Event("delta", {"text": item})
-                    else:
-                        written = item
-            except (anthropic.APIStatusError, httpx.HTTPStatusError) as exc:
-                if u.task == "drafting" or not llm.unavailable(exc):
-                    raise
-                written = _available_calculations(found.sources)
-                if written is None:
-                    raise
-                found.trace["calculation_fallback"] = True
+            if written is None:
+                raise
+            found.trace["calculation_fallback"] = True
         if written is None:
             raise RuntimeError("No verified answer was produced.")
         if u.task == "drafting" and written is not None:
@@ -273,12 +260,6 @@ def _available_calculations(sources: list[Source]) -> Written | None:
     intro = calculation_terms()["fallback_intro"]
     body = "\n\n".join(f"{segment.text} [[{segment.keys[0]}]]" for segment in segments)
     return Written(segments, f"{intro}\n\n{body}", [])
-
-
-def _new(have: list[Source], more: list[Source]) -> list[Source]:
-    """`more` without the sources already among `have` (an article found by research too)."""
-    keys = {s.evidence.key for s in have}
-    return [s for s in more if s.evidence.key not in keys]
 
 
 def _calendar_only(u: Understanding, agenda: Agenda | None) -> bool:
