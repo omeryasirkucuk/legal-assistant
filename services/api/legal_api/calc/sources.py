@@ -11,8 +11,9 @@ days are given with the articles on the recess.
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from legal_api.agent.sources import Source, SourceFinder
 from legal_api.calc.deadlines import UNITS, Deadline, compute
@@ -20,6 +21,7 @@ from legal_api.calc.interest import KINDS as INTEREST_KINDS
 from legal_api.calc.interest import compute as compute_interest
 from legal_api.calc.interest_text import render as render_interest
 from legal_api.calc.severance import compute as compute_severance
+from legal_api.calc.severance import compute_months
 from legal_api.calc.severance_text import render as render_severance
 from legal_api.grounding.evidence import EvidenceLedger
 from legal_api.grounding.normalize import tr_fold
@@ -124,19 +126,31 @@ SEVERANCE_ARTICLES = (("1475", "14"), ("4857", "17"))
 
 async def severance_sources(spec: dict, finder: SourceFinder,
                             ledger: EvidenceLedger) -> list[Source]:
-    """Severance and notice pay from the dates and pay the lawyer gave, with the articles
-    that set them."""
+    """Use stated dates or a stated duration with the applicable end-date scenario."""
     try:
-        start, end = date.fromisoformat(spec["start_date"]), date.fromisoformat(spec["end_date"])
+        today_scenario = spec["end_date"] == "today"
+        end = (datetime.now(ZoneInfo("Europe/Istanbul")).date() if today_scenario
+               else date.fromisoformat(spec["end_date"]))
         monthly = Decimal(str(spec["gross_monthly"])) + Decimal(str(spec.get("extras_monthly") or 0))
-    except (KeyError, ValueError, ArithmeticError):
+        if not monthly.is_finite() or monthly <= 0:
+            return []
+        duration = re.fullmatch(r"P([1-9][0-9]{0,3})M", spec["start_date"])
+        if duration:
+            months = int(duration[1])
+            if months > 1200:
+                return []
+            record = compute_months(months, end, monthly)
+        else:
+            start = date.fromisoformat(spec["start_date"])
+            if end <= start:
+                return []
+            record = compute_severance(start, end, monthly)
+    except (KeyError, TypeError, ValueError, ArithmeticError):
         return []
-    if end <= start or monthly <= 0:
-        return []
-    text = render_severance(compute_severance(start, end, monthly))
+    text = render_severance(record, today_scenario=today_scenario)
     out = [a for law, label in SEVERANCE_ARTICLES if (a := await finder.article(law, label))]
     evidence = ledger.add_calculation(
-        source_id=f"calc:severance:{start}:{end}:{monthly}",
+        source_id=f"calc:severance:{record.start}:{record.service}:{end}:{monthly}:{today_scenario}",
         citation=calculation_terms()["severance"]["citation"], text=text)
     return [*out, Source(evidence, text)]
 

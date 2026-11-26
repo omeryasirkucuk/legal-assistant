@@ -135,3 +135,40 @@ def test_a_marker_cites_only_the_sentence_before_it():
         '<quote ref="E1">may object within seven days</quote>.')], sources)
     cited = [s for s in segs if s.keys]
     assert len(cited) == 1 and cited[0].text == "The debtor may object in seven days"
+
+
+async def test_openrouter_recovers_before_streaming_when_writer_cannot_afford_enough_tokens(monkeypatch):
+    settings = _settings()
+    monkeypatch.setattr(llm, "get_settings", lambda: settings)
+    monkeypatch.setattr(llm, "routed", lambda role: {"write": "writer", "main": "main"}.get(role))
+    requests = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        requests.append((payload["model"], payload["max_tokens"]))
+        assert payload["provider"] == {"data_collection": "deny"}
+        if payload["max_tokens"] > 2400:
+            cap = 323 if payload["model"] == "writer" else 2400
+            return httpx.Response(402, json={"error": {"message": f"You can only afford {cap}."}})
+        return httpx.Response(200, text=(
+            'data: {"choices":[{"delta":{"content":"Verified answer"},"finish_reason":"length"}]}\n\n'
+            'data: [DONE]\n\n'))
+
+    transport = httpx.MockTransport(respond)
+    monkeypatch.setattr(llm, "openai_client", lambda _: httpx.AsyncClient(
+        base_url="https://openrouter.test", transport=transport))
+    usage = llm.Usage()
+    items = [item async for item in llm.stream(
+        "write", usage, "write", max_tokens=8000, messages=[{"role": "user", "content": "Test"}])]
+    assert requests == [("writer", 8000), ("main", 4000), ("main", 2400)]
+    assert items[0] == "Verified answer"
+    assert items[-1].model == "main"
+    assert items[-1].stop_reason == "max_tokens"
+
+
+@pytest.mark.parametrize("status, expected", [(401, True), (402, True), (403, True), (429, False)])
+def test_openai_provider_failure_has_correct_chat_status(status, expected):
+    request = httpx.Request("POST", "https://model.test/chat/completions")
+    error = httpx.HTTPStatusError("provider", request=request,
+                                  response=httpx.Response(status, request=request))
+    assert llm.unavailable(error) is expected

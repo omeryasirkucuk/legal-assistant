@@ -19,14 +19,19 @@ def _day(d: date) -> str:
     return d.strftime("%d.%m.%Y")
 
 
-def render(r: Severance) -> str:
+def render(r: Severance, *, today_scenario: bool = False) -> str:
     t = calculation_terms()["severance"]
     s = r.service
     years = Decimal(s.years) + Decimal(s.months) / 12 + Decimal(s.days) / 365
-    lines = [t["title"],
-             t["service"].format(start=_day(r.start), end=_day(r.end), years=s.years,
-                                 months=s.months, days=s.days),
-             t["monthly"].format(monthly=money(r.monthly))]
+    lines = [t["title"]]
+    if r.start:
+        lines.append(t["service"].format(start=_day(r.start), end=_day(r.end), years=s.years,
+                                         months=s.months, days=s.days))
+    else:
+        lines.append(t["service_months"].format(months=s.total_months))
+    if today_scenario or not r.start:
+        lines.append(t["today_scenario" if today_scenario else "known_end"].format(end=_day(r.end)))
+    lines.append(t["monthly"].format(monthly=money(r.monthly)))
     if r.ceiling is None:
         lines.append(t["ceiling_missing"].format(end=_day(r.end)))
     else:

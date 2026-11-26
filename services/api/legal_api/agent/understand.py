@@ -161,7 +161,8 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
         listing = "\n".join(f"{n}: {t}" for n, t in sorted(laws.items()))
         content = f"<indexed_laws>\n{listing}\n</indexed_laws>\n\n{content}"
     response = await llm.create(
-        "cheap", usage, "understand", max_tokens=4000, system=_system(),
+        "cheap", usage, "understand", max_tokens=1800 if len(message) <= 1000 else 4000,
+        system=_system(),
         messages=[*history, {"role": "user", "content": content}],
         output_config={"effort": get_settings().answer_effort,
                        "format": {"type": "json_schema", "schema": _SCHEMA}})
