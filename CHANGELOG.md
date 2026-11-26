@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 · 2026-11-27
+
+- Handle standalone greetings, acknowledgments and capability questions directly. Classify topic switches and preserve the last substantive answer for corrections and reformats. Keep the latest message separate from earlier facts when extracting updated calculation inputs. Present citation checks more compactly.
+- Check cited claims against the matched quotations and the facts supplied by the user. Open the cited source directly from a warning.
+
+
 ## 0.3.6 · 2026-11-26
 
 - Reduce the analysis response grammar to restore chat answers when a provider rejects a complex schema. If a provider rejects grammar compilation, retry with schema-guided JSON and validate it in the backend.

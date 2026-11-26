@@ -30,7 +30,7 @@ async def test_support_check_batches_claims_on_the_same_sources(monkeypatch):
     other = ledger.add_calculation(source_id="b", citation="Other", text=text)
     segments = [
         Segment("Yalnızca ilk paragrafın başlangıcı. "),
-        Segment("Bu durumda başvuru süresi 14 gündür.\n\n", (evidence.key,)),
+        Segment("Bu durumda başvuru süresi 14 gündür.\n\n", (evidence.key,), (text,)),
         Segment("Bütün başvurularda bu süre aynıdır.\n\n", (evidence.key,)),
         Segment("Diğer kaynak farklı bir olayı anlatır.", (other.key,)),
     ]
@@ -38,6 +38,8 @@ async def test_support_check_batches_claims_on_the_same_sources(monkeypatch):
     async def verdict(_client, state, questions, _usage, _purpose):
         if len(questions) == 2:
             assert "Other" not in state["sources"]
+            assert state["case_facts"] == "Karar dün tebliğ edildi."
+            assert state["claims"]["claim_0"]["verified_quotations"] == [text]
             context = state["claims"]["claim_0"]["context"]
             assert "ilk paragrafın başlangıcı" in context
             assert "Bütün başvurularda" not in context
@@ -50,7 +52,7 @@ async def test_support_check_batches_claims_on_the_same_sources(monkeypatch):
     monkeypatch.setattr(write.decisions, "client", client)
     monkeypatch.setattr(write.decisions, "yes_probabilities", judge)
     flags = await write.check(segments, [Source(evidence, text), Source(other, text)],
-                              "", llm.Usage())
+                              "Karar dün tebliğ edildi.", llm.Usage())
 
     assert judge.await_count == 2
     assert len(flags) == 1

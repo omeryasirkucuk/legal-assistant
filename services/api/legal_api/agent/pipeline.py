@@ -78,7 +78,7 @@ class WrittenResult:
 
     @property
     def checked(self) -> dict | None:
-        if self.understanding.task == "workspace":
+        if self.understanding.task in {"workspace", "direct"}:
             return None
         return {"issues": [], "claims": self.written.flagged, "citation_check": "source_passages"}
 
@@ -121,7 +121,7 @@ async def answer_events(question: str, history: list[dict] | None = None,
         yield step_event("analyse")
         async with db.acquire() as conn:
             laws = await indexed_laws(conn)
-        u = await understand(for_understanding(search_text or question, attachments),
+        u = await understand(for_understanding(question, attachments),
                              history or [], usage, laws)
         mark("understand_s")
         if u.task == "workspace":

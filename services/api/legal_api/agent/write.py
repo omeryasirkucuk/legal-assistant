@@ -44,7 +44,8 @@ SUPPORT_CHECK = ("Evaluate only this claim and its stated qualification, using i
                  "to resolve references. Treat an explicitly hypothetical fact as a premise, "
                  "never as legal authority. Accept a conditional application when the sources support the "
                  "legal rule and the condition is kept explicit. Check dates, quantities "
-                 "and scope. Reject outcomes or rules the supplied sources do not support.")
+                 "and scope. Use case_facts only as reported facts, never as legal authority. Treat the "
+                 "verified quotations as excerpts from the cited sources. Reject outcomes or rules the supplied sources do not support.")
 
 
 @dataclass
@@ -182,7 +183,7 @@ async def check(segments: list[Segment], sources: list[Source], message: str,
             batches = [(keys, batch) for keys, group in to_judge.items()
                        for batch in batched(group, SUPPORT_BATCH_SIZE)]
             verdicts = await asyncio.gather(*(
-                _support_batch(client, batch, [by_key[k] for k in keys], context, usage)
+                _support_batch(client, batch, [by_key[k] for k in keys], context, message, usage)
                 for keys, batch in batches))
         scores = {id(seg): score for (_, batch), verdict in zip(batches, verdicts, strict=True)
                   for seg, score in zip(batch, verdict, strict=True)}
@@ -195,10 +196,11 @@ async def check(segments: list[Segment], sources: list[Source], message: str,
 
 
 async def _support_batch(client, segments: tuple[Segment, ...], sources: list[Source],
-                         context: dict[int, str], usage: llm.Usage) -> list[float | None]:
-    claims = {f"claim_{i}": {"text": seg.text.strip(), "context": context[id(seg)]}
+                         context: dict[int, str], message: str, usage: llm.Usage) -> list[float | None]:
+    claims = {f"claim_{i}": {"text": seg.text.strip(), "context": context[id(seg)],
+                              "verified_quotations": [q[:2000] for q in seg.quotes]}
               for i, seg in enumerate(segments)}
-    state = {"claims": claims, "sources": "\n\n".join(
+    state = {"case_facts": message[:6000], "claims": claims, "sources": "\n\n".join(
         f"{s.evidence.citation}:\n{s.document[:CHECK_SOURCE_CHARS]}" for s in sources)}
     questions = {key: f"Evaluate only claims.{key}. {SUPPORT_CHECK}" for key in claims}
     verdict = await decisions.yes_probabilities(client, state, questions, usage, "check")

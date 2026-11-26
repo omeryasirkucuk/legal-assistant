@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.4.0 · 2026-11-27
+
+- Restart the API and rebuild the web client. No migration is needed. Run the chat intent regression tests with `uv run --locked pytest tests/test_turn_intent.py tests/test_compose.py` from `services/api`.
+
+
 ## 0.3.6 · 2026-11-26
 
 - Restart the API after updating. No migration is required. Chat failure logs include the pipeline phase and HTTP status without recording provider response bodies.

@@ -99,13 +99,17 @@ async def test_model_extracted_months_produce_sourced_calculation_without_fake_d
 
     monkeypatch.setattr(pipeline, "write", writer)
     holder = {}
-    async for _ in pipeline.answer_events(update, result=holder, search_text=conversation):
+    history = [{"role": "user", "content": question}, {"role": "assistant", "content": "Fesih nedeni?"}]
+    async for _ in pipeline.answer_events(update, history, result=holder, search_text=conversation):
         pass
     answer = holder["result"]
     assert answer.question == update
     assert answer.text == "Koşullu tutar" and answer.understanding.shape == "amount"
     assert answer.usage.cost_usd == 0
     assert model.await_count == 1
+    messages = model.call_args.kwargs["messages"]
+    assert messages[:-1] == history
+    assert update in messages[-1]["content"] and question not in messages[-1]["content"]
     assert answer.understanding.case_kind == answer.understanding.area == "other"
     properties = model.call_args.kwargs["output_config"]["format"]["schema"]["properties"]
     for field in ("shape", "petition_type", "output_format", "case_kind", "area"):

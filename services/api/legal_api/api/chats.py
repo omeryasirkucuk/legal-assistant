@@ -18,6 +18,7 @@ from sqlalchemy import or_, select
 from legal_api import llm
 from legal_api.agent.detail import detail_stream
 from legal_api.agent.power import power_of
+from legal_api.agent.route import direct_intent
 from legal_api.agent.turn import turn_events
 from legal_api.auth import DB, CurrentUser
 from legal_api.chat import runs
@@ -321,10 +322,10 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
         usage = llm.Usage()
         # The first question names the chat; written alongside the answer.
         title_task = (asyncio.create_task(generate_title(text, usage))
-                      if previous is None else None)
+                      if previous is None and (files or not direct_intent(text)) else None)
         try:
             async for event in turn_events(text, turns, previous, holder, style, power,
-                                           attachments, agenda, usage=usage, workspace=context):
+                                           attachments, agenda, explicit_files=bool(files), usage=usage, workspace=context):
                 run.emit(event.type, event.data)
             title = await _finished_title(title_task)
         finally:
@@ -346,7 +347,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
             draft = None
             u = getattr(result, "understanding", None)
             asked = getattr(result, "asked", False)
-            if u is not None and previous is not None and (previous.answer or {}).get("asked"):
+            if u is not None and u.gap_trace.get("just_asked"):
                 await record_reply(session, user_pk, skipped=u.write_now)
             fmt = await file_format(session, user_pk, u.output_format) if u and not asked else None
             if u is not None and u.task == "drafting" and not asked:

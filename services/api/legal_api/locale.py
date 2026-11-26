@@ -123,3 +123,7 @@ def interest_data() -> dict:
 def deadline_rules() -> dict:
     """How the judicial recess and the manner of service bear on a period, by branch."""
     return _bundle("deadline_rules")
+
+
+def chat_turns() -> dict:
+    return _bundle("chat_turns")

@@ -22,7 +22,7 @@ export type StreamEvent =
   | { type: "final"; data: { text: string; checked?: Checked; cost_usd: number;
       timings: Record<string, number> } }
   | { type: "saved"; data: { id: string } }
-  | { type: "route"; data: { kind: "new" | "reformat" | "followup" } }
+  | { type: "route"; data: { kind: "new" | "reformat" | "followup" | "contextual" | "direct" } }
   | { type: "step"; data: Step }
   | { type: "line"; data: AnswerLine }
   | { type: "title"; data: { chat_id: string; title: string } }

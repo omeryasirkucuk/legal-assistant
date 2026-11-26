@@ -97,7 +97,7 @@ export function AssistantAnswer(props: Props) {
         )}
 
         {!streaming && !refused && !asked && checked && (
-          <Verification checked={checked} repaired={repaired} number={number} />
+          <Verification checked={checked} repaired={repaired} number={number} onOpen={onOpenSource} />
         )}
 
         {/* Narrow screens: sources follow the answer instead of sitting in the margin. */}
@@ -141,10 +141,12 @@ function Verification({
   checked,
   repaired,
   number,
+  onOpen,
 }: {
   checked: Checked;
   repaired?: boolean;
   number: (key: string) => number;
+  onOpen: (key: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const errors = checked.issues.filter((i) => i.severity === "error");
@@ -157,20 +159,20 @@ function Verification({
       ? t("verifiedWithWarnings", { count: partial.length })
       : t(currentCheck ? "verified" : "legacyVerification");
   const colors = {
-    verified: "bg-verified-soft text-verified",
-    caution: "bg-caution-soft text-caution",
+    verified: "text-muted",
+    caution: "border-l-2 border-caution pl-3 text-muted",
     danger: "bg-[#f6e3e3] text-danger",
   }[tone];
 
   return (
-    <div className={`mt-6 rounded-md px-3 py-2 text-sm ${colors}`}>
+    <div className={`mt-4 px-2 py-1 text-xs ${colors}`}>
       <div className="flex items-start justify-between gap-4">
         <p>
           {summary}
           {repaired && <span className="block text-xs opacity-80">{t("repaired")}</span>}
         </p>
         {(errors.length > 0 || partial.length > 0) && (
-          <button onClick={() => setOpen(!open)} className="shrink-0 underline-offset-2 hover:underline">
+          <button aria-expanded={open} onClick={() => setOpen(!open)} className="shrink-0 underline-offset-2 hover:underline">
             {open ? t("hideDetails") : t("showDetails")}
           </button>
         )}
@@ -181,14 +183,18 @@ function Verification({
             <li key={`e${idx}`}>{i.message}</li>
           ))}
           {partial.map((c, idx) => {
-            const citations = c.keys.map(number).filter((n) => n > 0).join(", ");
+            const citations = [...new Set(c.keys)].filter((key) => number(key) > 0);
             const note = c.reason === "citation_unmatched" ? t("citationUnmatched")
               : c.reason === "citation_missing" ? t("citationMissing")
               : c.reason === "support_low" ? t("citationSupportLow") : c.note;
             return (
               <li key={`c${idx}`}>
-                {c.sentence && <span className="font-serif italic">&ldquo;{c.sentence}&rdquo;{" "}</span>}
-                <span className="text-muted">{citations && `[${citations}] `}{note}</span>
+                {c.sentence && <div className="mb-1 text-sm"><Markdown skipHtml allowedElements={["p", "strong", "em", "li", "ul", "ol", "code"]} unwrapDisallowed>{c.sentence}</Markdown></div>}
+                <span className="text-muted">{note}</span>
+                {citations.map((key) => (
+                  <Chip key={key} n={number(key)} label={t("sources") + " · " + number(key)}
+                    onClick={() => onOpen(key)} />
+                ))}
               </li>
             );
           })}

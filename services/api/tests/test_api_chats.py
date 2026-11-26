@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from legal_api.agent.answer import Event
 from legal_api.api import chats
-from legal_api.chat.service import drop_unanswered
+from legal_api.chat.service import drop_unanswered, history, previous_turn
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, Message
 from legal_api.main import create_app
@@ -45,7 +45,7 @@ async def test_answer_spend_survives_chat_deletion(monkeypatch):
     async def title(_question, _usage):
         return None
 
-    async def answer(_message, _history, _previous, result, *_args, usage, workspace):
+    async def answer(_message, _history, _previous, result, *_args, explicit_files, usage, workspace):
         usage.record("test", SimpleNamespace(cost=0.012), "write")
         result["result"] = SimpleNamespace(
             text="Answer", structure=lambda: {}, usage=usage, timings={}, trace={}, ledger=[],
@@ -127,3 +127,26 @@ async def test_an_unanswered_last_question_is_dropped():
                                  .bindparams(c=chat.id))).all()
         assert left == []
     await engine.dispose()
+
+
+async def test_greeting_is_saved_without_replacing_substantive_context():
+    async with await _client() as c:
+        await c.post("/auth/register", json={"email": _email("turn"), "password": "secret-pass",
+                                              "name": "Test", "invite_code": "test-invite"})
+        chat_id = (await c.post("/chats", json={"content": "Kıdem hesabı"})).json()["id"]
+        engine = create_async_engine(get_settings().database_url)
+        try:
+            async with async_sessionmaker(engine, expire_on_commit=False)() as db:
+                chat = await db.get(Chat, uuid.UUID(chat_id))
+                db.add(Message(chat_id=chat.id, role="user", content="Kıdem hesabı"))
+                await db.flush()
+                db.add(Message(chat_id=chat.id, role="assistant", content="Önceki hesap"))
+                await db.commit()
+                response = await c.post(f"/chats/{chat_id}/messages", json={"content": "selam"})
+                assert "event: saved" in response.text and "Merhaba" in response.text
+                previous = await previous_turn(db, chat)
+                assert previous.question == "Kıdem hesabı" and previous.short == "Önceki hesap"
+                assert [m["content"] for m in await history(db, chat)] == [
+                    "Kıdem hesabı", "Önceki hesap"]
+        finally:
+            await engine.dispose()

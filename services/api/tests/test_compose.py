@@ -49,9 +49,14 @@ def test_without_a_previous_answer_every_message_is_new():
     assert asyncio.run(route("shorter please", None, None, llm.Usage())) == "new"
 
 
-def test_without_a_decision_model_a_message_after_an_answer_is_a_followup(monkeypatch):
+def test_without_decisions_the_configured_model_can_route_reformats(monkeypatch):
     monkeypatch.setattr("legal_api.agent.route.decisions.enabled", lambda: False)
-    assert asyncio.run(route("shorter please", "q", "a", llm.Usage())) == "followup"
+
+    async def classify(*args, **kwargs):
+        return SimpleNamespace(content=[SimpleNamespace(type="text", text="reformat")])
+
+    monkeypatch.setattr(llm, "create", classify)
+    assert asyncio.run(route("shorter please", "q", "a", llm.Usage())) == "reformat"
 
 
 def test_no_cited_line_says_nothing_was_found():

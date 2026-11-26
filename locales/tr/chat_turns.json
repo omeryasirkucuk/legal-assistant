@@ -1,0 +1,41 @@
+{
+  "greeting": {
+    "phrases": [
+      "selam",
+      "selamlar",
+      "merhaba",
+      "merhabalar",
+      "günaydın",
+      "iyi günler",
+      "iyi akşamlar",
+      "selamünaleyküm",
+      "slm",
+      "mrb",
+      "hey",
+      "hello",
+      "hi"
+    ],
+    "reply": "Merhaba. Hangi hukuki konuda yardımcı olabilirim?"
+  },
+  "thanks": {
+    "phrases": [
+      "teşekkürler",
+      "teşekkür ederim",
+      "çok teşekkürler",
+      "çok teşekkür ederim",
+      "sağ ol",
+      "sağol",
+      "eyvallah"
+    ],
+    "reply": "Rica ederim."
+  },
+  "help": {
+    "phrases": [
+      "ne yapabilirsin",
+      "neler yapabilirsin",
+      "nasıl yardımcı olabilirsin",
+      "seni nasıl kullanabilirim"
+    ],
+    "reply": "Bir hukuki soruyu kaynaklarıyla yanıtlayabilir, mevzuat ve karar arayabilir, verdiğin bilgilerle süre veya tutar hesaplayabilir ve dilekçe taslağı hazırlayabilirim. İncelememi istediğin bir belgeyi de ekleyebilirsin."
+  }
+}

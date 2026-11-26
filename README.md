@@ -4,6 +4,8 @@ A web assistant for Turkish lawyers that answers questions, searches case law an
 and drafts or edits petitions. Every statute article and court decision it cites is retrieved
 from an official or public source and rendered by the backend, never written from model memory.
 
+Standalone greetings and thanks receive a short reply. A later follow-up or formatting request can still use the last substantive answer and its sources. A new independent question starts fresh. Citation concerns remain available under each answer. Open a numbered reference in the details to inspect the source behind a flagged statement.
+
 ## Layout
 
 | Path | Purpose |
