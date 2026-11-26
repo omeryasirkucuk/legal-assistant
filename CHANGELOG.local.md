@@ -1,5 +1,11 @@
 # Local changelog
 
+## 0.4.0 · 2026-11-27
+
+- Run `make setup` and `make migrate`, then restart the API and rebuild the web app. The migration adds `calendar_events` and preserves existing case deadlines.
+- Smoke-test a personal reminder and a case-linked hearing in both calendar views. Verify that an alert becomes visible while signed in, dismissal persists, and rescheduling arms the reminder again.
+- Reminders use Europe/Istanbul time. In-app alerts appear when the app is open or reopened. An exported ICS file is a snapshot and the destination calendar handles its alarms.
+
 ## 0.3.3 · 2026-11-26
 
 - Set the writer and optional credit-budget fallback in `.env` with `WRITE_ROUTE` and `WRITE_FALLBACK_ROUTE`. Restart the API after changing either setting.

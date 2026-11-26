@@ -63,6 +63,32 @@ citations show a warning alongside the complete answer. When the decision model 
 the app also checks cited claims against those specific sources and marks uncertain support.
 Previous chats display their original citations with a legacy verification label.
 
+## Calendar and reminders
+
+Open **Takvim → Kayıt ekle**, or select a day and choose **Bu güne ekle**.
+Create a hearing, meeting, personal reminder or general event with an optional case, time,
+location or meeting link, and notes. For example, choose **Hatırlatıcı**, enter
+“Avukat Deniz’i ara”, pick Tuesday and set the alert for the start time. For an all-day
+entry, the alert uses 09:00 as its reference. Dates, times and alerts use Europe/Istanbul.
+An alert appears across the signed-in app within about 30 seconds while the tab is active,
+or when the app is reopened. Dismiss an alert to hide it across devices, or complete the
+entry to remove it from pending reminders.
+
+Use **Dava süresi** to save a case deadline directly from the calendar. Enter the date
+or use the notice calculator. Case deadlines remain available in the case's deadline
+panel. Case-linked events appear on both the calendar and the case page. Deleting a case
+keeps its events in your personal calendar. The month view shows official holidays and
+the judicial recess. Use the list for a cross-month view and filter by type, case, text
+or completion. Calendar questions in chat use the saved records for the open case, or
+your calendar when the chat is outside a case.
+
+Open a saved event and choose **ICS indir** to import a copy with its scheduled alarm
+into a calendar app that supports iCalendar. The file includes the event's title,
+location and notes. The external app controls notification delivery for imported events.
+
+After updating an existing installation to 0.4.0, run `make setup` and `make migrate`
+before restarting the API and rebuilding the frontend.
+
 ## Calculations and document updates in chat
 
 Ask for a calculation in the existing chat. A hypothetical severance or notice question

@@ -13,9 +13,9 @@
   "document_parts": "{name} (dosyadaki belge, soruyla ilgili kısımlar)",
   "gap": "[…]",
   "agenda": {
-    "citation": "Takviminiz: kaydettiğiniz süreler",
-    "citation_matter": "Takviminiz: {client} davasının süreleri",
-    "title": "Avukatın uygulamaya kaydettiği süreler (bugün {today} {weekday}).",
+    "citation": "Takviminiz: kaydettiğiniz kayıtlar",
+    "citation_matter": "Takviminiz: {client} davasının takvim kayıtları",
+    "title": "Avukatın uygulamaya kaydettiği takvim kayıtları (bugün {today} {weekday}).",
     "this_matter": "Bu davanın süreleri ({client}):",
     "open": "Açık süreler:",
     "none": "Kayıtlı açık süre yok.",
@@ -34,6 +34,15 @@
       "administrative": "idari yargı",
       "arbitration": "tahkim"
     },
-    "more": "... ve {count} süre daha."
+    "events": "Duruşmalar, görüşmeler, hatırlatıcılar ve diğer etkinlikler (Türkiye saati):",
+    "none_events": "Bu kapsamda başka takvim kaydı yok.",
+    "all_day": "tüm gün",
+    "kinds": {
+      "hearing": "Duruşma",
+      "meeting": "Görüşme",
+      "reminder": "Hatırlatıcı",
+      "event": "Etkinlik"
+    },
+    "more": "... ve {count} kayıt daha."
   }
 }

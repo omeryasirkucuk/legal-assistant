@@ -37,8 +37,19 @@ export type MatterDetail = Matter & {
   documents: StoredFile[];
   drafts: Array<{ id: string; chat_id: string | null; title: string; petition_type: string; updated_at: string }>;
   deadlines: Deadline[];
+  events: CalendarEvent[];
 };
-export type CalendarItem = Deadline & { client: string; subject: string };
+export type CalendarDeadline = Deadline & { client: string; subject: string };
+export type EventKind = "hearing" | "meeting" | "reminder" | "event";
+export type CalendarEventFields = {
+  kind: EventKind; label: string; due: string; matter_id: string | null;
+  start_time: string | null; end_time: string | null; location: string; notes: string;
+  reminder_minutes: number | null;
+};
+export type CalendarEvent = CalendarEventFields & {
+  id: string; done: boolean; remind_at: string | null; reminder_dismissed: boolean;
+};
+export type DueReminder = Pick<CalendarEvent, "id" | "label" | "due"> & { remind_at: string };
 export type Service = "electronic" | "hearing" | "physical";
 export type Branch = "civil" | "criminal" | "enforcement" | "administrative" | "arbitration";
 export type PeriodUnit = "day" | "week" | "month" | "year";
@@ -256,10 +267,19 @@ export const api = {
   },
   addDeadline: (matterId: string, label: string, due: string, messageId?: string, branch?: Branch) =>
     call<Deadline>(`/matters/${matterId}/deadlines`, json({ label, due, branch: branch ?? null, message_id: messageId ?? null })),
-  editDeadline: (id: string, fields: Partial<Pick<Deadline, "label" | "due" | "done">>) =>
+  editDeadline: (id: string, fields: Partial<Pick<Deadline, "label" | "due" | "done" | "branch">>) =>
     call<Deadline>(`/deadlines/${id}`, { method: "PATCH", body: JSON.stringify(fields) }),
   deleteDeadline: (id: string) => call<void>(`/deadlines/${id}`, { method: "DELETE" }),
-  calendar: () => call<CalendarItem[]>("/deadlines"),
+  calendar: () => call<CalendarDeadline[]>("/deadlines"),
+  calendarEvents: () => call<CalendarEvent[]>("/calendar/events"),
+  addCalendarEvent: (fields: CalendarEventFields) => call<CalendarEvent>("/calendar/events", json(fields)),
+  editCalendarEvent: (id: string, fields: CalendarEventFields) =>
+    call<CalendarEvent>(`/calendar/events/${id}`, put(fields)),
+  updateCalendarEvent: (id: string, fields: { done?: boolean; dismiss_reminder_at?: string }) =>
+    call<CalendarEvent>(`/calendar/events/${id}`, { method: "PATCH", body: JSON.stringify(fields) }),
+  deleteCalendarEvent: (id: string) => call<void>(`/calendar/events/${id}`, { method: "DELETE" }),
+  calendarEventIcsUrl: (id: string) => `${API_URL}/calendar/events/${id}/ics`,
+  dueReminders: () => call<DueReminder[]>("/calendar/reminders", { cache: "no-store" }),
   calculateDeadline: (body: { received: string; service: Service; amount: number; unit: PeriodUnit; branch: Branch }) =>
     call<NoticeResult>("/deadlines/calculate", json(body)),
   holidays: (year: number) => call<CalendarYear>(`/holidays/${year}`),

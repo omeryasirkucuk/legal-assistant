@@ -66,3 +66,22 @@ def test_only_a_pure_calendar_question_skips_the_statute_search():
     assert not _calendar_only(Understanding(calendar=True,
                                             issues=[("appeal period", "appeal period")]), agenda)
     assert not _calendar_only(Understanding(), agenda)
+
+
+def test_events_have_their_type_and_time_and_are_scoped_to_the_case():
+    from datetime import time
+
+    from legal_api.db.matter_models import CalendarEvent
+
+    case = _matter("Case A")
+    event = CalendarEvent(kind="hearing", matter_id=case.id, label="Review",
+                          due=TODAY, start_time=time(10), end_time=time(10, 30), done=False)
+    personal = CalendarEvent(kind="reminder", label="Call", due=TODAY, done=False)
+    completed = CalendarEvent(kind="event", matter_id=case.id, label="Filed", due=TODAY, done=True)
+    events = [(event, case), (personal, None), (completed, case)]
+
+    general = render([], TODAY, events=events)
+    assert "10:00–10:30 · Duruşma · Review · Case A" in general
+    assert "Hatırlatıcı · Call" in general and "Filed" not in general
+    scoped = render([], TODAY, case, events)
+    assert "Review" in scoped and "Filed" in scoped and "Call" not in scoped

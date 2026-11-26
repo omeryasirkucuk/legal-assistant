@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from legal_api.api import (
     auth,
+    calendar,
     chats,
     deadline_calc,
     drafting,
@@ -56,8 +57,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (health, auth, chats, deadline_calc, drafting, files, folders, matters, search,
-                   settings):
+    for module in (health, auth, calendar, chats, deadline_calc, drafting, files, folders,
+                   matters, search, settings):
         app.include_router(module.router)
 
     @app.exception_handler(FileProtectionError)
