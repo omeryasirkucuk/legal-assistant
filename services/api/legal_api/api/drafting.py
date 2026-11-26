@@ -379,7 +379,7 @@ async def get_draft_file(draft_id: uuid.UUID, user: CurrentUser, db: DB,
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, str(e)) from e
     except QuotaExceeded as e:
         raise HTTPException(status.HTTP_507_INSUFFICIENT_STORAGE, "storage full") from e
-    return Response(read_file(stored), media_type=MEDIA_TYPES[fmt], headers={
+    return Response(await asyncio.to_thread(read_file, stored), media_type=MEDIA_TYPES[fmt], headers={
         "Content-Disposition": f"attachment; filename=\"petition.{fmt}\"; "
                                f"filename*=UTF-8''{quote(stored.name)}"})
 

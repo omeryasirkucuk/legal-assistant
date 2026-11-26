@@ -35,7 +35,7 @@ async def refresh_draft_file(db: AsyncSession, draft: Draft) -> StoredFile:
     """Drop the draft's files (its text changed) and make the one in its format."""
     rows = (await db.scalars(select(StoredFile).where(StoredFile.draft_id == draft.id))).all()
     for f in rows:
-        store.remove_from_disk(f)
+        await store.remove_payload(f)
     await db.execute(delete(StoredFile).where(StoredFile.draft_id == draft.id))
     await db.commit()
     return await draft_file(db, draft, draft.meta.get("format", "docx"))

@@ -10,7 +10,7 @@ browser action. Client-derived search terms stay in the local indexes.
 
 | Data | Where it goes |
 | --- | --- |
-| Original files and generated exports | The API encrypts payloads with AES-256-GCM, using the owning account and file UUID as associated data. The filesystem path uses identifiers in place of the filename. |
+| Original files and generated exports | The API encrypts payloads with AES-256-GCM, using the owning account and file UUID as associated data. The filesystem path or optional private S3 key uses identifiers in place of the filename. |
 | Extracted text, filenames, case notes, chats, drafts and style samples | Postgres, scoped to the account. Use an encrypted Postgres volume and encrypted backups. The database can search these fields while mounted and must be accessible only to authorized services and operators. |
 | The current request, relevant case excerpts and the conversation context | The protected model endpoint configured on the server. Configure its logging, retention, downstream services and access as part of the same boundary. |
 | Public statutes and decisions | Local statute and decision indexes. Run corpus updates as separate jobs using public law numbers and public datasets. |
@@ -64,7 +64,8 @@ viewer and provide extracted text when their contents are needed for an answer.
 ## Back up and restore
 
 Take a consistent snapshot of Postgres and `STORAGE_DIR` with writes stopped, or use coordinated
-storage snapshots with an equivalent consistency guarantee. Set the Postgres client connection
+storage snapshots with an equivalent consistency guarantee. With `S3_BUCKET` enabled,
+include the corresponding encrypted S3 objects and retain their original keys in the backup. Set the Postgres client connection
 with `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` and a restricted `PGPASSFILE` or equivalent secret
 mechanism. Use a backup public key whose private key stays in an independent recovery store.
 In the examples, `BACKUP_DIR` is a fresh private directory and `BACKUP_RECIPIENT` is the verified

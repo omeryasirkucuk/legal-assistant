@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.4.0 · 2026-11-27
+
+- Use the Oracle VM Compose runbook to deploy, migrate Postgres and index the core statutes. Configure a private S3 bucket and a separate document key for new production uploads and exports.
+
 ## 0.3.3 · 2026-11-26
 
 - Set the writer and optional credit-budget fallback in `.env` with `WRITE_ROUTE` and `WRITE_FALLBACK_ROUTE`. Restart the API after changing either setting.

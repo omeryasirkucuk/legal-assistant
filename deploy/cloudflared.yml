@@ -1,0 +1,6 @@
+tunnel: legal-folonto
+
+ingress:
+  - hostname: legal.folonto.com
+    service: http://127.0.0.1:3100
+  - service: http_status:404

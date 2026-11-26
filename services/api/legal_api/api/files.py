@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Annotated
@@ -117,7 +118,7 @@ async def usage(user: CurrentUser, db: DB) -> dict:
 async def download(file_id: uuid.UUID, user: CurrentUser, db: DB,
                    inline: bool = False) -> Response:
     f = await _owned(db, user, file_id)
-    data = store.read(f)
+    data = await asyncio.to_thread(store.read, f)
     preview_type = store.inline_type(data) if inline else None
     kind = "inline" if preview_type else "attachment"
     return Response(data, media_type=preview_type or "application/octet-stream", headers={
@@ -221,7 +222,8 @@ async def copy(file_id: uuid.UUID, body: CopyTo, user: CurrentUser, db: DB) -> F
         StoredFile.user_id == user.id, StoredFile.folder_id.is_(None) if body.folder_id is None
         else StoredFile.folder_id == body.folder_id))).all())
     try:
-        made = await store.save(db, user.id, _free_name(f.name, taken), store.read(f),
+        data = await asyncio.to_thread(store.read, f)
+        made = await store.save(db, user.id, _free_name(f.name, taken), data,
                                 "upload", f.media_type)
     except store.QuotaExceeded as e:
         raise HTTPException(status.HTTP_507_INSUFFICIENT_STORAGE, "storage full") from e

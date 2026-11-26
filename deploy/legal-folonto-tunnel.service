@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Tunnel for legal.folonto.com
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/cloudflared --no-autoupdate --config /etc/cloudflared/legal-folonto.yml tunnel run --credentials-file %d/tunnel.json
+Restart=on-failure
+RestartSec=5
+DynamicUser=yes
+LoadCredential=tunnel.json:/etc/cloudflared/legal-folonto.json
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

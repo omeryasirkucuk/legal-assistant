@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import("next").NextConfig} */
+const nextConfig = {
   // Hide the Next.js dev-tools badge; it only exists in `next dev` and clutters the UI.
   devIndicators: false,
   // The public deployment builds into its own folder so it never clashes with `next dev`.

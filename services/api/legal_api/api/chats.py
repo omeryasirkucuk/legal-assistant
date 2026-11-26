@@ -273,7 +273,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
         f.chat_id, f.message_id = chat.id, question.id
     await db.commit()
     attachments = [Attachment(f.name, f.media_type, f.text,
-                              read_file(f) if f.media_type.startswith("image/") else None)
+                              await asyncio.to_thread(read_file, f) if f.media_type.startswith("image/") else None)
                    for f in files]
     in_file = []
     # In a case file, its parties, court, notes and documents come with every question.

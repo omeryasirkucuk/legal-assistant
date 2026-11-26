@@ -128,7 +128,7 @@ async def save_answer(db: AsyncSession, chat: Chat, result) -> Message:
         await db.commit()
     except BaseException:
         for file in written_files:
-            file_store.remove_from_disk(file)
+            await file_store.discard_payload(file)
         raise
     return msg
 

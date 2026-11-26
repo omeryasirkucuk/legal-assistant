@@ -40,7 +40,7 @@ class StoredFile(Base):
     media_type: Mapped[str] = mapped_column(String(120))
     size: Mapped[int] = mapped_column(BigInteger)
     sha256: Mapped[str] = mapped_column(String(64))
-    path: Mapped[str] = mapped_column(Text)                 # relative to the storage dir
+    path: Mapped[str] = mapped_column(Text)                 # local path or prefixed S3 key
     encrypted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     text: Mapped[str] = mapped_column(Text, default="")     # extracted text, for answers
     # what the file is, for filtering (files/labels.py); None until labelled

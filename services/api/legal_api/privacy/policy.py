@@ -7,7 +7,7 @@ from legal_api.privacy.file_crypto import document_key
 
 
 def validate(settings: Settings) -> None:
-    if settings.document_encryption_key or settings.protected_data:
+    if settings.document_encryption_key or settings.protected_data or settings.s3_bucket:
         document_key(settings.document_encryption_key)
     if not settings.protected_data:
         return

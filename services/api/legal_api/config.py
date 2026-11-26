@@ -29,6 +29,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://legal:legal@localhost:5433/legal"
     storage_dir: Path = REPO_ROOT / "var" / "storage"
+    s3_bucket: str = ""
     user_storage_bytes: int = 5 * 1024**3   # each user's space for attachments and made files
     data_mode: Literal["development", "protected"] = "development"
     brave_search_api_key: str = ""

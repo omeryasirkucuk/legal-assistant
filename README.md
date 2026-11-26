@@ -91,6 +91,18 @@ indexes do not cover a rule. Outbound web queries are built from public legal te
 becomes evidence only after the official document is retrieved and its passage is checked.
 Protected mode keeps live source requests off and uses the local indexes.
 
+## Production
+
+[legal.folonto.com](https://legal.folonto.com) runs on the existing Oracle ARM VM. A dedicated
+Cloudflare Tunnel sends HTTPS traffic to its loopback proxy. The UI and API share an origin,
+with the API under `/api`. Postgres with pgvector runs on the private Compose network. The API
+encrypts uploaded files and generated exports before storing them in a private S3 bucket in
+Frankfurt. Postgres holds file metadata, extracted text and application records.
+
+See the [deployment runbook](docs/DEPLOYMENT.md) for build, migration, corpus and verification
+commands. The live deployment uses the OpenRouter routing from local development. Use
+synthetic or public material with that configuration.
+
 ## Client data
 
 Use `DATA_MODE=protected` for real client material. Protected mode encrypts original and

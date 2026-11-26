@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import os
 import uuid
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from legal_api.config import get_settings
 from legal_api.db.file_models import StoredFile
 from legal_api.db.session import get_sessionmaker
+from legal_api.files import store
 from legal_api.files.store import encrypt_existing
 from legal_api.main import create_app
 
@@ -143,3 +145,39 @@ async def test_a_copy_gets_a_free_name_in_its_folder(client):
     there = (await client.post(f"/files/{f['id']}/copy", json={"folder_id": folder["id"]})).json()
     assert there["name"] == "memo.txt" and there["folder_id"] == folder["id"]
     assert (await client.get(f"/files/{there['id']}")).content == b"Some text."
+
+
+async def test_s3_uploads_are_sealed_and_downloadable(client, monkeypatch):
+    objects = {}
+
+    class Bucket:
+        def put_object(self, *, Bucket, Key, Body, ContentType):
+            assert Bucket == "test-bucket"
+            assert ContentType == "application/octet-stream"
+            objects[Key] = Body
+
+        def get_object(self, *, Bucket, Key):
+            assert Bucket == "test-bucket"
+            return {"Body": io.BytesIO(objects[Key])}
+
+        def delete_object(self, *, Bucket, Key):
+            assert Bucket == "test-bucket"
+            objects.pop(Key, None)
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "s3_bucket", "test-bucket")
+    monkeypatch.setattr(settings, "document_encryption_key",
+                        base64.urlsafe_b64encode(os.urandom(32)).decode())
+    monkeypatch.setattr(store, "_s3", Bucket)
+
+    data = b"Synthetic S3 document"
+    result = await client.post("/files", files={"file": ("upload.txt", data)})
+    assert result.status_code == 201, result.text
+    file_id = result.json()["id"]
+    key, = objects
+    assert key.startswith("sealed/") and key.endswith(f"/{file_id}/payload")
+    assert data not in objects[key]
+    assert not list(settings.storage_dir.iterdir())
+    assert (await client.get(f"/files/{file_id}")).content == data
+    assert (await client.delete(f"/files/{file_id}")).status_code == 204
+    assert not objects

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 · 2026-11-27
+
+- Added ARM production deployment under `legal.folonto.com` and optional encrypted S3 storage for uploads and exports.
+
 ## 0.3.3 · 2026-11-26
 
 - Allow an explicitly chosen OpenRouter answer writer to use a separately configured model when the affordable response budget is too small.
