@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.5.1 · 2026-11-27
+
+- Reload the web client after updating. This navigation change requires no database migration.
+
 ## 0.5.0 · 2026-11-27
 
 - Restart the API to load the planner, routing and writing changes. Chat context uses existing message metadata and needs no migration. Older chats use recent messages and recover attachments from the preceding question when available.

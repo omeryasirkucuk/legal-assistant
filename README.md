@@ -8,6 +8,8 @@ Standalone greetings and thanks receive a short reply. A later follow-up or form
 
 For a related follow-up the planner can use up to ten prior user messages (bounded excerpts of long messages, keeping the opening request) and the five most recently referenced file IDs from the active topic. It resolves references into a research question and can request one clarification when the intended person, document or action is ambiguous. A combined request can run a calculation and an explicit precedent search in the same answer. Documents supply case facts; legal conclusions still use retrieved sources.
 
+Request calculations in chat by describing the calculation and providing the relevant dates and amounts.
+
 ## Layout
 
 | Path | Purpose |
