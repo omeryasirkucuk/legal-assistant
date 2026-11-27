@@ -4,6 +4,8 @@ A web assistant for Turkish lawyers that answers questions, searches case law an
 and drafts or edits petitions. Every statute article and court decision it cites is retrieved
 from an official or public source and rendered by the backend, never written from model memory.
 
+The production API includes a Turkish-capable serif font and tests PDF generation during the image build. If preparing a file fails after a draft is saved, downloading it retries the export from that draft.
+
 The Folonto Legal monogram appears on sign-in, in the workspace and in the browser tab.
 The chat welcome screen, conversation and message box share a centered column. Answers use
 the available width when there are no sources. On wide screens, answers with sources show

@@ -39,7 +39,7 @@ from legal_api.clock import istanbul_date
 from legal_api.db.app_models import Chat, LLMConnectionSettings, Message, MessageEvidence
 from legal_api.db.file_models import StoredFile
 from legal_api.db.session import get_sessionmaker
-from legal_api.drafting.files import refresh_draft_file
+from legal_api.drafting.files import draft_file
 from legal_api.drafting.store import file_format, record_reply, save_draft, style_book
 from legal_api.files.context import Attachment
 from legal_api.files.store import owned as owned_files
@@ -405,7 +405,8 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
                 stored_chat.title = title
             result = holder["result"]
             saved = await save_answer(session, stored_chat, result)
-            draft = None
+            saved_id = str(saved.id)
+            draft_id = None
             u = getattr(result, "understanding", None)
             asked = getattr(result, "asked", False)
             if (u is not None and u.task != "direct" and previous is not None
@@ -415,12 +416,17 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
                 fmt = await file_format(session, user_pk, u.output_format)
                 draft = await save_draft(session, user_pk, chat_pk, saved.id, u.petition_type,
                                          title or stored_chat.title, result.full_text, fmt)
-                await refresh_draft_file(session, draft)
-        if draft is not None:
-            run.emit("draft", {"id": str(draft.id), "format": fmt})
+                draft_id = str(draft.id)
+                try:
+                    await draft_file(session, draft, fmt)
+                except Exception as exc:
+                    # The editable draft is committed. Download retries file creation.
+                    logger.error("draft export deferred for %s (%s)", draft_id, type(exc).__name__)
+        if draft_id is not None:
+            run.emit("draft", {"id": draft_id, "format": fmt})
         if title:
             run.emit("title", {"chat_id": str(chat_pk), "title": title})
-        run.emit("saved", {"id": str(saved.id)})
+        run.emit("saved", {"id": saved_id})
 
     return _stream(_follow(runs.start(chat.id, work)))
 

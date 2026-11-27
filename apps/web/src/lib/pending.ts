@@ -5,6 +5,7 @@ import type { AnswerLine, Step, StreamEvent } from "./stream";
 
 export type Pending = {
   question: string;
+  questionId?: string;
   startedAt: number;
   steps: Step[];
   plan: Array<{ label: string; asks: string[] }>;
@@ -34,7 +35,7 @@ function withStep(steps: Step[], step: Step): Step[] {
 export function applyEvent(p: Pending, e: StreamEvent): Pending {
   switch (e.type) {
     case "question":
-      return { ...p, question: e.data.content, startedAt: e.data.started_at };
+      return { ...p, questionId: e.data.id, question: e.data.content, startedAt: e.data.started_at };
     case "step":
       return { ...p, steps: withStep(p.steps, e.data) };
     case "evidence":

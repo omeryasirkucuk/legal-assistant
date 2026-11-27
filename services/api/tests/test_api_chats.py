@@ -80,6 +80,37 @@ async def test_answer_spend_survives_chat_deletion(monkeypatch):
         assert (await c.get("/chats/stats/today")).json()["cost_usd"] == 0.012
 
 
+async def test_pdf_export_failure_preserves_answer_and_download(monkeypatch):
+    question = "Dilekçeyi tekrar yaz ve PDF olarak ver."
+    petition = "AİLE MAHKEMESİNE"
+
+    async def answer(_message, _history, _previous, holder, **kwargs):
+        holder["result"] = SimpleNamespace(
+            text=petition, full_text=petition, structure=dict, usage=kwargs["usage"],
+            timings={}, trace={}, ledger=[], understanding=SimpleNamespace(
+                task="drafting", output_format="pdf", petition_type="dava"),
+        )
+        yield Event("final", {"text": petition})
+
+    async def fail_export(*args):
+        raise OSError("temporary file storage failure")
+
+    monkeypatch.setattr(chats, "turn_events", answer)
+    monkeypatch.setattr(chats, "draft_file", fail_export)
+    async with await _client() as c:
+        await register_invited(c, _email("pdf"), "Test")
+        chat_id = (await c.post("/chats", json={"content": question})).json()["id"]
+        path = f"/chats/{chat_id}/messages"
+        stream = await c.post(path, json={"content": question})
+        assert "event: saved" in stream.text and "event: error" not in stream.text
+        question_row, answer_row = (await c.get(path)).json()
+        assert (question_row["content"], answer_row["content"]) == (question, petition)
+        draft, = (await c.get("/drafts", params={"chat_id": chat_id})).json()
+        assert draft["message_id"] == answer_row["id"]
+        download = await c.get(f"/drafts/{draft['id']}/file")
+        assert download.status_code == 200 and download.content.startswith(b"%PDF-")
+
+
 async def _client() -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=create_app()), base_url="http://test")
 

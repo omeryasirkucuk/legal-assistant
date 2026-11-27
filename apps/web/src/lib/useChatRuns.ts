@@ -59,6 +59,7 @@ export function useChatRuns({ onTitle, onFinished }: Callbacks) {
       if (controller.signal.aborted) return;
       const budget = err instanceof ApiError && err.status === 429;
       update(chatId, (p) => ({ ...p, error: true, budget }));
+      onFinished(chatId);
     } finally {
       if (watching.current[chatId] === controller) delete watching.current[chatId];
     }

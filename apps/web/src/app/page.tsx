@@ -110,14 +110,18 @@ export default function ChatApp() {
       setChats((cs) => cs.map((c) => (c.id === id ? { ...c, title } : c))), []),
     onFinished: useCallback((id: string) => {
       if (visibleChat.current === id) {
-        api.messages(id).then(setMessages).catch(() => {});
-        api.drafts(id).then(setDrafts).catch(() => {});
+        api.messages(id).then((rows) => { if (visibleChat.current === id) setMessages(rows); }).catch(() => {});
+        api.drafts(id).then((rows) => { if (visibleChat.current === id) setDrafts(rows); }).catch(() => {});
       }
       api.chats().then(setChats).catch(() => {});
       api.todayStats().then(setToday).catch(() => {});
     }, []),
   });
-  const pending = chatId ? runs.pending[chatId] ?? null : null;
+  const localRun = chatId ? runs.pending[chatId] : undefined;
+  const questionIndex = localRun?.questionId
+    ? messages.findIndex((m) => m.id === localRun.questionId) : -1;
+  const pending = questionIndex >= 0 && messages[questionIndex + 1]?.role === "assistant"
+    ? null : localRun;
   const sourceMessage = messages.find((m) => m.id === drawer?.messageId);
 
   useEffect(() => {

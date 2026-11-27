@@ -4,6 +4,10 @@
 
 - Clean obsolete Folonto Docker images and bound unused build cache after each verified production release. Retain the previous healthy API and web images for rollback.
 
+## 0.9.10 · 2026-11-27
+
+- Fix Turkish petition PDF generation in production and prevent a saved answer from showing a duplicate question and interruption warning after export failure.
+
 ## 0.9.9 · 2026-11-27
 
 - Choose precedent passages from the deciding court's majority opinion and include its disposition. Keep separately headed dissents available in the full source document. Require positive support for each material condition before labelling a case a direct precedent.

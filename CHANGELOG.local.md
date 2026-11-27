@@ -4,6 +4,10 @@
 
 - Use `sudo bash deploy/release.sh` on the Oracle VM for production builds. Run it with `--cleanup-only` to verify the serving release and clean up older images without building. Local application setup is unchanged.
 
+## 0.9.10 · 2026-11-27
+
+- Rebuild the API and web images. The API image installs DejaVu and renders a Turkish PDF at build time. Existing saved drafts can be downloaded without resubmitting a question.
+
 ## 0.9.9 · 2026-11-27
 
 - Restart the API and rebuild the web client. No database migration is required. Test with a split decision and verify that the precedent label follows the majority while the source viewer still shows the complete text. Repeat with a different payment fact and check that it stays outside the direct results.

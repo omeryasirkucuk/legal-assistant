@@ -13,5 +13,8 @@ COPY prompts /app/prompts
 COPY playbooks /app/playbooks
 # Keep the package at its source location so its repo-root data paths resolve.
 ENV PYTHONPATH=/app/services/api HF_HOME=/app/var/model-cache
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 USER 10001:10001
+RUN python -c "from legal_api.drafting.export import render; assert render('Türkçe dilekçe: İı Şş Ğğ', 'pdf').startswith(b'%PDF-')"
 CMD ["uvicorn", "legal_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
