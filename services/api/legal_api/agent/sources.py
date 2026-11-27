@@ -96,11 +96,12 @@ class SourceFinder:
         return [self.article_source(h) for h in hits]
 
     async def decisions_for(self, query: str, ask: str, usage: llm.Usage, keep: int = 2,
-                            live_limit: int = 4, precedents: bool = False) -> list[Source]:
+                            live_limit: int = 4, precedents: bool = False, *,
+                            supplemental: bool = False) -> list[Source]:
         """Decision passages that answer `ask`, from the local archive and live search."""
         async with self._db.acquire() as conn:
             passages = await case_passages(conn, self._decisions, query, ask, usage, keep,
-                                           live_limit, precedents)
+                                           live_limit, precedents, supplemental=supplemental)
         sources = []
         for p in passages:
             if p.live is not None:

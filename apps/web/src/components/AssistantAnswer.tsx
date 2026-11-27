@@ -201,7 +201,8 @@ function Verification({
             const citations = [...new Set(c.keys)].filter((key) => number(key) > 0);
             const note = c.reason === "citation_unmatched" ? t("citationUnmatched")
               : c.reason === "citation_missing" ? t("citationMissing")
-              : c.reason === "support_low" ? t("citationSupportLow") : c.note;
+              : c.reason === "support_low" ? t("citationSupportLow")
+              : c.reason === "support_unavailable" ? t("citationSupportUnavailable") : c.note;
             return (
               <li key={`c${idx}`}>
                 {c.sentence && (

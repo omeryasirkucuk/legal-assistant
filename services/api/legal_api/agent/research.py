@@ -192,7 +192,8 @@ async def _decision_sources(finder: SourceFinder, query: str, ask: str, usage: l
         query, ask, usage,
         keep=max(SEARCH_DECISIONS if asked_for_cases else 0, power.keep_decisions),
         live_limit=max(SEARCH_LIVE if asked_for_cases else 0, power.live_decisions),
-        precedents=asked_for_cases)
+        precedents=asked_for_cases,
+        supplemental=not asked_for_cases and not power.always_decisions)
     progress("caselaw", "done", count=len(sources))
     return sources
 

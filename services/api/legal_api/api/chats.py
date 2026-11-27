@@ -60,8 +60,8 @@ from legal_api.workspace.workbook import workbook
 router = APIRouter(prefix="/chats", tags=["chats"])
 logger = logging.getLogger(__name__)
 
-ANSWER_TIMEOUT_S = 60
-DEEP_ANSWER_TIMEOUT_S = 105
+ANSWER_TIMEOUT_S = 90
+DEEP_ANSWER_TIMEOUT_S = 120
 
 
 class ChatOut(BaseModel):

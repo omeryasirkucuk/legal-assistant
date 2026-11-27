@@ -26,6 +26,7 @@ from legal_api.sources.types import Decision
 LOCAL_CANDIDATES = 4
 LIVE_DECISIONS = 3     # with a search, about 8 s at the decision service's pace
 LIVE_BUDGET_S = 20
+SUPPLEMENTAL_LIVE_BUDGET_S = 8
 MIN_QUERY_WORDS = 2
 KEEP = 2
 RELEVANT = 0.7      # passages are judged more loosely than statute candidates
@@ -87,7 +88,7 @@ async def _search_relaxed(source: BedestenDecisions, query: str,
 
 
 async def _live(source: BedestenDecisions, query: str, ask: str,
-                limit: int = LIVE_DECISIONS) -> list[Passage]:
+                limit: int = LIVE_DECISIONS, *, supplemental: bool = False) -> list[Passage]:
     """Live decisions within a time budget: requests to the service are queued process-wide
     at one per second and can each take up to the gateway timeout, so several answers
     searching at once could wait for minutes. Whatever arrived in time is used."""
@@ -98,7 +99,9 @@ async def _live(source: BedestenDecisions, query: str, ask: str,
             found.append(await source.fetch(ref))
 
     try:
-        await asyncio.wait_for(fetch_all(), LIVE_BUDGET_S)
+        budget = SUPPLEMENTAL_LIVE_BUDGET_S if supplemental else LIVE_BUDGET_S
+        async with asyncio.timeout(budget):
+            await fetch_all()
     except (SourceError, TimeoutError):
         pass
     return [Passage(await asyncio.to_thread(_closest_passage, d.text, ask), d.text, live=d)
@@ -123,13 +126,14 @@ async def _screen(ask: str, passages: list[Passage], usage: llm.Usage,
 
 async def case_passages(conn: asyncpg.Connection, source: BedestenDecisions, query: str,
                         ask: str, usage: llm.Usage, keep: int = KEEP,
-                        live_limit: int = LIVE_DECISIONS, precedents: bool = False
-                        ) -> list[Passage]:
+                        live_limit: int = LIVE_DECISIONS, precedents: bool = False, *,
+                        supplemental: bool = False) -> list[Passage]:
     """`precedents`: the lawyer asked for decisions themselves; more are read and kept, and
     they are judged as precedents for the case rather than as answers to a sub-question."""
     async with asyncio.TaskGroup() as group:
         local = group.create_task(_local(conn, query))
-        live = group.create_task(_live(source, query, ask, live_limit))
+        live = group.create_task(
+            _live(source, query, ask, live_limit, supplemental=supplemental))
     seen, candidates = set(), []
     for p in [*live.result(), *local.result()]:
         key = (p.live.ref.case_no, p.live.ref.decision_no) if p.live else (

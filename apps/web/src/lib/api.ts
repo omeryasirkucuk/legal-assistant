@@ -80,9 +80,9 @@ export type Issue = { kind: string; severity: "error" | "warning"; paragraph: nu
 export type Claim = {
   sentence: string;
   keys: string[];
-  verdict: "supported" | "partial" | "not_supported";
+  verdict: "supported" | "partial" | "not_supported" | "unverified";
   note: string;
-  reason?: "citation_unmatched" | "citation_missing" | "support_low";
+  reason?: "citation_unmatched" | "citation_missing" | "support_low" | "support_unavailable";
 };
 export type Checked = { issues: Issue[]; claims: Claim[]; citation_check?: "source_passages" };
 export type WorkspaceSummary = {

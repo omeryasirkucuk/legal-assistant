@@ -22,8 +22,12 @@ Istanbul calendar date when the message was received. For example, on 27 Novembe
 An explicit request for an indexed article's text, such as `6098 sayılı Kanun madde 344`, returns the
 article and its source directly from the local index. Chat runs overlapping statute and case-law searches when both are needed. The chat saves the
 answer as soon as it is ready and keeps the question-derived title if the title model is still
-working. Generation has a 60-second limit, or 105 seconds in deep research. Timed-out requests
-offer a retry. The final event reports `first_delta_s` when answer text streamed and `total_s`
+working. Generation has a 90-second limit, or 120 seconds in deep research. A supplemental
+live case-law lookup has 8 seconds to retrieve decisions. Explicit case-law searches and deep
+research have 20 seconds for live retrieval. Local articles and decisions already retrieved remain
+available. If a citation support check cannot finish within 5 seconds, the answer keeps its
+citations and marks the affected statements for review. Timed-out generation offers a retry.
+The final event reports `first_delta_s` when answer text streamed and `total_s`
 for the generation run, including follow-up routing.
 
 ## Layout

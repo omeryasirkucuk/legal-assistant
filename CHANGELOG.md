@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.6 · 2026-11-27
+
+- Give grounded chat answers 90 seconds to finish, or 120 seconds in deep research. Limit supplemental live case-law retrieval to 8 seconds so legislation-based answers can start sooner.
+- Keep completed answers and their citations when a citation support check takes too long. The citation notice identifies statements whose support could not be checked.
+
 ## 0.9.5 · 2026-11-27
 
 - Classify unrelated requests before legal research and respond with a short Turkish redirect. Keep sports-related legal questions, document review and replies to pending legal questions in scope.

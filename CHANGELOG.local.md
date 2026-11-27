@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.9.6 · 2026-11-27
+
+- Run `make setup`, restart the API and rebuild the web client. No database migration is required.
+- Ask a general legal question such as `Ev sahibim beni evden hangi şartlarda çıkarabilir`. Check streamed text, the saved answer and its citations. A slow citation support check should open a review notice while preserving the answer.
+
 ## 0.9.5 · 2026-11-27
 
 - Run `make setup`, restart the API and rebuild the web client. No database migration is required.

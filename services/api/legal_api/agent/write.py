@@ -33,6 +33,7 @@ from legal_api.prompts import prompt
 
 MAX_DOCUMENT_CHARS = 8000
 CITATION_RETRY_S = 8
+SUPPORT_CHECK_S = 5
 CITE_AGAIN = ("<note>The previous attempt produced no verifiable citation. Follow the citation "
               "instructions for each sourced legal statement.</note>")
 # Includes the model's thinking; 4,000 cut a consultation answer off mid-section.
@@ -158,17 +159,26 @@ async def check(segments: list[Segment], sources: list[Source], message: str,
     if to_judge and decisions.enabled():
         context = _paragraphs(segments)
         async with decisions.client() as client:
-            verdicts = await asyncio.gather(*(
-                decisions.yes_probabilities(
-                    client, {"sentence": seg.text.strip(), "paragraph": context[id(seg)],
-                             "sources": "\n\n".join(
-                                 f"{s.evidence.citation}:\n{s.document[:CHECK_SOURCE_CHARS]}"
-                                 for s in relied)},
-                    {"supported": SUPPORT_CHECK}, usage, "check")
-                for seg, relied in to_judge))
-        for (seg, _), v in zip(to_judge, verdicts, strict=True):
-            score = v["supported"]
-            if score is not None and score < SUPPORTED:
+            async def support(seg: Segment, relied: list[Source]) -> float | None:
+                state = {
+                    "sentence": seg.text.strip(),
+                    "paragraph": context[id(seg)],
+                    "sources": "\n\n".join(
+                        f"{s.evidence.citation}:\n{s.document[:CHECK_SOURCE_CHARS]}" for s in relied),
+                }
+                try:
+                    async with asyncio.timeout(SUPPORT_CHECK_S):
+                        verdict = await decisions.yes_probabilities(
+                            client, state, {"supported": SUPPORT_CHECK}, usage, "check")
+                    return verdict["supported"]
+                except TimeoutError:
+                    return None
+
+            scores = await asyncio.gather(*(support(seg, relied) for seg, relied in to_judge))
+        for (seg, _), score in zip(to_judge, scores, strict=True):
+            if score is None:
+                flagged.append(_flag(seg, "", "support_unavailable", "unverified"))
+            elif score < SUPPORTED:
                 flagged.append(_flag(seg, "", "support_low", "partial" if score >= PARTIAL
                                      else "not_supported"))
     return flagged

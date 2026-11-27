@@ -984,7 +984,7 @@ wheels = [
 
 [[package]]
 name = "legal-api"
-version = "0.9.5"
+version = "0.9.6"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
