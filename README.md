@@ -22,7 +22,9 @@ Istanbul calendar date when the message was received. For example, on 27 Novembe
 An explicit request for an indexed article's text, such as `6098 sayılı Kanun madde 344`, returns the
 article and its source directly from the local index. Statute and case-law research run
 concurrently. Petition drafts use one shared decision search and cite only decisions verified
-against their material facts and legal route. Explicit precedent searches show directly
+against their material facts and legal route. The screening passage includes the majority
+disposition, and the source viewer retains the full decision, including dissents. A direct match requires affirmative source support for each case condition.
+Explicit precedent searches show directly
 matching decisions first and label decisions that turn on different facts. When the reviewed
 passages do not establish a direct match, the answer says so. The existing analysis schema
 carries the query variants and conditions together in its case-law text field. Successfully

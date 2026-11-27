@@ -58,7 +58,7 @@ async def test_match_requires_the_holding_and_every_condition(monkeypatch):
         assert state["required_conditions"] == ("ana kira borcu", "hiç ödeme yok")
         full = dict.fromkeys(checks, 0.91)
         return {
-            "exact": full,
+            "exact": {**full, "direct": 0.78, "holding": 0.83},
             "partial payment": {**full, "condition_1": 0.04, "related": 0.97},
             "quoted lower court": {**full, "holding": 0.08, "related": 0.93},
             "unrelated": {**full, "direct": 0.05, "related": 0.22},
@@ -168,3 +168,16 @@ async def test_local_decision_survives_a_live_rate_limit(monkeypatch):
     result = await case_law.case_passages(None, BlockedSource(), "kira borcu", "case",
                                           llm.Usage(), alternative="kira bedeli")
     assert [p.passage for p in result] == ["local passage"]
+
+
+def test_decision_passage_keeps_majority_disposition_and_excludes_dissent():
+    text = (
+        "Somut olayda alacak kira bedeline ilişkindir.\n\n"
+        "IV. SONUÇ: Hükmün incelenmek üzere bozulmasına karar verildi.\n\n"
+        "KARŞI OY \n"
+        "İtiraz ve ödeme konusunda çoğunluğun aksine tahliye gerekir."
+    )
+
+    excerpt = case_law._closest_passage(text, "itiraz ödeme tahliye")
+    assert "bozulmasına karar verildi" in excerpt
+    assert "tahliye gerekir" not in excerpt

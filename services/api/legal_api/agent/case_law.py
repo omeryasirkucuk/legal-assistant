@@ -32,8 +32,15 @@ LOCAL_BUDGET_S = 3
 CACHE_BUDGET_S = 1
 DECISION_CHECK_S = 5
 KEEP = 2
-RELEVANT = 0.75
-DIRECT = 0.85
+RELEVANT = 0.72
+HOLDING_MIN = 0.80
+DIRECT_MIN = 0.75
+CONDITION_MIN = 0.85
+DISSENT_HEADING = re.compile(
+    r"^[ \t]*(?:karşı[ \t]+(?:oy|görüş)(?:[ \t]+(?:yazısı|gerekçesi))?"
+    r"|muhalefet[ \t]+şerhi|ayrışık[ \t]+oy)[ \t]*(?:[:.]|$)",
+    re.IGNORECASE | re.MULTILINE,
+)
 Match = Literal["direct", "related"]
 
 HOLDING = ("Does the passage include the deciding court's own legal reasoning or disposition "
@@ -88,8 +95,10 @@ def _terms(text: str) -> set[str]:
 
 
 def _closest_passage(text: str, ask: str) -> str:
-    """Keep relevant facts and the actual disposition, in source order."""
-    chunks = [c.text for c in chunk_text(text)] or [text]
+    """Keep relevant facts and the deciding court's disposition, in source order."""
+    dissent = DISSENT_HEADING.search(text)
+    majority = text[:dissent.start()].rstrip() if dissent else text
+    chunks = [c.text for c in chunk_text(majority)] or [majority]
     terms = _terms(ask)
     overlaps = [terms & _terms(chunk) for chunk in chunks]
     selected = {len(chunks) - 1}
@@ -169,9 +178,12 @@ async def _screen(ask: str, passages: list[Passage], usage: llm.Usage, keep: int
     scored = []
     for answer, passage in zip(answers, passages, strict=True):
         relevant = answer.get("related") or 0.0
-        direct = min((answer.get(key) or 0.0 for key in checks if key != "related"), default=0.0)
-        if direct >= DIRECT:
-            scored.append((True, direct, replace(passage, match="direct")))
+        holding = answer.get("holding") or 0.0
+        direct = answer.get("direct") or 0.0
+        conditions = min((answer.get(f"condition_{i}") or 0.0
+                          for i in range(len(requirements))), default=0.0)
+        if holding >= HOLDING_MIN and direct >= DIRECT_MIN and conditions >= CONDITION_MIN:
+            scored.append((True, min(holding, direct, conditions), replace(passage, match="direct")))
         elif include_related and relevant >= RELEVANT:
             scored.append((False, relevant, replace(passage, match="related")))
     scored.sort(key=lambda result: (result[0], result[1]), reverse=True)

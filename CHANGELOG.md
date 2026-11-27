@@ -4,6 +4,10 @@
 
 - Clean obsolete Folonto Docker images and bound unused build cache after each verified production release. Retain the previous healthy API and web images for rollback.
 
+## 0.9.9 · 2026-11-27
+
+- Choose precedent passages from the deciding court's majority opinion and include its disposition. Keep separately headed dissents available in the full source document. Require positive support for each material condition before labelling a case a direct precedent.
+
 ## 0.9.8 · 2026-11-27
 
 - Keep the established provider schema for legal analysis and carry the precedent plan in its existing text field. Parse variant queries and conditions without increasing the provider's grammar complexity.

@@ -1,6 +1,6 @@
 [project]
 name = "legal-api"
-version = "0.9.8"
+version = "0.9.9"
 description = "Backend for a grounded legal research and drafting assistant."
 requires-python = ">=3.12"
 dependencies = [
