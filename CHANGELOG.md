@@ -4,6 +4,11 @@
 
 - Clean obsolete Folonto Docker images and bound unused build cache after each verified production release. Retain the previous healthy API and web images for rollback.
 
+## 0.9.8 · 2026-11-27
+
+- Keep the established provider schema for legal analysis and carry the precedent plan in its existing text field. Parse variant queries and conditions without increasing the provider's grammar complexity.
+- Keep official decision texts in the local public corpus after successful retrieval. Search those texts during upstream throttling without requiring an embedding pass.
+
 ## 0.9.7 · 2026-11-27
 
 - Run one bounded court-decision search alongside statute research. Petition drafts reuse the same decisions and avoid serial searches for individual grounds.

@@ -70,6 +70,24 @@ async def insert(conn: asyncpg.Connection, records: list[DecisionRecord]) -> int
     return len(fresh)
 
 
+async def cache_decisions(conn: asyncpg.Connection, records: list[DecisionRecord]) -> None:
+    """Index public live decisions once, including concurrent fetches of the same text."""
+    async with conn.transaction():
+        for record in records:
+            inserted = await conn.fetchval(
+                """INSERT INTO corpus_decisions
+                       (id, source, chamber, case_no, decision_no, decision_date, url, text, raw_sha256)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                   ON CONFLICT (id) DO NOTHING RETURNING id""",
+                record.id, record.source, record.chamber, record.case_no, record.decision_no,
+                record.decision_date, record.url, record.text, record.raw_sha256)
+            if inserted:
+                await conn.copy_records_to_table(
+                    "corpus_chunks", columns=["decision_id", "ordinal", "start_char", "text"],
+                    records=[(record.id, c.ordinal, c.start, c.text) for c in chunk_text(record.text)],
+                )
+
+
 async def run(path: Path, chamber_limits: dict[str, int] | None, limit: int | None) -> None:
     conn = await asyncpg.connect(asyncpg_dsn())
     try:

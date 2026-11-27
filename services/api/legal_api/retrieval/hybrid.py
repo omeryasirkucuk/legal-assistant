@@ -28,7 +28,8 @@ WHERE tsv @@ any_terms('turkish', $1)
 ORDER BY ts_rank_cd(tsv, any_terms('turkish', $1)) DESC
 LIMIT $2
 """
-_VECTOR_SQL = "SELECT id FROM corpus_chunks ORDER BY embedding <=> $1 LIMIT $2"
+_VECTOR_SQL = """SELECT id FROM corpus_chunks WHERE embedding IS NOT NULL
+                 ORDER BY embedding <=> $1 LIMIT $2"""
 _HITS_SQL = """
 SELECT c.id AS chunk_id, c.start_char, c.text AS passage,
        d.id, d.chamber, d.case_no, d.decision_no, d.decision_date, d.url
@@ -60,8 +61,10 @@ def fuse(rankings: list[list[int]], k: int = RRF_K) -> dict[int, float]:
 
 async def search(conn: asyncpg.Connection, query: str, limit: int = 10) -> list[Hit]:
     fts_ids = [r["id"] for r in await conn.fetch(_FTS_SQL, query, CANDIDATES)]
-    vector = await asyncio.to_thread(embed_query, query)
-    vector_ids = [r["id"] for r in await conn.fetch(_VECTOR_SQL, vector, CANDIDATES)]
+    vector_ids = []
+    if await conn.fetchval("SELECT EXISTS (SELECT 1 FROM corpus_chunks WHERE embedding IS NOT NULL)"):
+        vector = await asyncio.to_thread(embed_query, query)
+        vector_ids = [r["id"] for r in await conn.fetch(_VECTOR_SQL, vector, CANDIDATES)]
     scores = fuse([fts_ids, vector_ids])
     rows = {r["chunk_id"]: r for r in await conn.fetch(_HITS_SQL, list(scores))}
 

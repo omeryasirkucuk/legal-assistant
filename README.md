@@ -24,7 +24,10 @@ article and its source directly from the local index. Statute and case-law resea
 concurrently. Petition drafts use one shared decision search and cite only decisions verified
 against their material facts and legal route. Explicit precedent searches show directly
 matching decisions first and label decisions that turn on different facts. When the reviewed
-passages do not establish a direct match, the answer says so.
+passages do not establish a direct match, the answer says so. The existing analysis schema
+carries the query variants and conditions together in its case-law text field. Successfully
+retrieved official decisions are indexed in the local public corpus for later requests,
+including during upstream rate limits.
 
 Generation has a 90-second limit, or 120 seconds in deep research. Live decision retrieval
 has a shared budget of 14 seconds for petitions, explicit searches and deep research, or

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from hashlib import sha256
 
 from legal_api.locale import institution, with_institution
+from legal_api.sources.types import Decision
 
 ICTIHAT_PAGE = "https://mevzuat.adalet.gov.tr/ictihat"
 DANISTAY_PAGE = "https://karararama.danistay.gov.tr/getDokuman"
@@ -62,4 +64,14 @@ def from_dataset_row(row: dict) -> DecisionRecord:
         url=_url(source, row["document_id"], case_no, decision_no),
         text=row["text"],
         raw_sha256=row["raw_sha256"].removeprefix("sha256:"),
+    )
+
+
+def from_bedesten(decision: Decision) -> DecisionRecord:
+    ref = decision.ref
+    return DecisionRecord(
+        id=ref.source_id, source="bedesten", chamber=ref.chamber, case_no=ref.case_no,
+        decision_no=ref.decision_no,
+        decision_date=date.fromisoformat(ref.decision_date) if ref.decision_date else None,
+        url=ref.url, text=decision.text, raw_sha256=sha256(decision.text.encode()).hexdigest(),
     )

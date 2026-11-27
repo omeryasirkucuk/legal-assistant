@@ -134,3 +134,37 @@ async def test_draft_research_runs_one_case_pass_alongside_statutes(monkeypatch)
     assert calls[0][1]["include_related"] is False
     assert result.trace["direct_decisions"] == 0
     assert result.trace["case_law_searched"] is True
+
+
+def test_case_plan_preserves_legacy_queries_and_keeps_separate_conditions():
+    from legal_api.agent.understand import _case_plan
+
+    assert _case_plan("kira tahliye") == ("kira tahliye", "", [])
+    assert _case_plan("") == ("", "", [])
+    assert _case_plan(
+        "kira borcu tahliye\nalternatif: kira bedeli örnek 13\n"
+        "koşul: itiraz yok\nkoşul: kısmi ödeme yok\nkoşul: itiraz yok"
+    ) == ("kira borcu tahliye", "kira bedeli örnek 13", ["itiraz yok", "kısmi ödeme yok"])
+
+
+async def test_local_decision_survives_a_live_rate_limit(monkeypatch):
+    from legal_api.sources.gateway import SourceBlocked
+
+    class BlockedSource:
+        async def search(self, query, *, size):
+            raise SourceBlocked("rate limited")
+
+    async def archived(_conn, query, _excerpt_query):
+        assert "kira bedeli" in query
+        return [case_law.Passage("local passage", "local full text", live=Decision(
+            ref("archive"), "local full text"))]
+
+    async def screen(_ask, passages, _usage, _keep, **_options):
+        return passages
+
+    monkeypatch.setattr(case_law, "_local", archived)
+    monkeypatch.setattr(case_law, "_screen", screen)
+
+    result = await case_law.case_passages(None, BlockedSource(), "kira borcu", "case",
+                                          llm.Usage(), alternative="kira bedeli")
+    assert [p.passage for p in result] == ["local passage"]

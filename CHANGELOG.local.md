@@ -4,6 +4,10 @@
 
 - Use `sudo bash deploy/release.sh` on the Oracle VM for production builds. Run it with `--cleanup-only` to verify the serving release and clean up older images without building. Local application setup is unchanged.
 
+## 0.9.8 · 2026-11-27
+
+- Restart the API and rebuild the web client. No database migration is required. Verify the configured production model can process a legal prompt and produce a precedent plan before testing the saved chat output. Confirm a previously indexed public decision is available when the live decision source is throttled.
+
 ## 0.9.7 · 2026-11-27
 
 - Run `make setup`, restart the API and rebuild the web client. No database migration is required.

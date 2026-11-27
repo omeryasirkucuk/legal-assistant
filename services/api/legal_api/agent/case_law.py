@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from dataclasses import dataclass, replace
 from itertools import zip_longest
@@ -12,18 +13,23 @@ import asyncpg
 
 from legal_api import decisions, llm
 from legal_api.corpus.chunking import chunk_text
+from legal_api.corpus.ingest import cache_decisions
+from legal_api.corpus.records import from_bedesten
 from legal_api.grounding.normalize import tr_fold
 from legal_api.retrieval.hybrid import search as search_local
 from legal_api.sources.bedesten_decisions import BedestenDecisions
 from legal_api.sources.gateway import SourceBlocked, SourceError
 from legal_api.sources.types import Decision, DecisionRef
 
-LOCAL_CANDIDATES = 4
+logger = logging.getLogger(__name__)
+
+LOCAL_CANDIDATES = 6
 LIVE_DECISIONS = 3
 LIVE_BUDGET_S = 14
 SUPPLEMENTAL_LIVE_BUDGET_S = 8
 SEARCH_QUERY_S = 4
 LOCAL_BUDGET_S = 3
+CACHE_BUDGET_S = 1
 DECISION_CHECK_S = 5
 KEEP = 2
 RELEVANT = 0.75
@@ -63,14 +69,14 @@ class Passage:
         return (tr_fold(chamber), case, decision) if case and decision else (source,)
 
 
-async def _local(conn: asyncpg.Connection, query: str) -> list[Passage]:
+async def _local(conn: asyncpg.Connection, query: str, excerpt_query: str) -> list[Passage]:
     if not await conn.fetchval("SELECT EXISTS (SELECT 1 FROM corpus_decisions)"):
         return []
     hits = await search_local(conn, query, limit=LOCAL_CANDIDATES)
     texts = {r["id"]: r["text"] for r in await conn.fetch(
         "SELECT id, text FROM corpus_decisions WHERE id = ANY($1::text[])",
         [h.decision_id for h in hits])}
-    return [Passage(_closest_passage(texts[h.decision_id], query), texts[h.decision_id], local={
+    return [Passage(_closest_passage(texts[h.decision_id], excerpt_query), texts[h.decision_id], local={
         "source_id": h.decision_id, "chamber": h.chamber, "case_no": h.case_no,
         "decision_no": h.decision_no, "decision_date": h.decision_date, "url": h.url})
         for h in hits if h.decision_id in texts]
@@ -186,7 +192,7 @@ async def case_passages(conn: asyncpg.Connection, source: BedestenDecisions, que
     async def local() -> list[Passage]:
         try:
             async with asyncio.timeout(LOCAL_BUDGET_S):
-                return await _local(conn, query)
+                return await _local(conn, f"{query} {alternative}".strip(), excerpt_query)
         except TimeoutError:
             return []
 
@@ -194,5 +200,12 @@ async def case_passages(conn: asyncpg.Connection, source: BedestenDecisions, que
         local(), _live(source, query, excerpt_query, live_limit,
                        supplemental=supplemental, alternative=alternative))
     candidates = {p.identity(): p for p in [*archive, *live]}
-    return await _screen(ask, list(candidates.values()), usage, keep, strict=precedents,
-                         requirements=requirements, include_related=include_related)
+    assessed = await _screen(ask, list(candidates.values()), usage, keep, strict=precedents,
+                             requirements=requirements, include_related=include_related)
+    if live:
+        try:
+            async with asyncio.timeout(CACHE_BUDGET_S):
+                await cache_decisions(conn, [from_bedesten(p.live) for p in live if p.live])
+        except (TimeoutError, asyncpg.PostgresError, ValueError):
+            logger.warning("Public decision cache write skipped")
+    return assessed
