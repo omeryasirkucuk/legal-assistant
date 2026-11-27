@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1 · 2026-11-27
+
+- Center the chat welcome screen, conversation and message box in the workspace.
+- Keep the chat input focus highlight on the rounded message box.
+
 ## 0.9.0 · 2026-11-27
 
 - Keep admin invitation codes in the admin panel with active, used and expired states. New codes expire after 24 hours and remain bound to the specified email address.

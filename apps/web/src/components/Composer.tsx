@@ -177,7 +177,7 @@ export function Composer({ followUp, busy, onSubmit, onStop, footer, placeholder
           }}
           placeholder={placeholder ?? t("askPlaceholder")}
           aria-label={t("messageLabel")}
-          className="block max-h-[min(15rem,max(2.75rem,calc(var(--app-viewport-height)*0.24)))] w-full resize-none bg-transparent px-4 pt-3 text-[15px] leading-relaxed outline-none placeholder:text-faint focus-visible:outline-none"
+          className="block max-h-[min(15rem,max(2.75rem,calc(var(--app-viewport-height)*0.24)))] w-full resize-none bg-transparent px-4 pt-3 text-[15px] leading-relaxed outline-none placeholder:text-faint focus-visible:outline-hidden!"
         />
         <div className="relative flex items-center gap-1 px-2 pb-2">
           <button onClick={() => picker.current?.click()} aria-label={t("attach")} title={t("attach")}

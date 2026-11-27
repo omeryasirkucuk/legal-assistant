@@ -327,6 +327,7 @@ export default function ChatApp() {
     fn(...args);
   };
 
+  const chatColumn = "box-content max-w-[42rem] px-4 sm:px-6 @4xl:px-12";
   const empty = view === "chat" && !messages.length && !pending;
   const currentMatter = matters.find((m) => m.id === matterId) ?? null;
   const lastAnswer = [...messages].reverse().find((m) => m.role === "assistant");
@@ -383,7 +384,9 @@ export default function ChatApp() {
         <MobileBar title={barTitle} onMenu={() => setNavOpen(true)} onNew={newChat} />
         <div ref={workspaceScroll} data-workspace-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
           {reminders}
-          <div className="mx-auto w-full max-w-[64rem] px-4 pb-6 pt-5 sm:px-6 sm:pb-12 md:pt-10 @4xl:px-12">
+          <div className={`mx-auto pb-6 pt-5 sm:pb-12 md:pt-10 ${view === "chat"
+            ? chatColumn
+            : "w-full max-w-[64rem] px-4 sm:px-6 @4xl:px-12"}`}>
             {view === "matter" && matterId && (
               <MatterView key={`${matterId}-${matterVersion}`} matterId={matterId} onOpenChat={openChat}
                 onOpenDraft={openChat} onChanged={refreshMatters} matters={matters} onEventsChanged={remindersChanged}
@@ -471,7 +474,9 @@ export default function ChatApp() {
         {/* Keep the composer and its menus outside the message scroller. */}
         {view !== "calendar" && view !== "files" && (
         <div className="shrink-0 border-t border-rule/60">
-          <div className="mx-auto grid w-full max-w-[64rem] grid-cols-1 gap-x-10 bg-paper px-3 py-2 sm:px-6 sm:pb-4 @4xl:grid-cols-[minmax(0,42rem)_15rem] @4xl:px-12">
+          <div className={`mx-auto bg-paper py-2 sm:pb-4 ${view === "chat"
+            ? chatColumn
+            : "grid w-full max-w-[64rem] grid-cols-1 gap-x-10 px-3 sm:px-6 @4xl:grid-cols-[minmax(0,42rem)_15rem] @4xl:px-12"}`}>
             <div className="relative">
               {held && (
                 <MatterSuggest question={held.question} candidates={held.candidates} onWith={(m) => answerHeld(m)} onWithout={() => answerHeld(null)} />

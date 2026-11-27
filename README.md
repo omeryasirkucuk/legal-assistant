@@ -5,6 +5,8 @@ and drafts or edits petitions. Every statute article and court decision it cites
 from an official or public source and rendered by the backend, never written from model memory.
 
 The Folonto Legal monogram appears on sign-in, in the workspace and in the browser tab.
+The chat welcome screen, conversation and message box share a centered column. Focusing
+the message box highlights its rounded border.
 
 ## Layout
 

@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.9.1 · 2026-11-27
+
+- Rebuild the web client and check chat alignment on desktop and mobile. Click or tab into
+  the message box to check its focus border. This update requires no database migration.
+
 ## 0.9.0 · 2026-11-27
 
 - Run `make setup` and `make migrate` before restarting the API and rebuilding the web app. The migration adds invite history, account budget overrides and the saved writer model.
