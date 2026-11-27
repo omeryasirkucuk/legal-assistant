@@ -10,6 +10,13 @@ For a related follow-up the planner can use up to ten prior user messages (bound
 
 Request calculations in chat by describing the calculation and providing the relevant dates and amounts.
 
+A request for an indexed article's text, such as `6098 sayılı Kanun madde 344`, returns the
+article and its source directly from the local index. Chat runs overlapping statute and case-law searches when both are needed. The chat saves the
+answer as soon as it is ready and keeps the question-derived title if the title model is still
+working. Generation has a 60-second limit, or 105 seconds in deep research. Timed-out requests
+offer a retry. The final event reports `first_delta_s` when answer text streamed and `total_s`
+for the generation run, including follow-up routing.
+
 ## Layout
 
 | Path | Purpose |

@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.5.2 · 2026-11-27
+
+- Run `make setup`, restart the API and reload the rebuilt web client. No database migration is required.
+- Check `timings.first_delta_s` and `timings.total_s` on chat final events to compare response latency. A cold local search uses cached embedding weights when available.
+
 ## 0.5.1 · 2026-11-27
 
 - Reload the web client after updating. This navigation change requires no database migration.

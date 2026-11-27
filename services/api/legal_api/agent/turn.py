@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from dataclasses import dataclass, field
 from datetime import datetime
 from time import monotonic
@@ -24,6 +25,7 @@ from legal_api.files.store import read as read_file
 from legal_api.grounding.evidence import EvidenceLedger
 from legal_api.locale import chat_turns
 from legal_api.matters.agenda import Agenda
+from legal_api.retrieval.statutes import article_request
 from legal_api.workspace.session import Context
 
 
@@ -83,6 +85,8 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
     workspace_reply = previous is not None and (previous.answer or {}).get("task") == "workspace"
     kind = None if uploaded else direct_intent(message)
     earlier = case_turns(previous, history)
+    if kind is None and not (uploaded or attachments) and article_request(message):
+        kind = "new"
     if kind is None:
         kind = await route(message, previous.question if previous else None,
                            previous.short if previous else None, usage, earlier,
@@ -151,8 +155,9 @@ async def turn_events(message: str, history: list[dict], previous: Previous | No
                                just_asked=just_asked, agenda=agenda, workspace=workspace)
     yield Event("route", {"kind": kind})
     yield step_event("understand", "done")
-    async for event in events:
-        yield event
+    async with aclosing(events):
+        async for event in events:
+            yield event
     if "result" in result:
         result["result"].case_file_ids = case_files
         result["result"].case_turns = _bounded_turns([*active, message])

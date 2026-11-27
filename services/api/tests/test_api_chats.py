@@ -1,5 +1,7 @@
+import asyncio
 import json
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,12 +10,14 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from legal_api.agent import pipeline
 from legal_api.agent.answer import Event
 from legal_api.api import chats
 from legal_api.chat.service import drop_unanswered, history, previous_turn
 from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, Message
 from legal_api.main import create_app
+from legal_api.retrieval.statutes import StatuteHit
 
 TR = json.loads((Path(__file__).parent / "fixtures" / "tr" / "test_strings.json").read_text(encoding="utf-8"))
 
@@ -42,13 +46,21 @@ async def _delete_test_users():
 
 
 async def test_answer_spend_survives_chat_deletion(monkeypatch):
+    title_started = asyncio.Event()
+    title_cancelled = asyncio.Event()
+
     async def title(_question, _usage):
-        return None
+        title_started.set()
+        try:
+            await asyncio.Future()
+        finally:
+            title_cancelled.set()
 
     async def answer(_message, _history, _previous, result, *_args, explicit_files, usage, workspace):
+        await title_started.wait()
         usage.record("test", SimpleNamespace(cost=0.012), "write")
         result["result"] = SimpleNamespace(
-            text="Answer", structure=lambda: {}, usage=usage, timings={}, trace={}, ledger=[],
+            text="Answer", structure=dict, usage=usage, timings={}, trace={}, ledger=[],
         )
         yield Event("final", {"text": "Answer"})
 
@@ -60,6 +72,8 @@ async def test_answer_spend_survives_chat_deletion(monkeypatch):
         chat_id = (await c.post("/chats", json={"content": "Question"})).json()["id"]
         response = await c.post(f"/chats/{chat_id}/messages", json={"content": "Question"})
         assert "event: saved" in response.text
+        assert title_cancelled.is_set()
+        assert (await c.get(f"/chats/{chat_id}/messages")).json()[-1]["content"] == "Answer"
         assert (await c.get("/chats/stats/today")).json()["cost_usd"] == 0.012
         assert (await c.delete(f"/chats/{chat_id}")).status_code == 204
         assert (await c.get("/chats/stats/today")).json()["cost_usd"] == 0.012
@@ -150,3 +164,54 @@ async def test_greeting_is_saved_without_replacing_substantive_context():
                     "Kıdem hesabı", "Önceki hesap"]
         finally:
             await engine.dispose()
+
+
+async def test_stalled_answer_closes_the_stream_and_can_be_retried(monkeypatch):
+    cleaned = asyncio.Event()
+
+    async def stalled(*_args, **_kwargs):
+        try:
+            yield Event("step", {"name": "analyse", "state": "active"})
+            await asyncio.Future()
+        finally:
+            cleaned.set()
+
+    async with await _client() as c:
+        await c.post("/auth/register", json={"email": _email("timeout"), "password": "secret-pass",
+                                              "name": "Test", "invite_code": "test-invite"})
+        chat_id = (await c.post("/chats", json={"content": "Merhaba"})).json()["id"]
+        with monkeypatch.context() as patch:
+            patch.setattr(chats, "ANSWER_TIMEOUT_S", 0.05)
+            patch.setattr(chats, "turn_events", stalled)
+            response = await c.post(f"/chats/{chat_id}/messages", json={"content": "Merhaba"})
+        assert 'event: error\ndata: {"timed_out": true}' in response.text
+        assert cleaned.is_set()
+        assert (await c.get(f"/chats/{chat_id}/run")).status_code == 204
+        retried = await c.post(f"/chats/{chat_id}/messages", json={"content": "Merhaba"})
+        assert "event: saved" in retried.text
+
+
+async def test_explicit_article_text_is_served_with_its_source(monkeypatch):
+    async def article(_connection, law, label):
+        assert (law, label) == ("6098", "344")
+        return StatuteHit(1, law, "Türk Borçlar Kanunu", "s", label, "",
+                          "Yerel dizinden alınan örnek madde metni.", "https://example.com/article",
+                          datetime.now(UTC))
+
+    async def no_model(*_args, **_kwargs):
+        pytest.fail("An explicit article text request should not invoke a model")
+
+    monkeypatch.setattr(pipeline, "get_article", article)
+    monkeypatch.setattr(pipeline, "understand", no_model)
+    monkeypatch.setattr(chats, "generate_title", no_model)
+    question = "6098 sayılı Kanun’un 344. maddesinin metnini göster"
+    async with await _client() as c:
+        await c.post("/auth/register", json={"email": _email("article"), "password": "secret-pass",
+                                              "name": "Test", "invite_code": "test-invite"})
+        chat_id = (await c.post("/chats", json={"content": question})).json()["id"]
+        response = await c.post(f"/chats/{chat_id}/messages", json={"content": question})
+        assert "event: evidence" in response.text and "event: saved" in response.text
+        assert '"first_delta_s":' in response.text
+        messages = (await c.get(f"/chats/{chat_id}/messages")).json()
+        assert "Yerel dizinden alınan örnek madde metni." in messages[-1]["content"]
+        assert messages[-1]["evidence"][0]["url"] == "https://example.com/article"

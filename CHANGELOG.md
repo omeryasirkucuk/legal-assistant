@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 · 2026-11-27
+
+- Return the text and source of an explicitly requested indexed article directly from the local index.
+- Run legislation and case-law searches concurrently. Use cached embedding model files and move query encoding off the server event loop.
+- Save completed answers without waiting for a slow title. Preserve the first answer with citation warnings if the citation retry stalls.
+- Bound chat generation to 60 seconds, or 105 seconds in deep research, and report timeouts with a retry action. Record time to first text and total generation time.
+
 ## 0.5.1 · 2026-11-27
 
 - Keep calculations in chat and remove the standalone Calculations screen and its navigation entries.

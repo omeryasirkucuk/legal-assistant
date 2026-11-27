@@ -6,6 +6,7 @@ the model already knowing their numbers.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -63,7 +64,8 @@ def _hit(row: asyncpg.Record, score: float = 0.0) -> StatuteHit:
 async def search_statutes(conn: asyncpg.Connection, query: str, limit: int = 10,
                           laws: list[str] | None = None) -> list[StatuteHit]:
     fts = [r["id"] for r in await conn.fetch(_FTS_SQL, query, CANDIDATES, laws)]
-    vec = [r["id"] for r in await conn.fetch(_VECTOR_SQL, embed_query(query), CANDIDATES, laws)]
+    vector = await asyncio.to_thread(embed_query, query)
+    vec = [r["id"] for r in await conn.fetch(_VECTOR_SQL, vector, CANDIDATES, laws)]
     scores = fuse([fts, vec])
     rows = {r["id"]: r for r in await conn.fetch(_ROWS_SQL, list(scores))}
     hits = [_hit(rows[i], s) for i, s in sorted(scores.items(), key=lambda kv: -kv[1])]
@@ -103,6 +105,21 @@ def law_number_of(law: str, laws: dict[str, str]) -> str | None:
 
 async def find_law(conn: asyncpg.Connection, law: str) -> str | None:
     return law_number_of(law, await indexed_laws(conn))
+
+
+_ARTICLE_REQUEST = re.compile(
+    r"([0-9]{3,5}) sayılı kanun(?:'un|un)? (?:madde ([0-9]{1,4})|"
+    r"([0-9]{1,4})\.? maddesinin metnini (?:göster|ver))[.!?]?"
+)
+
+
+def article_request(text: str) -> tuple[str, str] | None:
+    """Recognize requests for a specific article's text with no other instruction."""
+    match = _ARTICLE_REQUEST.fullmatch(tr_fold(text))
+    if match:
+        law, label, ordinal = match.groups()
+        return law, label or ordinal
+    return None
 
 
 async def get_article(conn: asyncpg.Connection, law: str, label: str) -> StatuteHit | None:

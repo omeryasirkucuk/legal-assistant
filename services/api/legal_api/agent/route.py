@@ -12,6 +12,7 @@ answer is classified by the configured cheap language model.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import Literal
@@ -61,19 +62,23 @@ async def route(message: str, previous_question: str | None, previous_answer: st
     if earlier_requests:
         state["earlier_user_messages"] = earlier_requests
     if decisions.enabled():
-        async with decisions.client() as client:
-            picked = await decisions.choose(client, state, INSTRUCTIONS, CRITERIA, usage, "route")
-        if picked:
-            return picked[0]
+        try:
+            async with asyncio.timeout(2), decisions.client() as client:
+                picked = await decisions.choose(client, state, INSTRUCTIONS, CRITERIA, usage, "route")
+            if picked:
+                return picked[0]
+        except TimeoutError:
+            pass
     try:
-        response = await llm.create("cheap", usage, "route", max_tokens=256,
-                                    system=INSTRUCTIONS + " Return only the matching label. "
-                                    + json.dumps(CRITERIA),
-                                    messages=[{"role": "user", "content": json.dumps(
-                                        state, ensure_ascii=False)}])
+        async with asyncio.timeout(4):
+            response = await llm.create("cheap", usage, "route", max_tokens=256,
+                                        system=INSTRUCTIONS + " Return only the matching label. "
+                                        + json.dumps(CRITERIA),
+                                        messages=[{"role": "user", "content": json.dumps(
+                                            state, ensure_ascii=False)}])
         label = next((b.text.strip().lower() for b in response.content if b.type == "text"), "")
         if label in CRITERIA:
             return label
-    except (anthropic.APIError, httpx.HTTPError):
+    except (anthropic.APIError, httpx.HTTPError, TimeoutError):
         pass
     return "contextual"

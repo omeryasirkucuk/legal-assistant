@@ -421,7 +421,9 @@ export default function ChatApp() {
                     {messages[messages.length - 1]?.role !== "user" && <Question text={pending.question} />}
                     {pending.error ? (
                       <Unanswered
-                        text={pending.budget ? t("budgetReached") : pending.unavailable ? t("serviceUnavailable") : t("streamError")}
+                        text={pending.budget ? t("budgetReached")
+                          : pending.unavailable ? t("serviceUnavailable")
+                          : pending.timedOut ? t("answerTimeout") : t("streamError")}
                         onRetry={pending.budget || pending.unavailable ? undefined : () => ask(pending.question)}
                       />
                     ) : (
