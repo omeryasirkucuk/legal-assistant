@@ -76,9 +76,10 @@ fewer output tokens during analysis. If the writer is unavailable after a calcul
 the app still shows and saves the computed result with its evidence.
 
 New answers show a source chip when the cited passage matches the stored original. For
-OpenAI-compatible writers, the passage must also appear in the supplied excerpt. Missing and unmatched
-citations show a warning alongside the complete answer. When the decision model is configured,
-the app also checks cited claims against those specific sources and marks uncertain support.
+OpenAI-compatible writers, the passage must also appear in the supplied excerpt. Missing or
+unmatched citations and uncertain support appear in a compact notice below the complete answer.
+Open **Ayrıntıları göster** to read the reasons and select any numbered chip to inspect its source.
+When the decision model is configured, the app checks cited claims against those specific sources.
 Previous chats display their original citations with a legacy verification label.
 
 ## Change your password

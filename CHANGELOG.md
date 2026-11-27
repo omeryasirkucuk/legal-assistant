@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.3 · 2026-11-27
+
+- Restore the compact citation verification notice in the Folonto chat. Its details retain readable statement formatting and open numbered sources directly.
+
+
 ## 0.9.2 · 2026-11-27
 
 - Load the local petition style model only for requests classified as drafting.

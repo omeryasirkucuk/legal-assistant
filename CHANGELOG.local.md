@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.9.3 · 2026-11-27
+
+- Rebuild and reload the web client. Open citation details at desktop and phone widths and check that a numbered source opens. This release needs only a web rebuild.
+
+
 ## 0.9.2 · 2026-11-27
 
 - Run `make setup`, restart the API and reload the rebuilt web client. No database migration is required.
