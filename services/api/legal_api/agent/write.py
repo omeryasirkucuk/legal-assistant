@@ -15,6 +15,7 @@ import re
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 from dataclasses import dataclass
+from datetime import date
 from functools import cache
 
 import anthropic
@@ -25,6 +26,7 @@ from legal_api.agent.atoms import CitationStream, Segment, openai_segments_from,
 from legal_api.agent.power import POWERS, Power
 from legal_api.agent.sources import Source
 from legal_api.agent.understand import Understanding
+from legal_api.clock import date_context, istanbul_date
 from legal_api.grounding.numbers import digits_for_quantities, numbers_in, unsupported_numbers
 from legal_api.locale import reference_terms
 from legal_api.prompts import prompt
@@ -202,11 +204,12 @@ def _flag(seg: Segment, note: str, reason: str | None = None,
 async def write(message: str, u: Understanding, sources: list[Source], usage: llm.Usage,
                 instruction: str | None = None, previous: str | None = None,
                 max_tokens: int = MAX_TOKENS, power: Power = POWERS["balanced"],
-                context: list[dict] | None = None) -> AsyncIterator[str | Written]:
+                context: list[dict] | None = None, *,
+                today: date | None = None) -> AsyncIterator[str | Written]:
     """`context`: content blocks the lawyer attached (their documents' text, images), read
     as the case's material but not cited as legal sources."""
     """Yields text deltas while writing, then the Written answer."""
-    system = prompt("write")
+    system = f"{prompt('write')}\n\n{date_context(today or istanbul_date())}"
     compatible = llm.openai_for(power.write_role)
     if compatible:
         keys = ", ".join(s.evidence.key for s in sources)

@@ -11,9 +11,8 @@ days are given with the articles on the recess.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from legal_api.agent.sources import Source, SourceFinder
 from legal_api.calc.deadlines import UNITS, Deadline, compute
@@ -23,6 +22,7 @@ from legal_api.calc.interest_text import render as render_interest
 from legal_api.calc.severance import compute as compute_severance
 from legal_api.calc.severance import compute_months
 from legal_api.calc.severance_text import render as render_severance
+from legal_api.clock import istanbul_date
 from legal_api.grounding.evidence import EvidenceLedger
 from legal_api.grounding.normalize import tr_fold
 from legal_api.locale import calculation_terms, number_words
@@ -125,11 +125,11 @@ SEVERANCE_ARTICLES = (("1475", "14"), ("4857", "17"))
 
 
 async def severance_sources(spec: dict, finder: SourceFinder,
-                            ledger: EvidenceLedger) -> list[Source]:
+                            ledger: EvidenceLedger, *, today: date | None = None) -> list[Source]:
     """Use stated dates or a stated duration with the applicable end-date scenario."""
     try:
         today_scenario = spec["end_date"] == "today"
-        end = (datetime.now(ZoneInfo("Europe/Istanbul")).date() if today_scenario
+        end = ((today or istanbul_date()) if today_scenario
                else date.fromisoformat(spec["end_date"]))
         monthly = Decimal(str(spec["gross_monthly"])) + Decimal(str(spec.get("extras_monthly") or 0))
         if not monthly.is_finite() or monthly <= 0:
@@ -155,13 +155,14 @@ async def severance_sources(spec: dict, finder: SourceFinder,
     return [*out, Source(evidence, text)]
 
 
-async def interest_sources(spec: dict, ledger: EvidenceLedger) -> list[Source]:
+async def interest_sources(spec: dict, ledger: EvidenceLedger, *,
+                           today: date | None = None) -> list[Source]:
     """Interest on a principal over a span; both kinds when the answer cannot tell which
     applies (statutory interest, or the advance rate in commercial matters)."""
     try:
         principal = Decimal(str(spec["principal"]))
         start = date.fromisoformat(spec["start_date"])
-        end = date.fromisoformat(spec["end_date"]) if spec.get("end_date") else date.today()
+        end = date.fromisoformat(spec["end_date"]) if spec.get("end_date") else (today or istanbul_date())
     except (KeyError, ValueError, ArithmeticError):
         return []
     if principal <= 0 or end <= start:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
+from xml.sax.saxutils import escape, quoteattr
 
 from legal_api.locale import attachment_terms
 
@@ -29,14 +30,14 @@ class Attachment:
 
 def _doc(a: Attachment, chars: int) -> str:
     body = a.text[:chars] if a.text else attachment_terms()["unreadable"]
-    return f"<attached_document name=\"{a.name}\">\n{body}\n</attached_document>"
+    return f"<attached_document name={quoteattr(a.name)}>\n{escape(body)}\n</attached_document>"
 
 
 def for_understanding(message: str, attachments: list[Attachment]) -> str:
     if not attachments:
         return message
     docs = [_doc(a, UNDERSTAND_CHARS) for a in attachments if a.image is None]
-    images = [a.name for a in attachments if a.image is not None]
+    images = [escape(a.name) for a in attachments if a.image is not None]
     parts = [message, "<attachments>", *docs]
     if images:
         parts.append(attachment_terms()["images"].format(names=", ".join(images)))

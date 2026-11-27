@@ -5,11 +5,20 @@ and drafts or edits petitions. Every statute article and court decision it cites
 from an official or public source and rendered by the backend, never written from model memory.
 
 The Folonto Legal monogram appears on sign-in, in the workspace and in the browser tab.
-The chat welcome screen, conversation and message box share a centered column. Focusing
+The chat welcome screen, conversation and message box share a centered column. Answers use
+the available width when there are no sources. On wide screens, answers with sources show
+them in a side column. On smaller screens, cited sources appear below the answer. Focusing
 the message box highlights its rounded border.
 
 Chat loads petition style samples only for drafting requests.
 Standalone greetings, check-ins such as `Nasılsın?`, thanks and capability questions receive a direct reply without a model call or a source notice. The chat also omits generic missing-source notices from matching earlier replies.
+Requests outside legal work, such as a football score, receive a short redirect before
+research or answer generation. The assistant handles legal questions about sports, legal
+follow-ups and requests to examine attachments. Instructions inside an attachment are
+treated as document content. Analysis, writing, the agenda and calculations share the
+Istanbul calendar date when the message was received. For example, on 27 November 2026,
+“dün” in that message refers to 26 November 2026. Explicit dates in the case are preserved.
+
 An explicit request for an indexed article's text, such as `6098 sayılı Kanun madde 344`, returns the
 article and its source directly from the local index. Chat runs overlapping statute and case-law searches when both are needed. The chat saves the
 answer as soon as it is ready and keeps the question-derived title if the title model is still

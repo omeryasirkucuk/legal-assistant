@@ -35,6 +35,7 @@ from legal_api.chat.service import (
     workspace_context,
 )
 from legal_api.chat.titles import generate_title
+from legal_api.clock import istanbul_date
 from legal_api.db.app_models import Chat, LLMConnectionSettings, Message, MessageEvidence
 from legal_api.db.file_models import StoredFile
 from legal_api.db.session import get_sessionmaker
@@ -307,6 +308,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
                          "size": f.size} for f in files]} if files else {})
     db.add(question)
     await db.flush()
+    today = istanbul_date(question.created_at)
     for f in files:
         f.chat_id, f.message_id = chat.id, question.id
     await db.commit()
@@ -325,7 +327,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
             attachments[:0] = [matter_context(matter, in_file),
                                *await asyncio.to_thread(matter_material, text, docs)]
     # The recorded deadlines, cited only if the question turns out to be about them.
-    agenda = await load_agenda(db, user.id, matter)
+    agenda = await load_agenda(db, user.id, matter, today=today)
     chat_files = await db.scalars(select(StoredFile).where(
         StoredFile.user_id == user.id, or_(StoredFile.chat_id == chat.id,
                                          StoredFile.id.in_([f.id for f in in_file])))
@@ -362,18 +364,22 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
                               "started_at": time.time() * 1000})
         holder: dict = {}
         usage = llm.Usage()
-        # The first question names the chat; written alongside the answer.
-        title_task = (asyncio.create_task(_title_with_budget(text, usage))
-                      if previous is None and (files or not (is_direct or article_request(text)))
-                      else None)
+        # Generate a title only after analysis has accepted the first substantive request.
+        can_title = previous is None and (files or not (is_direct or article_request(text)))
+        title_task = None
         first_delta = None
         try:
             events = turn_events(text, turns, previous, holder, power=power,
                                  attachments=attachments, agenda=agenda, usage=usage,
-                                 workspace=context, style_loader=load_style)
+                                 workspace=context, style_loader=load_style, today=today)
             timeout = DEEP_ANSWER_TIMEOUT_S if power.name == "deep" else ANSWER_TIMEOUT_S
             async with asyncio.timeout(timeout), aclosing(events):
                 async for event in events:
+                    if event.type == "route" and event.data["kind"] == "direct":
+                        can_title = False
+                    if (can_title and title_task is None and event.type == "step"
+                            and event.data["name"] == "analyse" and event.data["state"] == "done"):
+                        title_task = asyncio.create_task(_title_with_budget(text, usage))
                     if event.type == "delta" and first_delta is None:
                         first_delta = round(time.monotonic() - started, 3)
                     if event.type == "final":
@@ -402,10 +408,11 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
             draft = None
             u = getattr(result, "understanding", None)
             asked = getattr(result, "asked", False)
-            if u is not None and previous is not None and (previous.answer or {}).get("asked"):
+            if (u is not None and u.task != "direct" and previous is not None
+                    and (previous.answer or {}).get("asked")):
                 await record_reply(session, user_pk, skipped=u.write_now)
-            fmt = await file_format(session, user_pk, u.output_format) if u and not asked else None
             if u is not None and u.task == "drafting" and not asked:
+                fmt = await file_format(session, user_pk, u.output_format)
                 draft = await save_draft(session, user_pk, chat_pk, saved.id, u.petition_type,
                                          title or stored_chat.title, result.full_text, fmt)
                 await refresh_draft_file(session, draft)

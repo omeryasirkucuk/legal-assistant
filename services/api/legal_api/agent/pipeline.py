@@ -14,6 +14,7 @@ import asyncio
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field, replace
+from datetime import date
 
 import anthropic
 import asyncpg
@@ -32,6 +33,7 @@ from legal_api.calc.court_costs_sources import court_cost_sources
 from legal_api.calc.penalty_sources import penalty_sources
 from legal_api.calc.severance import stated_dismissal_estimate
 from legal_api.calc.sources import deadline_sources, interest_sources, severance_sources
+from legal_api.clock import istanbul_date
 from legal_api.corpus.ingest import asyncpg_dsn
 from legal_api.drafting.asking import find_gaps, kind_of, question_text, should_ask
 from legal_api.drafting.brief import StyleBook
@@ -40,7 +42,7 @@ from legal_api.drafting.style import around_petition
 from legal_api.drafting.tidy import tidy
 from legal_api.files.context import Attachment, for_understanding, for_writer
 from legal_api.grounding.evidence import Evidence, EvidenceLedger
-from legal_api.locale import calculation_terms
+from legal_api.locale import calculation_terms, chat_turns
 from legal_api.matters.agenda import Agenda
 from legal_api.retrieval.statutes import article_request, get_article, indexed_laws
 from legal_api.sources.gateway import Gateway
@@ -91,6 +93,19 @@ class WrittenResult:
                              for s in self.written.segments]}
 
 
+async def direct_events(question: str, kind: str, usage: llm.Usage, result: dict | None,
+                        started: float) -> AsyncIterator[Event]:
+    reply = chat_turns()[kind]["reply"]
+    res = WrittenResult(question, Understanding(task="direct"),
+                        Written([Segment(reply)], reply, []), EvidenceLedger(), usage,
+                        {"total_s": round(time.monotonic() - started, 1)}, {"route": kind})
+    if result is not None:
+        result["result"] = res
+    yield Event("delta", {"text": reply})
+    yield Event("final", {"text": reply, "cost_usd": round(usage.cost_usd, 4),
+                          "timings": res.timings})
+
+
 async def answer_events(question: str, history: list[dict] | None = None,
                         result: dict | None = None, search_text: str | None = None,
                         usage: llm.Usage | None = None, style: StyleBook | None = None,
@@ -99,12 +114,14 @@ async def answer_events(question: str, history: list[dict] | None = None,
                         just_asked: bool = False,
                         agenda: Agenda | None = None,
                         workspace: Context | None = None,
-                        style_loader: Callable[[], Awaitable[StyleBook]] | None = None
+                        style_loader: Callable[[], Awaitable[StyleBook]] | None = None,
+                        *, today: date | None = None
                         ) -> AsyncIterator[Event]:
     """`style`: the lawyer's style, used when the message asks for a petition; `power`: how
     much work the answer gets; `attachments`: the lawyer's documents for this message;
     `just_asked`: the previous turn asked the lawyer for facts (drafting/asking.py);
     `agenda`: the deadlines the lawyer recorded, a source when the message is about them."""
+    today = today or istanbul_date()
     attachments = attachments or []
     usage, ledger = usage or llm.Usage(), EvidenceLedger()
     started = time.monotonic()
@@ -148,7 +165,7 @@ async def answer_events(question: str, history: list[dict] | None = None,
         local_only = False
         try:
             u = await understand(for_understanding(search_text or question, attachments),
-                                 history or [], usage, laws)
+                                 history or [], usage, laws, today=today)
         except (anthropic.APIStatusError, httpx.HTTPStatusError) as exc:
             if attachments or not llm.unavailable(exc):
                 raise
@@ -158,11 +175,17 @@ async def answer_events(question: str, history: list[dict] | None = None,
             u = Understanding(task="consultation", severance=estimate)
             local_only = True
         mark("understand_s")
+        if u.task == "out_of_scope":
+            yield Event("route", {"kind": "direct"})
+            yield step_event("analyse", "done")
+            async for event in direct_events(question, u.task, usage, result, started):
+                yield event
+            return
         if u.task == "workspace":
             yield step_event("analyse", "done", issues=len(u.issues))
             yield step_event("calculate")
             agent = Workspace(workspace or Context(), finder, PublicResearch(gateway), ledger, usage)
-            outcome = await agent.run(question, history or [])
+            outcome = await agent.run(question, history or [], today=today)
             mark("total_s")
             yield step_event("calculate", "done")
             for source in outcome.sources:
@@ -245,13 +268,13 @@ async def answer_events(question: str, history: list[dict] | None = None,
             found.sources += await deadline_sources(u.deadlines, finder, ledger, computed)
             found.trace["deadlines_computed"] = computed
             if u.severance:
-                found.sources += await severance_sources(u.severance, finder, ledger)
+                found.sources += await severance_sources(u.severance, finder, ledger, today=today)
             for spec in u.interest:
-                found.sources += await interest_sources(spec, ledger)
+                found.sources += await interest_sources(spec, ledger, today=today)
             found.sources += _new(found.sources, await penalty_sources(u.penalties, finder, ledger))
             if u.court_costs:
                 found.sources += _new(found.sources,
-                                      await court_cost_sources(u.court_costs, finder, ledger))
+                                      await court_cost_sources(u.court_costs, finder, ledger, today=today))
             count = (len(u.deadlines) + (1 if u.severance else 0) + len(u.interest)
                      + len(u.penalties) + (1 if u.court_costs else 0))
             found.trace["calculations"] = count
@@ -268,7 +291,7 @@ async def answer_events(question: str, history: list[dict] | None = None,
             try:
                 async for item in write(question, u, found.sources, usage, instruction,
                                         max_tokens=max_tokens, power=power,
-                                        context=for_writer(attachments)):
+                                        context=for_writer(attachments), today=today):
                     if isinstance(item, str):
                         # A petition is delivered as a file, not streamed into the chat.
                         if u.task != "drafting":
@@ -343,7 +366,8 @@ async def _ask(question: str, u: Understanding, gaps, usage: llm.Usage, ledger: 
 
 async def rewrite_events(instruction: str, question: str, previous_text: str,
                          sources: list[Source], usage: llm.Usage,
-                         result: dict | None = None) -> AsyncIterator[Event]:
+                         result: dict | None = None, *,
+                         today: date | None = None) -> AsyncIterator[Event]:
     """A reformat request: the previous answer written again from the same sources."""
     started = time.monotonic()
     ledger = EvidenceLedger()
@@ -354,7 +378,7 @@ async def rewrite_events(instruction: str, question: str, previous_text: str,
     u = Understanding(task="lookup")
     written: Written | None = None
     async for item in write(question, u, sources, usage, instruction=instruction,
-                            previous=previous_text):
+                            previous=previous_text, today=today):
         if isinstance(item, str):
             yield Event("delta", {"text": item})
         else:

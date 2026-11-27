@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 
 from legal_api.agent.sources import Source, SourceFinder
 from legal_api.calc.court_costs import MEASURES, appeal, fees
+from legal_api.clock import istanbul_date
 from legal_api.grounding.evidence import EvidenceLedger
 from legal_api.locale import court_costs
 
@@ -74,7 +75,7 @@ def _appeal_lines(value: Decimal, filed: date, guessed: bool) -> list[str]:
 
 
 async def court_cost_sources(spec: dict, finder: SourceFinder,
-                             ledger: EvidenceLedger) -> list[Source]:
+                             ledger: EvidenceLedger, *, today: date | None = None) -> list[Source]:
     """`spec`: {value, court, measure, bodily_harm, filed_on} from the understanding step."""
     try:
         value = Decimal(str(spec.get("value") or 0)) or None
@@ -83,7 +84,7 @@ async def court_cost_sources(spec: dict, finder: SourceFinder,
         return []
     measure = spec.get("measure") if spec.get("measure") in MEASURES else "unknown"
     text = render(value, spec.get("court") or "asliye", measure, bool(spec.get("bodily_harm")),
-                  filed, date.today())
+                  filed, today or istanbul_date())
     out = [a for law, label in ARTICLES if (a := await finder.article(law, label))]
     evidence = ledger.add_calculation(
         source_id=f"calc:court:{value}:{spec.get('court')}:{measure}:{filed}",

@@ -77,7 +77,9 @@ export function AssistantAnswer(props: Props) {
   );
 
   return (
-    <div className="grid grid-cols-1 gap-x-10 @4xl:grid-cols-[minmax(0,42rem)_15rem]">
+    <div className={evidence.length
+      ? "grid grid-cols-1 gap-x-10 @5xl:grid-cols-[minmax(0,1fr)_14rem]"
+      : ""}>
       <div className="min-w-0">
         {refused ? (
           <p className="text-muted">{t("refused")}</p>
@@ -108,7 +110,7 @@ export function AssistantAnswer(props: Props) {
 
         {/* Narrow screens: sources follow the answer instead of sitting in the margin. */}
         {order.length > 0 && (
-          <ol className="mt-6 space-y-2 border-t border-rule pt-4 @4xl:hidden">
+          <ol className="mt-6 space-y-2 border-t border-rule pt-4 @5xl:hidden">
             {order.map((key) => (
               <SourceNote key={key} n={number(key)} evidence={byKey.get(key)!} onOpen={onOpenSource} />
             ))}
@@ -116,16 +118,18 @@ export function AssistantAnswer(props: Props) {
         )}
       </div>
 
-      <aside className="hidden @4xl:block" aria-label={t("sources")}>
-        <ol className="sticky top-6 space-y-3 border-l border-rule pl-5">
-          {order.map((key) => (
-            <SourceNote key={key} n={number(key)} evidence={byKey.get(key)!} onOpen={onOpenSource} />
-          ))}
-          {evidence.length > 0 && (
-            <li className="pt-1 text-xs text-faint">{t("sourcesFound", { count: evidence.length })}</li>
-          )}
-        </ol>
-      </aside>
+      {evidence.length > 0 && (
+        <aside className="hidden @5xl:block" aria-label={t("sources")}>
+          <ol className="sticky top-6 space-y-3 border-l border-rule pl-5">
+            {order.map((key) => (
+              <SourceNote key={key} n={number(key)} evidence={byKey.get(key)!} onOpen={onOpenSource} />
+            ))}
+            <li className="pt-1 text-xs text-faint">
+              {t("sourcesFound", { count: evidence.length })}
+            </li>
+          </ol>
+        </aside>
+      )}
     </div>
   );
 }

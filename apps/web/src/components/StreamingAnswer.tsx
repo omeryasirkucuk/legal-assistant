@@ -58,9 +58,7 @@ export function StreamingAnswer({ pending, onOpenSource }: {
     const raw = pending.finalText ?? pending.text;
     return (
       <div>
-        <div className="@4xl:max-w-[42rem]">
-          <AnswerProgress steps={pending.steps} startedAt={pending.startedAt} />
-        </div>
+        <AnswerProgress steps={pending.steps} startedAt={pending.startedAt} />
         {raw && (
           <AssistantAnswer raw={raw} evidence={pending.evidence} checked={pending.checked}
             streaming={pending.finalText === undefined} onOpenSource={onOpenSource} />
@@ -73,7 +71,9 @@ export function StreamingAnswer({ pending, onOpenSource }: {
   const number = (key: string) => order.indexOf(key) + 1;
 
   return (
-    <div className="grid grid-cols-1 gap-x-10 @4xl:grid-cols-[minmax(0,42rem)_15rem]">
+    <div className={pending.evidence.length
+      ? "grid grid-cols-1 gap-x-10 @5xl:grid-cols-[minmax(0,1fr)_14rem]"
+      : ""}>
       <div className="min-w-0">
         <AnswerProgress steps={pending.steps} startedAt={pending.startedAt} />
         {pending.plan.length > 0 && (
@@ -92,18 +92,18 @@ export function StreamingAnswer({ pending, onOpenSource }: {
           </ul>
         )}
       </div>
-      <aside className="hidden @4xl:block" aria-label={t("sources")}>
-        <ol className="sticky top-6 space-y-3 border-l border-rule pl-5">
-          {order.map((key) => (
-            <SourceNote key={key} n={number(key)} evidence={byKey.get(key)!} onOpen={onOpenSource} />
-          ))}
-          {pending.evidence.length > 0 && (
+      {pending.evidence.length > 0 && (
+        <aside className="hidden @5xl:block" aria-label={t("sources")}>
+          <ol className="sticky top-6 space-y-3 border-l border-rule pl-5">
+            {order.map((key) => (
+              <SourceNote key={key} n={number(key)} evidence={byKey.get(key)!} onOpen={onOpenSource} />
+            ))}
             <li className="pt-1 text-xs text-faint">
               {t("sourcesFound", { count: pending.evidence.length })}
             </li>
-          )}
-        </ol>
-      </aside>
+          </ol>
+        </aside>
+      )}
     </div>
   );
 }

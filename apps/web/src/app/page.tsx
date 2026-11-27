@@ -327,7 +327,7 @@ export default function ChatApp() {
     fn(...args);
   };
 
-  const chatColumn = "box-content max-w-[42rem] px-4 sm:px-6 @4xl:px-12";
+  const chatColumn = "w-full max-w-[64rem] px-4 sm:px-6 @4xl:px-12";
   const empty = view === "chat" && !messages.length && !pending;
   const currentMatter = matters.find((m) => m.id === matterId) ?? null;
   const lastAnswer = [...messages].reverse().find((m) => m.role === "assistant");
@@ -466,7 +466,7 @@ export default function ChatApp() {
                 )}
             </div>
             {chatCost > 0 && !pending && (
-              <p className="mt-10 max-w-[42rem] border-t border-rule pt-3 text-xs text-faint">
+              <p className="mt-10 border-t border-rule pt-3 text-xs text-faint">
                 {t("chatCost", { cost: formatUsd(chatCost) })}
               </p>
             )}

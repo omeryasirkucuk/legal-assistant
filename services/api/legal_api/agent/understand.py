@@ -16,6 +16,7 @@ from datetime import date
 
 from legal_api import llm
 from legal_api.calc.deadlines import UNITS
+from legal_api.clock import date_context, istanbul_date
 from legal_api.config import get_settings
 from legal_api.drafting.cases import case_kinds
 from legal_api.drafting.export import FORMATS
@@ -23,7 +24,7 @@ from legal_api.drafting.sample_profile import AREAS
 from legal_api.drafting.types import petition_types
 from legal_api.prompts import prompt
 
-TASKS = ("lookup", "consultation", "drafting", "search", "review", "workspace")
+TASKS = ("lookup", "consultation", "drafting", "search", "review", "workspace", "out_of_scope")
 SHAPES = ("single", "answers", "routes", "plan", "draft", "list")
 MAX_ISSUES = 8
 MAX_HINTS = 10
@@ -152,17 +153,16 @@ def _system() -> str:
 
 
 async def understand(message: str, history: list[dict], usage: llm.Usage,
-                     laws: dict[str, str] | None = None) -> Understanding:
+                     laws: dict[str, str] | None = None, *, today: date | None = None) -> Understanding:
     """`laws`: the indexed laws (number -> title), so named articles carry the right law
     number (one run named the enforcement article with the civil procedure law's number)."""
-    # The date, so "served today" or "last Monday" become dates for the period calculator.
-    content = f"<today>{date.today().isoformat()}</today>\n\n{message}"
+    content = message
     if laws:
         listing = "\n".join(f"{n}: {t}" for n, t in sorted(laws.items()))
         content = f"<indexed_laws>\n{listing}\n</indexed_laws>\n\n{content}"
     response = await llm.create(
         "cheap", usage, "understand", max_tokens=1800 if len(message) <= 1000 else 4000,
-        system=_system(),
+        system=f"{_system()}\n\n{date_context(today or istanbul_date())}",
         messages=[*history, {"role": "user", "content": content}],
         output_config={"effort": get_settings().answer_effort,
                        "format": {"type": "json_schema", "schema": _SCHEMA}})
@@ -170,6 +170,8 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
     if text is None:
         return Understanding()
     data = json.loads(text)
+    if data["task"] == "out_of_scope":
+        return Understanding(task="out_of_scope")
     return Understanding(
         task=data["task"] if data["task"] in TASKS else "lookup",
         characterisation=data["characterisation"].strip(),

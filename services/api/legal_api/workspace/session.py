@@ -8,14 +8,14 @@ import re
 import uuid
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date
 from typing import Literal
-from zoneinfo import ZoneInfo
 
 from pydantic import Field, ValidationError
 
 from legal_api import llm
 from legal_api.agent.sources import Source, SourceFinder
+from legal_api.clock import istanbul_date
 from legal_api.db.file_models import StoredFile
 from legal_api.grounding.evidence import Evidence, EvidenceLedger
 from legal_api.grounding.normalize import tr_fold
@@ -388,11 +388,12 @@ class Workspace:
         }
         return Outcome(text, snapshot, [*cited_sources, source])
 
-    async def run(self, question: str, history: list[dict]) -> Outcome:
+    async def run(self, question: str, history: list[dict], *,
+                  today: date | None = None) -> Outcome:
         self._restore()
         statement = self.ledger.add_record(source_id=STATEMENT_KEY, kind="statement",
                                            citation="Bu sohbetteki kullanıcı beyanı", text=question)
-        date_label = f"Türkiye saatiyle bugün: {datetime.now(ZoneInfo('Europe/Istanbul')).date()}"
+        date_label = f"Türkiye saatiyle bugün: {today or istanbul_date()}"
         today = self.ledger.add_record(source_id="workspace-today", kind="clock",
                                        citation="Hesabın çalıştırıldığı tarih", text=date_label)
         actions = []

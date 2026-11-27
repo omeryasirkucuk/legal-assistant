@@ -1,4 +1,8 @@
 {
+  "out_of_scope": {
+    "phrases": [],
+    "reply": "Ben bir hukuk asistanıyım. Hukuki bir konuda size nasıl yardımcı olabilirim?"
+  },
   "greeting": {
     "phrases": [
       "selam",

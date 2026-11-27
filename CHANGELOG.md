@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.5 · 2026-11-27
+
+- Classify unrelated requests before legal research and respond with a short Turkish redirect. Keep sports-related legal questions, document review and replies to pending legal questions in scope.
+- Use the Istanbul date of the incoming message throughout chat analysis, writing, agenda context and calculations. Treat instructions and dates in attachments as document content.
+- Widen the conversation and composer on desktop. Reserve a source column only when sources exist and space allows. Keep text and sources readable at phone widths.
+
 ## 0.9.4 · 2026-11-27
 
 - Answer standalone check-ins directly and omit citation warnings for casual replies. Hide the generic missing-source notice when reopening matching older turns.

@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.9.5 · 2026-11-27
+
+- Run `make setup`, restart the API and rebuild the web client. No database migration is required.
+- Check a new out-of-scope request, a legal follow-up and a request near midnight Istanbul time. View responses with and without sources at desktop and mobile widths.
+
 ## 0.9.4 · 2026-11-27
 
 - Update and restart the API. Test a new and a previously saved `Nasılsın?` turn. This release needs no database migration or web rebuild.

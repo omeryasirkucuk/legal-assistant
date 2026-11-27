@@ -10,8 +10,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from legal_api import llm
 from legal_api.agent import pipeline
-from legal_api.agent.answer import Event
+from legal_api.agent.answer import Event, step_event
 from legal_api.api import chats
 from legal_api.chat.service import drop_unanswered
 from legal_api.config import get_settings
@@ -57,6 +58,7 @@ async def test_answer_spend_survives_chat_deletion(monkeypatch):
             title_cancelled.set()
 
     async def answer(_message, _history, _previous, result, *_args, usage, workspace, **_kwargs):
+        yield step_event("analyse", "done")
         await title_started.wait()
         usage.record("test", SimpleNamespace(cost=0.012), "write")
         result["result"] = SimpleNamespace(
@@ -228,6 +230,45 @@ async def test_chat_history_omits_only_generic_check_in_warning():
         assert "checked" not in messages[1]["meta"]
         assert messages[1]["meta"]["cost_usd"] == 0.002
         assert messages[3]["meta"]["checked"] == checked
+
+
+async def test_out_of_scope_chat_bypasses_research_and_uses_message_date(monkeypatch):
+    async def classify(role, usage, phase, **request):
+        assert (role, phase) == ("cheap", "understand")
+        assert "<today>2026-11-27</today>" in request["system"]
+        assert "<yesterday>2026-11-26</yesterday>" in request["system"]
+        assert request["messages"][-1]["content"] == question
+        schema = request["output_config"]["format"]["schema"]
+        assert "out_of_scope" in schema["properties"]["task"]["enum"]
+        return SimpleNamespace(content=[llm.TextBlock("text", '{"task": "out_of_scope"}')])
+
+    async def unexpected(*_args, **_kwargs):
+        pytest.fail("An out-of-scope request should skip research, writing and title generation")
+
+    # 21:15 UTC on 26 November is already 27 November in Istanbul.
+    original_now = Message.__table__.c.created_at.default.arg
+
+    def message_time(context):
+        if context.get_current_parameters()["role"] == "user":
+            return datetime(2026, 11, 26, 21, 15, tzinfo=UTC)
+        return original_now(context)
+
+    monkeypatch.setattr(Message.__table__.c.created_at.default, "arg", message_time)
+    monkeypatch.setattr(llm, "create", classify)
+    monkeypatch.setattr(pipeline, "research", unexpected)
+    monkeypatch.setattr(pipeline, "write", unexpected)
+    monkeypatch.setattr(chats, "generate_title", unexpected)
+    question = "dün ki beşiktaş maçı kaç kaç bitti"
+    async with await _client() as c:
+        await register_invited(c, _email("outside-scope"), "Test")
+        chat_id = (await c.post("/chats", json={"content": question})).json()["id"]
+        response = await c.post(f"/chats/{chat_id}/messages", json={"content": question})
+        assert "event: saved" in response.text
+        assert "event: evidence" not in response.text
+        messages = (await c.get(f"/chats/{chat_id}/messages")).json()
+        assert messages[-1]["meta"]["answer"]["task"] == "direct"
+        assert "checked" not in messages[-1]["meta"]
+        assert messages[-1]["content"].startswith("Ben bir hukuk asistanıyım.")
 
 
 async def test_explicit_article_text_is_served_with_its_source(monkeypatch):

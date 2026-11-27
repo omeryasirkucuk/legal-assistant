@@ -19,11 +19,14 @@ from typing import Literal
 from legal_api import decisions, llm
 from legal_api.locale import chat_turns
 
-Route = Literal["new", "reformat", "followup"]
+Route = Literal["new", "reformat", "followup", "out_of_scope"]
 
 INSTRUCTIONS = ("A lawyer is chatting with a legal research assistant. Decide what the new "
                 "message asks for, given the previous question and the previous answer.")
 CRITERIA = {
+    "out_of_scope": "Only unrelated to legal work, even after a legal answer (e.g. just "
+                    "a match score, weather or a recipe). A legal question about sports and "
+                    "an answer to a pending question about the case are in scope.",
     "new": "A new legal question that can be answered without the previous answer.",
     "reformat": "Only a change to how the previous answer is presented (shorter, as a list or "
                 "table, simpler words, only part of it). Nothing is asked that the previous "

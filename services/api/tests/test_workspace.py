@@ -131,7 +131,7 @@ async def test_chat_unknown_case_reformat_update_edit_and_account_isolation(monk
     monkeypatch.setattr(settings, "brave_search_api_key", "test-key")
     monkeypatch.setattr(settings, "data_mode", "development")
 
-    async def understand(*_args):
+    async def understand(*_args, **_kwargs):
         return Understanding(task="workspace")
 
     async def title(*_args):
