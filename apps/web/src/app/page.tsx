@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AssistantAnswer } from "@/components/AssistantAnswer";
 import { StreamingAnswer } from "@/components/StreamingAnswer";
+import { ReportButton } from "@/components/ProblemReports";
 import { Composer } from "@/components/Composer";
 import { Sidebar } from "@/components/Sidebar";
 import { SourceDrawer } from "@/components/SourceDrawer";
@@ -496,7 +497,10 @@ export default function ChatApp() {
                 protectedData={user.protected_data}
                 onSubmit={(text, fileIds, power) => ask(text, { fileIds, power })}
                 placeholder={view === "matter" && currentMatter ? t("askInMatter", { client: currentMatter.client }) : undefined}
-                footer={<UsageMeter today={today} onOpenFiles={openFiles} />}
+                footer={<>
+                  <ReportButton key={chatId} chatId={view === "chat" ? chatId : null} />
+                  <UsageMeter today={today} onOpenFiles={openFiles} />
+                </>}
                 onStop={() => chatId && runs.stop(chatId)}
               />
             </div>

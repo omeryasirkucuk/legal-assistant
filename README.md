@@ -4,6 +4,8 @@ A web assistant for Turkish lawyers that answers questions, searches case law an
 and drafts or edits petitions. Every statute article and court decision it cites is retrieved
 from an official or public source and rendered by the backend, never written from model memory.
 
+Signed-in users can select **Raporla** beside the chat usage meter and describe a problem. Submitting saves a separate `problem_reports` row with the current conversation, saved replies and extracted document text. Administrators can open each submission under **Yönetim paneli → Sorun raporları** and download the original attachments while they remain in storage. Reports from an empty chat contain only the description.
+
 The production API includes a Turkish-capable serif font and tests PDF generation during the image build. If preparing a file fails after a draft is saved, downloading it retries the export from that draft.
 
 The Folonto Legal monogram appears on sign-in, in the workspace and in the browser tab.

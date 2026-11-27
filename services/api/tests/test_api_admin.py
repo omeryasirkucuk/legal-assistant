@@ -224,3 +224,37 @@ async def test_model_settings_show_active_openrouter_defaults_for_admins(account
         assert (await participant.get("/chats/response-models")).json() == {
             "fast": "anthropic/claude-haiku-5.5", "balanced": "openai/writer", "deep": "openai/writer",
         }
+
+
+async def test_report_snapshot_and_access(accounts):
+    from legal_api.db.app_models import Chat, Message
+
+    admin, member, other = accounts
+    chat = Chat(id=uuid4(), title="Test conversation", user_id=member.id)
+    async with get_sessionmaker()() as db:
+        db.add(chat)
+        await db.flush()
+        db.add(Message(chat_id=chat.id, role="assistant", content="Saved answer"))
+        await db.commit()
+    body = {"chat_id": str(chat.id), "description": "  Check this answer  "}
+    async with _client() as guest, _client(member) as reporter, _client(other) as outsider, _client(admin) as reviewer:
+        assert (await guest.post("/reports", json=body)).status_code == 401
+        assert (await outsider.post("/reports", json=body)).status_code == 404
+        assert (await reporter.post("/reports", json={"description": "  "})).status_code == 422
+        empty = await reporter.post("/reports", json={"description": "Empty chat problem"})
+        assert empty.status_code == 201
+        response = await reporter.post("/reports", json=body)
+        assert response.status_code == 201
+        report_id = response.json()["id"]
+        path = f"/admin/reports/{report_id}"
+        assert (await reporter.get("/admin/reports")).status_code == 403
+        assert (await reporter.get(path)).status_code == 403
+        async with get_sessionmaker()() as db:
+            await db.execute(delete(Chat).where(Chat.id == chat.id))
+            await db.commit()
+        rows = (await reviewer.get("/admin/reports")).json()
+        assert next(r for r in rows if r["id"] == report_id)["description"] == "Check this answer"
+        snapshot = (await reviewer.get(path)).json()
+        assert snapshot["messages"] == [{"role": "assistant", "content": "Saved answer"}]
+        assert snapshot["title"] == chat.title
+        assert (await reviewer.get(f"{path}/files/{uuid4()}")).status_code == 404

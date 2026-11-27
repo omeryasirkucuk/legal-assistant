@@ -19,6 +19,7 @@ from legal_api.api import (
     folders,
     health,
     matters,
+    reports,
     search,
     settings,
 )
@@ -59,7 +60,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     for module in (health, auth, admin, calendar, chats, deadline_calc, drafting, files,
-                   folders, matters, search, settings):
+                   folders, matters, reports, search, settings):
         app.include_router(module.router)
 
     @app.exception_handler(FileProtectionError)

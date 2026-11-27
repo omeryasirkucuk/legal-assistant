@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 · 2026-11-27
+
+- Add chat problem reporting for all signed-in users and individual report review in the admin panel.
 
 - Clean obsolete Folonto Docker images and bound unused build cache after each verified production release. Retain the previous healthy API and web images for rollback.
 

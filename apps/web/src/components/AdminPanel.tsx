@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { ReportList } from "./ProblemReports";
 import { X } from "lucide-react";
 import { api, ApiError, type AccountBudget, type AdminInvite, type AdminUser } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -88,6 +89,7 @@ export function AdminPanel({ ownId, onClose, onDemoted, onBudgetSaved }: Props) 
           </button>
         </header>
         <div className="px-3 pb-4 pt-3 sm:px-6 sm:pb-5 sm:pt-4">
+          <ReportList />
           <InviteForm />
           {error && <p role="alert" className="mb-4 text-sm text-danger">{error}</p>}
           {notice && <p role="status" className="mb-4 text-sm text-verified">{notice}</p>}

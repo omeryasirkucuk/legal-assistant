@@ -198,7 +198,18 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
   return (await res.json()) as T;
 }
 
+export type ReportSummary = { id: string; created_at: string; email: string; description: string };
+export type ReportContext = {
+  title: string;
+  messages: { role: string; content: string }[];
+  files: { id: string; name: string; text: string }[];
+};
+
 export const api = {
+  reportProblem: (description: string, chat_id: string | null) =>
+    call<{ id: string }>("/reports", json({ description, chat_id })),
+  reports: () => call<ReportSummary[]>("/admin/reports", { cache: "no-store" }),
+  reportContext: (id: string) => call<ReportContext>(`/admin/reports/${id}`, { cache: "no-store" }),
   createInvite: (email: string) =>
     call<AdminInvite>("/admin/invites", json({ email })),
   adminInvites: () => call<AdminInvite[]>("/admin/invites", { cache: "no-store" }),

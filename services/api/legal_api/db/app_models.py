@@ -142,3 +142,13 @@ class LlmSpend(Base):
 
 # Chats point to matters: their table must be known wherever chats are.
 from legal_api.db import matter_models  # noqa: F401
+
+
+class ProblemReport(Base):
+    __tablename__ = "problem_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    description: Mapped[str] = mapped_column(Text)
+    context: Mapped[dict] = mapped_column(JSONB)

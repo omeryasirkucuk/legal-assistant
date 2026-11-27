@@ -1,6 +1,8 @@
 # Local changelog
 
-## Unreleased
+## 0.10.0 · 2026-11-27
+
+- Apply Alembic revision a3282fd12b90 and rebuild the API and web client to enable problem reporting.
 
 - Use `sudo bash deploy/release.sh` on the Oracle VM for production builds. Run it with `--cleanup-only` to verify the serving release and clean up older images without building. Local application setup is unchanged.
 
