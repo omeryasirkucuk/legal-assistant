@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.4 · 2026-11-27
+
+- Answer standalone check-ins directly and omit citation warnings for casual replies. Hide the generic missing-source notice when reopening matching older turns.
+
 ## 0.9.3 · 2026-11-27
 
 - Restore the compact citation verification notice in the Folonto chat. Its details retain readable statement formatting and open numbered sources directly.

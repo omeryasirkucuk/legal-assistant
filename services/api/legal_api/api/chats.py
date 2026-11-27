@@ -184,9 +184,27 @@ async def list_messages(chat_id: uuid.UUID, user: CurrentUser, db: DB) -> list[M
     for message_id, key, kind, citation, url in evidence:
         by_message.setdefault(message_id, []).append(
             {"key": key, "kind": kind, "citation": citation, "url": url})
-    return [MessageOut(id=str(m.id), role=m.role, content=m.content, meta=_message_meta(m.meta or {}),
-                       evidence=by_message.get(m.id, []), created_at=m.created_at.isoformat())
-            for m in messages]
+    result = []
+    direct_question = False
+    for message in messages:
+        meta = _message_meta(message.meta or {})
+        sources = by_message.get(message.id, [])
+        if message.role == "user":
+            direct_question = not meta.get("attachments") and bool(direct_intent(message.content))
+        elif message.role == "assistant":
+            # Old small-talk replies may carry the writer's generic missing-citation flag.
+            if direct_question and not sources:
+                checked = meta.get("checked") or {}
+                claims = checked.get("claims") or []
+                if (not checked.get("issues") and len(claims) == 1
+                        and claims[0].get("reason") == "citation_missing"
+                        and not claims[0].get("sentence") and not claims[0].get("keys")):
+                    meta = {key: value for key, value in meta.items() if key != "checked"}
+            direct_question = False
+        result.append(MessageOut(id=str(message.id), role=message.role, content=message.content,
+                                 meta=meta, evidence=sources,
+                                 created_at=message.created_at.isoformat()))
+    return result
 
 
 @router.get("/{chat_id}/messages/{message_id}/evidence/{key}")
@@ -283,6 +301,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
     previous = await previous_turn(db, chat)
     text = body.content.strip()
     files = await owned_files(db, user.id, body.file_ids)
+    is_direct = not files and direct_intent(text) is not None
     question = Message(chat_id=chat.id, role="user", content=text, meta={
         "attachments": [{"id": str(f.id), "name": f.name, "media_type": f.media_type,
                          "size": f.size} for f in files]} if files else {})
@@ -299,11 +318,12 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
     matter = await owned_matter(db, user.id, chat.matter_id) if chat.matter_id else None
     if matter is not None:
         in_file = await matter_files(db, matter.id)
-        attached = {f.id for f in files}
-        docs = [Document(f.id, f.name, f.text or "") for f in in_file
-                if f.id not in attached and not f.media_type.startswith("image/")]
-        attachments[:0] = [matter_context(matter, in_file),
-                           *await asyncio.to_thread(matter_material, text, docs)]
+        if not is_direct:
+            attached = {f.id for f in files}
+            docs = [Document(f.id, f.name, f.text or "") for f in in_file
+                    if f.id not in attached and not f.media_type.startswith("image/")]
+            attachments[:0] = [matter_context(matter, in_file),
+                               *await asyncio.to_thread(matter_material, text, docs)]
     # The recorded deadlines, cited only if the question turns out to be about them.
     agenda = await load_agenda(db, user.id, matter)
     chat_files = await db.scalars(select(StoredFile).where(
@@ -344,7 +364,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
         usage = llm.Usage()
         # The first question names the chat; written alongside the answer.
         title_task = (asyncio.create_task(_title_with_budget(text, usage))
-                      if previous is None and (files or not (direct_intent(text) or article_request(text)))
+                      if previous is None and (files or not (is_direct or article_request(text)))
                       else None)
         first_delta = None
         try:

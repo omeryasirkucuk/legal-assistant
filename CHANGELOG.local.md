@@ -1,5 +1,9 @@
 # Local changelog
 
+## 0.9.4 · 2026-11-27
+
+- Update and restart the API. Test a new and a previously saved `Nasılsın?` turn. This release needs no database migration or web rebuild.
+
 ## 0.9.3 · 2026-11-27
 
 - Rebuild and reload the web client. Open citation details at desktop and phone widths and check that a numbered source opens. This release needs only a web rebuild.

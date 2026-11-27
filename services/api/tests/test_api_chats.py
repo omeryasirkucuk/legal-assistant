@@ -183,6 +183,53 @@ async def test_stalled_answer_closes_the_stream_and_can_be_retried(monkeypatch):
         assert "event: saved" in retried.text
 
 
+async def test_new_check_in_replies_directly_without_verification(monkeypatch):
+    async def no_model(*_args, **_kwargs):
+        pytest.fail("A standalone check-in should not invoke a model")
+
+    monkeypatch.setattr(pipeline, "understand", no_model)
+    monkeypatch.setattr(chats, "generate_title", no_model)
+    question = "Merhaba, nasılsın?"
+    async with await _client() as c:
+        await register_invited(c, _email("check-in"), "Test")
+        chat_id = (await c.post("/chats", json={"content": question})).json()["id"]
+        response = await c.post(f"/chats/{chat_id}/messages", json={"content": question})
+        assert 'event: route\ndata: {"kind": "direct"}' in response.text
+        assert "event: saved" in response.text
+        messages = (await c.get(f"/chats/{chat_id}/messages")).json()
+        assert messages[-1]["meta"]["answer"]["task"] == "direct"
+        assert messages[-1]["meta"]["cost_usd"] == 0
+        assert "checked" not in messages[-1]["meta"]
+
+
+async def test_chat_history_omits_only_generic_check_in_warning():
+    checked = {"citation_check": "source_passages", "issues": [], "claims": [
+        {"sentence": "", "keys": [], "verdict": "partial", "reason": "citation_missing"}
+    ]}
+    async with await _client() as c:
+        await register_invited(c, _email("check-in-history"), "Test")
+        chat_id = (await c.post("/chats", json={"content": "Nasılsın"})).json()["id"]
+        engine = create_async_engine(get_settings().database_url)
+        try:
+            async with async_sessionmaker(engine)() as db:
+                for question, answer in [
+                    ("Nasılsın", "İyiyim, teşekkür ederim!"),
+                    ("Nasılsın? Kira artışı nasıl hesaplanır?", "Örnek hukuki yanıt."),
+                ]:
+                    db.add(Message(chat_id=uuid.UUID(chat_id), role="user", content=question))
+                    await db.flush()
+                    db.add(Message(chat_id=uuid.UUID(chat_id), role="assistant", content=answer,
+                                   meta={"checked": checked, "cost_usd": 0.002}))
+                    await db.flush()
+                await db.commit()
+        finally:
+            await engine.dispose()
+        messages = (await c.get(f"/chats/{chat_id}/messages")).json()
+        assert "checked" not in messages[1]["meta"]
+        assert messages[1]["meta"]["cost_usd"] == 0.002
+        assert messages[3]["meta"]["checked"] == checked
+
+
 async def test_explicit_article_text_is_served_with_its_source(monkeypatch):
     async def article(_connection, law, label):
         assert (law, label) == ("6098", "344")

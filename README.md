@@ -9,7 +9,7 @@ The chat welcome screen, conversation and message box share a centered column. F
 the message box highlights its rounded border.
 
 Chat loads petition style samples only for drafting requests.
-Standalone greetings, thanks and capability questions receive a direct reply.
+Standalone greetings, check-ins such as `Nasılsın?`, thanks and capability questions receive a direct reply without a model call or a source notice. The chat also omits generic missing-source notices from matching earlier replies.
 An explicit request for an indexed article's text, such as `6098 sayılı Kanun madde 344`, returns the
 article and its source directly from the local index. Chat runs overlapping statute and case-law searches when both are needed. The chat saves the
 answer as soon as it is ready and keeps the question-derived title if the title model is still

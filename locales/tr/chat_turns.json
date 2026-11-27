@@ -17,6 +17,21 @@
     ],
     "reply": "Merhaba. Hangi hukuki konuda yardımcı olabilirim?"
   },
+  "check_in": {
+    "phrases": [
+      "nasılsın",
+      "nasılsınız",
+      "nasilsin",
+      "nasilsiniz",
+      "merhaba nasılsın",
+      "merhaba nasılsınız",
+      "selam nasılsın",
+      "selam nasılsınız",
+      "naber",
+      "ne haber"
+    ],
+    "reply": "İyiyim, teşekkür ederim! Sen nasılsın?"
+  },
   "thanks": {
     "phrases": [
       "teşekkürler",
