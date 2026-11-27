@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import asyncpg
 
 from legal_api import llm
-from legal_api.agent.case_law import case_passages
+from legal_api.agent.case_law import Match, case_passages
 from legal_api.grounding.evidence import Evidence, EvidenceLedger
 from legal_api.retrieval.statutes import StatuteHit, get_article, neighbours, search_statutes
 from legal_api.sources.bedesten_decisions import BedestenDecisions
@@ -27,6 +27,7 @@ SEARCHED_ARTICLES = 4
 class Source:
     evidence: Evidence
     document: str
+    case_match: Match | None = None
 
 
 TITLE_PREFIX = "Article title: "
@@ -97,16 +98,20 @@ class SourceFinder:
 
     async def decisions_for(self, query: str, ask: str, usage: llm.Usage, keep: int = 2,
                             live_limit: int = 4, precedents: bool = False, *,
-                            supplemental: bool = False) -> list[Source]:
+                            supplemental: bool = False, alternative: str = "",
+                            requirements: tuple[str, ...] = (), include_related: bool = True
+                            ) -> list[Source]:
         """Decision passages that answer `ask`, from the local archive and live search."""
         async with self._db.acquire() as conn:
             passages = await case_passages(conn, self._decisions, query, ask, usage, keep,
-                                           live_limit, precedents, supplemental=supplemental)
+                                           live_limit, precedents, supplemental=supplemental,
+                                           alternative=alternative, requirements=requirements,
+                                           include_related=include_related)
         sources = []
         for p in passages:
             if p.live is not None:
                 evidence = self.ledger.add_decision_ref(p.live.ref, p.full_text)
             else:
                 evidence = self.ledger.add_decision(**p.local, text=p.full_text)
-            sources.append(Source(evidence, p.passage))
+            sources.append(Source(evidence, p.passage, p.match))
         return sources

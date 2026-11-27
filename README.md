@@ -20,15 +20,20 @@ Istanbul calendar date when the message was received. For example, on 27 Novembe
 “dün” in that message refers to 26 November 2026. Explicit dates in the case are preserved.
 
 An explicit request for an indexed article's text, such as `6098 sayılı Kanun madde 344`, returns the
-article and its source directly from the local index. Chat runs overlapping statute and case-law searches when both are needed. The chat saves the
-answer as soon as it is ready and keeps the question-derived title if the title model is still
-working. Generation has a 90-second limit, or 120 seconds in deep research. A supplemental
-live case-law lookup has 8 seconds to retrieve decisions. Explicit case-law searches and deep
-research have 20 seconds for live retrieval. Local articles and decisions already retrieved remain
-available. If a citation support check cannot finish within 5 seconds, the answer keeps its
-citations and marks the affected statements for review. Timed-out generation offers a retry.
-The final event reports `first_delta_s` when answer text streamed and `total_s`
-for the generation run, including follow-up routing.
+article and its source directly from the local index. Statute and case-law research run
+concurrently. Petition drafts use one shared decision search and cite only decisions verified
+against their material facts and legal route. Explicit precedent searches show directly
+matching decisions first and label decisions that turn on different facts. When the reviewed
+passages do not establish a direct match, the answer says so.
+
+Generation has a 90-second limit, or 120 seconds in deep research. Live decision retrieval
+has a shared budget of 14 seconds for petitions, explicit searches and deep research, or
+8 seconds for supplemental lookup. Candidate evaluation has a separate five-second budget.
+The chat keeps completed source evaluations and returns linked decisions if the prose for
+an explicit precedent search takes too long. A slow citation support check marks affected
+statements for review while preserving the answer and its citations. The final event reports
+`first_delta_s` when text streamed and `total_s` for the generation run. Saved answer traces
+include separate durations for statute and case-law research.
 
 ## Layout
 

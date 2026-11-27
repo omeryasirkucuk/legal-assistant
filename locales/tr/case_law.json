@@ -1,0 +1,6 @@
+{
+  "no_direct": "İncelenen karar pasajlarında, aranan koşulların tümünü karşılayan bir emsal doğrulanamadı.",
+  "direct": "Doğrudan emsaller",
+  "related": "Farklı olgulu ilgili kararlar",
+  "writer_instruction": "Yalnızca direct listesindeki kararları doğrudan emsal olarak sun. Bunların kendi somut olayını, mahkemenin ulaştığı sonucu ve uyuşan olguyu kaynak pasajından göster. Related listesindeki kararları ayrı bir 'Farklı olgulu ilgili kararlar' başlığı altında, farkı karar başına kısa ve somut biçimde anlatarak ver. Kullanıcı farklı olgulu karar istemiyorsa o bölümü çıkar. Doğrudan emsal listesi boşsa sistem bunu zaten bildiriyor. Başka karar, künyesi ya da sonuç ekleme. Alt derece gerekçesini, taraf iddiasını veya aktarılan bir kararı inceleyen mahkemenin kendi sonucu olarak yazma."
+}

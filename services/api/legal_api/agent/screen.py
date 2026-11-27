@@ -20,6 +20,7 @@ from legal_api.retrieval.statutes import StatuteHit
 ANSWERS = 0.85
 REJECTED = 0.4     # below: dropped
 MAX_TEXT_CHARS = 12_000
+STATUTE_CHECK_S = 4
 
 INSTRUCTIONS = ("You are a Turkish lawyer screening statute articles for a legal question. "
                 "Answer yes only if the article text itself states a rule that answers the "
@@ -60,7 +61,13 @@ async def screen(question: str, hits: list[StatuteHit], usage: llm.Usage,
     if not decisions.enabled():
         return [Screened(h, None) for h in hits]
     async with decisions.client() as client:
-        answers = await asyncio.gather(*(
-            decisions.yes_probabilities(client, state_of(question, h), {"answers": instructions},
-                                        usage, "screen") for h in hits))
-    return [Screened(h, a["answers"]) for h, a in zip(hits, answers, strict=True)]
+        async def assess(hit: StatuteHit) -> Screened:
+            try:
+                async with asyncio.timeout(STATUTE_CHECK_S):
+                    answer = await decisions.yes_probabilities(
+                        client, state_of(question, hit), {"answers": instructions}, usage, "screen")
+                    return Screened(hit, answer["answers"])
+            except TimeoutError:
+                return Screened(hit, None)
+
+        return await asyncio.gather(*(assess(hit) for hit in hits))

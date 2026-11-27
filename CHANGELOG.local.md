@@ -4,6 +4,12 @@
 
 - Use `sudo bash deploy/release.sh` on the Oracle VM for production builds. Run it with `--cleanup-only` to verify the serving release and clean up older images without building. Local application setup is unchanged.
 
+## 0.9.7 · 2026-11-27
+
+- Run `make setup`, restart the API and rebuild the web client. No database migration is required.
+- Ask for a petition and a precedent search using a synthetic case. Verify that a different procedural outcome or payment fact is marked as a related decision and that a search with no verified direct match says so explicitly.
+- Compare the `research_stages_s` saved in the answer trace with `timings.total_s` and `timings.first_delta_s`. The statute and case-law durations can overlap.
+
 ## 0.9.6 · 2026-11-27
 
 - Run `make setup`, restart the API and rebuild the web client. No database migration is required.

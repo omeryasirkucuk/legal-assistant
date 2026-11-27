@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import aclosing
 from dataclasses import dataclass, field, replace
 from datetime import date
 
@@ -35,19 +36,22 @@ from legal_api.calc.severance import stated_dismissal_estimate
 from legal_api.calc.sources import deadline_sources, interest_sources, severance_sources
 from legal_api.clock import istanbul_date
 from legal_api.corpus.ingest import asyncpg_dsn
-from legal_api.drafting.asking import find_gaps, kind_of, question_text, should_ask
+from legal_api.drafting.asking import Gaps, find_gaps, kind_of, question_text, should_ask
 from legal_api.drafting.brief import StyleBook
 from legal_api.drafting.prepare import DRAFT_MAX_TOKENS, drafting_instruction
 from legal_api.drafting.style import around_petition
 from legal_api.drafting.tidy import tidy
 from legal_api.files.context import Attachment, for_understanding, for_writer
 from legal_api.grounding.evidence import Evidence, EvidenceLedger
-from legal_api.locale import calculation_terms, chat_turns
+from legal_api.locale import calculation_terms, chat_turns, message
 from legal_api.matters.agenda import Agenda
 from legal_api.retrieval.statutes import article_request, get_article, indexed_laws
 from legal_api.sources.gateway import Gateway
 from legal_api.workspace.public import PublicResearch
 from legal_api.workspace.session import Context, Workspace
+
+DRAFT_PREP_S = 8
+CASE_SEARCH_WRITE_S = 18
 
 
 @dataclass
@@ -63,13 +67,14 @@ class WrittenResult:
     asked: bool = False      # the turn asked for facts instead of drafting
     workspace: dict | None = None
     workspace_files: list[bytes] = field(default_factory=list)
+    case_note: str = ""
 
     @property
     def text(self) -> str:
         """What the chat shows: for a petition, the note and checklist beside the file."""
-        if self.understanding.task == "drafting" and not self.asked:
-            return around_petition(self.written.text)
-        return self.written.text
+        body = (around_petition(self.written.text)
+                if self.understanding.task == "drafting" and not self.asked else self.written.text)
+        return "\n\n".join(part for part in (self.case_note, body) if part)
 
     @property
     def full_text(self) -> str:
@@ -201,11 +206,19 @@ async def answer_events(question: str, history: list[dict] | None = None,
                 result["result"] = res
             return
         if u.task == "drafting":
-            if style_loader is not None:
-                style = await style_loader()
             kind = kind_of(u.case_kind)
-            gaps = await find_gaps(_conversation(history or [], for_understanding(
-                question, attachments)), kind, usage)
+            gaps = Gaps(questions=[{"question": question} for question in u.missing_facts])
+            try:
+                async with asyncio.timeout(DRAFT_PREP_S), asyncio.TaskGroup() as group:
+                    style_task = group.create_task(style_loader()) if style_loader else None
+                    gaps_task = group.create_task(find_gaps(_conversation(
+                        history or [], for_understanding(question, attachments)), kind, usage))
+            except TimeoutError:
+                pass
+            if style_task and style_task.done() and not style_task.cancelled():
+                style = style_task.result()
+            if gaps_task.done() and not gaps_task.cancelled():
+                gaps = gaps_task.result()
             asked = should_ask(gaps, kind, (style or StyleBook()).asking, u.write_now, just_asked)
             u.gap_trace = {"gap_score": gaps.score, "write_now": u.write_now,
                            "just_asked": just_asked, "asked": asked}
@@ -251,10 +264,7 @@ async def answer_events(question: str, history: list[dict] | None = None,
             found.trace["calendar"] = True
         instruction, max_tokens = None, MAX_TOKENS
         if u.task == "drafting":
-            yield step_event("caselaw")
-            instruction = await drafting_instruction(db, finder, found, search_text or question,
-                                                     u, style or StyleBook(), usage, power)
-            yield step_event("caselaw", "done", count=found.trace.get("ground_precedents", 0))
+            instruction = await drafting_instruction(finder, found, u, style or StyleBook())
             max_tokens = DRAFT_MAX_TOKENS
             # Petitions are written by the petition writer unless the lawyer chose the deepest
             # work (D48); without one configured, by the answer writer.
@@ -283,28 +293,45 @@ async def answer_events(question: str, history: list[dict] | None = None,
         for e in ledger:
             yield Event("evidence", {"key": e.key, "kind": e.kind, "citation": e.citation,
                                      "url": e.url})
+        case_search = u.task == "search" and found.trace.get("case_law_searched", False)
+        case_note = ""
+        if found.trace.get("case_law_searched") and u.task in {"drafting", "search"}:
+            instruction = "\n".join(filter(None, (instruction, _case_instruction(found.sources))))
+            if not found.trace["direct_decisions"]:
+                case_note = message("case_law", "no_direct")
+                yield Event("delta", {"text": f"{case_note}\n\n"})
         written: Written | None = None
         yield step_event("write")
         if local_only:
             written = _available_calculations(found.sources)
+        elif case_search and not any(s.case_match for s in found.sources):
+            written = Written([], "", [])
         else:
             try:
-                async for item in write(question, u, found.sources, usage, instruction,
-                                        max_tokens=max_tokens, power=power,
-                                        context=for_writer(attachments), today=today):
-                    if isinstance(item, str):
-                        # A petition is delivered as a file, not streamed into the chat.
-                        if u.task != "drafting":
-                            yield Event("delta", {"text": item})
-                    else:
-                        written = item
-            except (anthropic.APIStatusError, httpx.HTTPStatusError) as exc:
-                if u.task == "drafting" or not llm.unavailable(exc):
+                events = write(question, u, found.sources, usage, instruction,
+                               max_tokens=max_tokens, power=power,
+                               context=for_writer(attachments), today=today)
+                async with asyncio.timeout(CASE_SEARCH_WRITE_S if case_search else None), aclosing(events):
+                    async for item in events:
+                        if isinstance(item, str):
+                            if u.task != "drafting":
+                                yield Event("delta", {"text": item})
+                        else:
+                            written = item
+            except (TimeoutError, anthropic.APIError, httpx.HTTPError) as exc:
+                if case_search:
+                    written = _case_list(found.sources)
+                    found.trace["case_law_link_fallback"] = True
+                elif u.task != "drafting" and llm.unavailable(exc):
+                    written = _available_calculations(found.sources)
+                    if written is None:
+                        raise
+                    found.trace["calculation_fallback"] = True
+                else:
                     raise
-                written = _available_calculations(found.sources)
-                if written is None:
-                    raise
-                found.trace["calculation_fallback"] = True
+            if case_search and (written is None or not written.text.strip()):
+                written = _case_list(found.sources)
+                found.trace["case_law_link_fallback"] = True
         if written is None:
             raise RuntimeError("No verified answer was produced.")
         if u.task == "drafting" and written is not None:
@@ -312,7 +339,7 @@ async def answer_events(question: str, history: list[dict] | None = None,
         mark("total_s")
         yield step_event("write", "done")
         res = WrittenResult(question, u, written, ledger, usage, timings,
-                            {**u.trace(), **found.trace})
+                            {**u.trace(), **found.trace}, case_note=case_note)
         yield Event("final", {"text": res.text, "checked": res.checked,
                               "clarify": u.clarify,
                               "cost_usd": round(usage.cost_usd, 4), "timings": timings})
@@ -321,6 +348,25 @@ async def answer_events(question: str, history: list[dict] | None = None,
     finally:
         await gateway.aclose()
         await db.close()
+
+
+def _case_instruction(sources: list[Source]) -> str:
+    direct = ", ".join(s.evidence.key for s in sources if s.case_match == "direct")
+    related = ", ".join(s.evidence.key for s in sources if s.case_match == "related")
+    return (f'<case_law direct="{direct}" related="{related}">\n'
+            + message("case_law", "writer_instruction") + "\n</case_law>")
+
+
+def _case_list(sources: list[Source]) -> Written:
+    segments: list[Segment] = []
+    for match in ("direct", "related"):
+        cases = [source for source in sources if source.case_match == match]
+        if cases:
+            segments.append(Segment(f"### {message('case_law', match)}\n\n"))
+            segments.extend(Segment(f"- {case.evidence.citation}\n", (case.evidence.key,))
+                            for case in cases)
+            segments.append(Segment("\n"))
+    return Written(segments, assemble(segments), [])
 
 
 def _available_calculations(sources: list[Source]) -> Written | None:

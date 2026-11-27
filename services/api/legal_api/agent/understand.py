@@ -49,6 +49,8 @@ _SCHEMA = {
             "properties": {"law": {"type": "string"}, "article": {"type": "string"}},
             "required": ["law", "article"], "additionalProperties": False}},
         "case_law_query": {"type": "string"},
+        "case_law_alternative": {"type": "string"},
+        "case_law_requirements": {"type": "array", "items": {"type": "string"}},
         "petition_type": {"type": "string", "enum": list(PETITION_TYPES)},
         "output_format": {"type": "string", "enum": [*FORMATS, "none"]},
         "case_kind": {"type": "string", "enum": list(CASE_KINDS)},
@@ -109,7 +111,8 @@ _SCHEMA = {
             "required": ["question", "options"], "additionalProperties": False}},
     },
     "required": ["task", "questions", "shape", "characterisation", "issues", "statute_hints",
-                 "case_law_query", "petition_type", "output_format", "case_kind", "area",
+                 "case_law_query", "case_law_alternative", "case_law_requirements",
+                 "petition_type", "output_format", "case_kind", "area",
                  "write_now", "calendar", "deadlines", "penalties", "court_costs", "severance", "interest", "missing_facts",
                  "clarify"],
     "additionalProperties": False,
@@ -123,6 +126,8 @@ class Understanding:
     issues: list[tuple[str, str]] = field(default_factory=list)      # (name, search phrase)
     statute_hints: list[tuple[str, str]] = field(default_factory=list)  # (law, article)
     case_law_query: str = ""
+    case_law_alternative: str = ""
+    case_law_requirements: list[str] = field(default_factory=list)
     missing_facts: list[str] = field(default_factory=list)
     questions: list[str] = field(default_factory=list)   # the lawyer's own questions, in order
     shape: str = "single"                                 # the form the answer should take
@@ -180,6 +185,9 @@ async def understand(message: str, history: list[dict], usage: llm.Usage,
         statute_hints=[(h["law"].strip(), h["article"].strip())
                        for h in data["statute_hints"]][:MAX_HINTS],
         case_law_query=data["case_law_query"].strip(),
+        case_law_alternative=data.get("case_law_alternative", "").strip(),
+        case_law_requirements=[fact.strip()[:240] for fact in data.get("case_law_requirements", [])
+                               if fact.strip()][:6],
         missing_facts=[f.strip() for f in data["missing_facts"] if f.strip()][:4],
         questions=[q.strip() for q in data["questions"] if q.strip()][:5],
         shape=data["shape"] if data["shape"] in SHAPES else "single",

@@ -4,6 +4,12 @@
 
 - Clean obsolete Folonto Docker images and bound unused build cache after each verified production release. Retain the previous healthy API and web images for rollback.
 
+## 0.9.7 · 2026-11-27
+
+- Run one bounded court-decision search alongside statute research. Petition drafts reuse the same decisions and avoid serial searches for individual grounds.
+- Search two formulations of the material facts and check selected passages for the deciding court's holding and each required condition. Separate verified direct precedents from decisions with different facts and show a notice when none of the reviewed passages establishes a direct match.
+- Time-limit candidate evaluation and optional research steps. Keep decisions already retrieved and evaluated, and return linked decisions if case-search commentary takes too long. Record separate statute and decision research durations.
+
 ## 0.9.6 · 2026-11-27
 
 - Give grounded chat answers 90 seconds to finish, or 120 seconds in deep research. Limit supplemental live case-law retrieval to 8 seconds so legislation-based answers can start sooner.

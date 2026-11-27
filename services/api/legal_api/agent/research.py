@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from time import monotonic
 
 import asyncpg
 
@@ -42,6 +43,8 @@ NEIGHBOUR_SPAN = 3
 MAX_NEIGHBOURS = 3
 SEARCH_DECISIONS = 5    # decision passages kept when the lawyer asked for decisions
 SEARCH_LIVE = 6         # decisions read from live search then
+NEARBY_BUDGET_S = 3
+REFERENCE_BUDGET_S = 5
 
 
 @dataclass
@@ -170,11 +173,21 @@ async def _statute_sources(db: asyncpg.Pool, finder: SourceFinder, question: str
     screened = await screen(ask, hits, usage, NEEDED)
     answering, kept = select([(s.hit, s.p_answers) for s in screened], found,
                              power.max_articles)
-    kept += await nearby(db, ask, kept, {h.id for h in hits}, usage)
+    if answering:
+        try:
+            async with asyncio.timeout(NEARBY_BUDGET_S):
+                kept += await nearby(db, ask, kept, {h.id for h in hits}, usage)
+        except TimeoutError:
+            pass
     kept += await siblings(db, kept)
     progress("screen", "done", count=len(kept))
     progress("references", "active")
-    followed = await follow_references(db, ask, answering, usage)
+    followed = []
+    try:
+        async with asyncio.timeout(REFERENCE_BUDGET_S):
+            followed = await follow_references(db, ask, answering, usage)
+    except TimeoutError:
+        pass
     progress("references", "done", count=len(followed))
     sources = [finder.article_source(h) for h in kept]
     sources += [finder.article_source(
@@ -185,41 +198,59 @@ async def _statute_sources(db: asyncpg.Pool, finder: SourceFinder, question: str
         "referenced": [f"{f.hit.law_number}/{f.hit.label}" for f in followed]})
 
 
-async def _decision_sources(finder: SourceFinder, query: str, ask: str, usage: llm.Usage,
-                            progress, power: Power, asked_for_cases: bool) -> list[Source]:
+async def _decision_sources(finder: SourceFinder, query: str, ask: str, u: Understanding,
+                            usage: llm.Usage, progress, power: Power) -> list[Source]:
+    asked_for_cases = u.task == "search"
+    drafting = u.task == "drafting"
     progress("caselaw", "active")
     sources = await finder.decisions_for(
         query, ask, usage,
         keep=max(SEARCH_DECISIONS if asked_for_cases else 0, power.keep_decisions),
         live_limit=max(SEARCH_LIVE if asked_for_cases else 0, power.live_decisions),
-        precedents=asked_for_cases,
-        supplemental=not asked_for_cases and not power.always_decisions)
+        precedents=asked_for_cases or drafting,
+        supplemental=not (asked_for_cases or drafting or power.always_decisions),
+        alternative=u.case_law_alternative,
+        requirements=tuple(u.case_law_requirements),
+        include_related=not drafting)
     progress("caselaw", "done", count=len(sources))
     return sources
 
 
 async def research(db: asyncpg.Pool, finder: SourceFinder, question: str, u: Understanding,
                    usage: llm.Usage, progress, power: Power = POWERS["balanced"]) -> Research:
-    """`progress(step, state, **counts)` reports each step for the UI."""
+    """Run statute and decision research concurrently, with one decision pass per answer."""
     ask = screening_question(question, u)
-    asked_for_cases = u.task == "search"
+    query = u.case_law_query or u.characterisation
     fast_petition = u.task == "drafting" and power.name == "fast"
-    search_decisions = not fast_petition and (
-        u.case_law_query or asked_for_cases or power.always_decisions
-        or u.task == "consultation")
+    search_decisions = bool(query) and not fast_petition and bool(
+        u.case_law_query or u.case_law_requirements or u.task in {"drafting", "consultation"}
+        or power.always_decisions)
+
+    timings: dict[str, float] = {}
+
+    async def statute_work() -> Research:
+        started = monotonic()
+        found = await _statute_sources(db, finder, question, ask, u, usage, progress, power)
+        timings["statutes"] = round(monotonic() - started, 2)
+        return found
+
+    async def decision_work() -> list[Source]:
+        started = monotonic()
+        sources = await _decision_sources(finder, query, ask, u, usage, progress, power)
+        timings["decisions"] = round(monotonic() - started, 2)
+        return sources
 
     async with asyncio.TaskGroup() as group:
-        statutes = group.create_task(_statute_sources(
-            db, finder, question, ask, u, usage, progress, power))
-        cases = group.create_task(_decision_sources(
-            finder, u.case_law_query or u.characterisation, ask, usage, progress, power,
-            asked_for_cases)) if search_decisions else None
+        statutes = group.create_task(statute_work())
+        cases = group.create_task(decision_work()) if search_decisions else None
 
     found = statutes.result()
-    decisions = cases.result() if cases else []
+    precedents = cases.result() if cases else []
     unique: dict[str, Source] = {}
-    for source in [*found.sources, *decisions]:
+    for source in [*found.sources, *precedents]:
         unique.setdefault(source.evidence.key, source)
     found.sources = list(unique.values())
-    found.trace["decisions"] = len(decisions)
+    found.trace.update(research_stages_s=timings, decisions=len(precedents),
+                       direct_decisions=sum(s.case_match == "direct" for s in precedents),
+                       case_law_searched=search_decisions)
     return found

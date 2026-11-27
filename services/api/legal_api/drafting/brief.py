@@ -17,8 +17,6 @@ from legal_api.drafting.profile import (
 from legal_api.drafting.types import PetitionType
 from legal_api.prompts import prompt
 
-PASSAGE_CHARS = 900     # of each decision's passage shown beside its ground
-
 
 @dataclass
 class StyleBook:
@@ -33,12 +31,7 @@ class StyleBook:
 
 
 def brief(ptype: PetitionType | None, book: StyleBook, required_keys: list[str],
-          kind: CaseKind | None = None, precedents: dict | None = None,
-          requests: list[str] | None = None) -> str:
-    """`kind`: the kind of case, when it is one with its own guide; `precedents`: the court
-    decisions found for each ground of the case (ground -> sources). Each is given with its
-    citation and the passage that bears on the ground: a smaller writer given only the keys
-    cited no decision at all."""
+          kind: CaseKind | None = None, requests: list[str] | None = None) -> str:
     type_id = ptype.id if ptype else None
     t = targets(book.samples, book.preferences, type_id, kind.words if kind else None)
     parts = [prompt("draft_brief")]
@@ -52,12 +45,6 @@ def brief(ptype: PetitionType | None, book: StyleBook, required_keys: list[str],
     if requests:
         parts.append("<requests_to_make>\n" + "\n".join(f"- {r}" for r in requests)
                      + "\n</requests_to_make>")
-    if precedents:
-        parts.append("<ground_precedents>\n" + "\n".join(
-            f'<ground name="{ground}">\n' + "\n".join(
-                f"[[{s.evidence.key}]] {s.evidence.citation}\n{s.document[:PASSAGE_CHARS]}"
-                for s in sources) + "\n</ground>"
-            for ground, sources in precedents.items()) + "\n</ground_precedents>")
     if required_keys:
         parts.append("<required_contents_sources>" + ", ".join(required_keys)
                      + "</required_contents_sources>")

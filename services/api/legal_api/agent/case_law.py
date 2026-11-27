@@ -1,144 +1,198 @@
-"""Court-decision passages for one sub-question: local archive plus live search, screened.
-
-The local archive is a small development subset, so for many questions it holds no decision
-on point and its best matches are generic ("the law on evidence contracts is as follows").
-Decisions are therefore also searched live (Bedesten, Court of Cassation), the passage of
-each decision closest to the sub-question is taken, and every candidate passage is judged by
-the decision model: does it state something that answers the sub-question? Only those are
-given to the answering model, so a sub-answer is not left with generic passages to cite.
-"""
+"""Retrieve and verify court decisions within a single research pass."""
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
+from itertools import zip_longest
+from typing import Literal
 
 import asyncpg
 
 from legal_api import decisions, llm
 from legal_api.corpus.chunking import chunk_text
-from legal_api.embeddings import embed_passages, embed_query
+from legal_api.grounding.normalize import tr_fold
 from legal_api.retrieval.hybrid import search as search_local
 from legal_api.sources.bedesten_decisions import BedestenDecisions
-from legal_api.sources.gateway import SourceError
-from legal_api.sources.types import Decision
+from legal_api.sources.gateway import SourceBlocked, SourceError
+from legal_api.sources.types import Decision, DecisionRef
 
 LOCAL_CANDIDATES = 4
-LIVE_DECISIONS = 3     # with a search, about 8 s at the decision service's pace
-LIVE_BUDGET_S = 20
+LIVE_DECISIONS = 3
+LIVE_BUDGET_S = 14
 SUPPLEMENTAL_LIVE_BUDGET_S = 8
-MIN_QUERY_WORDS = 2
+SEARCH_QUERY_S = 4
+LOCAL_BUDGET_S = 3
+DECISION_CHECK_S = 5
 KEEP = 2
-RELEVANT = 0.7      # passages are judged more loosely than statute candidates
-MAX_PASSAGE_CHARS = 6000
+RELEVANT = 0.75
+DIRECT = 0.85
+Match = Literal["direct", "related"]
 
-INSTRUCTIONS = ("A lawyer asked the sub-question. Answer yes only if the court-decision passage "
-                "itself states a rule, test or finding that answers the sub-question (for "
-                "example how something is proved, or when a provision applies). A passage that "
-                "only quotes procedure, describes the parties' claims, or concerns another "
-                "issue is no.")
-# When the lawyer asks for decisions themselves, a decision on one of the case's issues is what
-# is wanted; judged by the instruction above, such passages scored 0.55-0.64 against a request
-# like "is there a precedent on this?" (0.9 and above with this one, procedure-only 0.15).
-PRECEDENT = ("A lawyer asked for court decisions on the case described by the request and its "
-             "legal characterisation. Answer yes if the court-decision passage decides or "
-             "states the court's view on one of the legal issues of that case, so the lawyer "
-             "could cite it as a precedent. A passage that only quotes procedure, only "
-             "describes the parties' claims, or concerns a different legal issue is no.")
+HOLDING = ("Does the passage include the deciding court's own legal reasoning or disposition "
+           "on the legal route the lawyer seeks? Answer no for submissions, quoted lower court "
+           "reasoning, an abstract rule alone, or a ruling on a different procedural issue.")
+RELATED = ("Does the court's reasoning materially help answer the legal request, including "
+           "helpful distinctions? Reject shared vocabulary or an abstract rule with no "
+           "application to the request. Distinguish the deciding court from the parties.")
+DIRECT_MATCH = ("Does the deciding court apply the requested legal route in a materially "
+                "matching case? Require affirmative evidence from the case facts or holding "
+                "for every required condition. Reject unknown facts, contradictions, excluded "
+                "facts and cases decided on a different issue. Do not infer facts from an "
+                "abstract statement of law, party submissions, or a quoted lower judgment.")
 
 
 @dataclass(frozen=True)
 class Passage:
-    """A candidate passage and what is needed to register its decision as evidence."""
+    """Verbatim excerpts and the text and metadata behind their citation."""
     passage: str
     full_text: str
-    local: dict | None = None            # local archive row fields
-    live: Decision | None = None         # live decision
+    local: dict | None = None
+    live: Decision | None = None
+    match: Match | None = None
+
+    def identity(self) -> tuple:
+        if self.live is not None:
+            ref = self.live.ref
+            chamber, case, decision, source = ref.chamber, ref.case_no, ref.decision_no, ref.source_id
+        else:
+            assert self.local is not None
+            chamber, case, decision, source = (
+                self.local[k] for k in ("chamber", "case_no", "decision_no", "source_id"))
+        return (tr_fold(chamber), case, decision) if case and decision else (source,)
 
 
 async def _local(conn: asyncpg.Connection, query: str) -> list[Passage]:
+    if not await conn.fetchval("SELECT EXISTS (SELECT 1 FROM corpus_decisions)"):
+        return []
     hits = await search_local(conn, query, limit=LOCAL_CANDIDATES)
     texts = {r["id"]: r["text"] for r in await conn.fetch(
         "SELECT id, text FROM corpus_decisions WHERE id = ANY($1::text[])",
         [h.decision_id for h in hits])}
-    return [Passage(h.passage, texts[h.decision_id], local={
+    return [Passage(_closest_passage(texts[h.decision_id], query), texts[h.decision_id], local={
         "source_id": h.decision_id, "chamber": h.chamber, "case_no": h.case_no,
         "decision_no": h.decision_no, "decision_date": h.decision_date, "url": h.url})
-        for h in hits]
+        for h in hits if h.decision_id in texts]
+
+
+def _terms(text: str) -> set[str]:
+    return {word[:5] for word in re.findall(r"[^\W_]+", tr_fold(text))
+            if len(word) >= 3 or word.isdigit()}
 
 
 def _closest_passage(text: str, ask: str) -> str:
+    """Keep relevant facts and the actual disposition, in source order."""
     chunks = [c.text for c in chunk_text(text)] or [text]
-    query = embed_query(ask)
-    vectors = embed_passages(chunks)
-    scores = [sum(a * b for a, b in zip(query, v, strict=True)) for v in vectors]
-    return chunks[max(range(len(chunks)), key=scores.__getitem__)]
-
-
-async def _search_relaxed(source: BedestenDecisions, query: str,
-                          size: int = LIVE_DECISIONS) -> list:
-    """The service matches every word; drop words from the end until something is found."""
-    words = query.split()
-    while words:
-        _, refs = await source.search(" ".join(words), size=size)
-        if refs or len(words) <= MIN_QUERY_WORDS:
-            return refs
-        words = words[:-1]
-    return []
+    terms = _terms(ask)
+    overlaps = [terms & _terms(chunk) for chunk in chunks]
+    selected = {len(chunks) - 1}
+    covered = overlaps[-1].copy()
+    while len(selected) < min(3, len(chunks)):
+        remaining = (index for index in range(len(chunks)) if index not in selected)
+        best = max(remaining, key=lambda index: (
+            len(overlaps[index] - covered), len(overlaps[index]), index))
+        selected.add(best)
+        covered.update(overlaps[best])
+    return "\n\n[…]\n\n".join(chunks[index] for index in sorted(selected))
 
 
 async def _live(source: BedestenDecisions, query: str, ask: str,
-                limit: int = LIVE_DECISIONS, *, supplemental: bool = False) -> list[Passage]:
-    """Live decisions within a time budget: requests to the service are queued process-wide
-    at one per second and can each take up to the gateway timeout, so several answers
-    searching at once could wait for minutes. Whatever arrived in time is used."""
+                limit: int = LIVE_DECISIONS, *, supplemental: bool = False,
+                alternative: str = "") -> list[Passage]:
     found: list[Decision] = []
-
-    async def fetch_all() -> None:
-        for ref in (await _search_relaxed(source, query, limit))[:limit]:
-            found.append(await source.fetch(ref))
-
+    budget = SUPPLEMENTAL_LIVE_BUDGET_S if supplemental else LIVE_BUDGET_S
     try:
-        budget = SUPPLEMENTAL_LIVE_BUDGET_S if supplemental else LIVE_BUDGET_S
         async with asyncio.timeout(budget):
-            await fetch_all()
-    except (SourceError, TimeoutError):
+            batches: list[list[DecisionRef]] = []
+            for phrase in dict.fromkeys((query, alternative)):
+                if not phrase.strip():
+                    continue
+                try:
+                    async with asyncio.timeout(SEARCH_QUERY_S):
+                        _, refs = await source.search(phrase, size=limit)
+                except SourceBlocked:
+                    break
+                except (SourceError, TimeoutError, ValueError):
+                    continue
+                batches.append(refs)
+            unique = {ref.source_id: ref for group in zip_longest(*batches)
+                      for ref in group if ref is not None}
+            for ref in list(unique.values())[:limit]:
+                try:
+                    found.append(await source.fetch(ref))
+                except SourceBlocked:
+                    break
+                except SourceError:
+                    continue
+    except TimeoutError:
         pass
-    return [Passage(await asyncio.to_thread(_closest_passage, d.text, ask), d.text, live=d)
-            for d in found]
+    return [Passage(_closest_passage(d.text, ask), d.text, live=d) for d in found]
 
 
-async def _screen(ask: str, passages: list[Passage], usage: llm.Usage,
-                  keep: int = KEEP, instruction: str = INSTRUCTIONS) -> list[Passage]:
+async def _screen(ask: str, passages: list[Passage], usage: llm.Usage, keep: int, *,
+                  strict: bool, requirements: tuple[str, ...], include_related: bool
+                  ) -> list[Passage]:
+    if not passages:
+        return []
     if not decisions.enabled():
-        return passages[:keep]
+        return [] if strict else passages[:keep]
+
+    checks = {"related": RELATED}
+    if strict:
+        checks.update(holding=HOLDING, direct=DIRECT_MATCH)
+        checks.update({f"condition_{i}": (
+            f"Does the deciding court's own reasoning or accepted case facts establish this "
+            f"condition for this case: {requirement}? Answer no if the passage leaves it "
+            f"unknown, states only the general law, or merely quotes a party's submission.")
+            for i, requirement in enumerate(requirements)})
+
     async with decisions.client() as client:
-        answers = await asyncio.gather(*(
-            decisions.yes_probabilities(
-                client, {"sub_question": ask, "decision_passage": p.passage[:MAX_PASSAGE_CHARS]},
-                {"answers": instruction}, usage, "case_law")
-            for p in passages))
-    scored = [(a["answers"], p) for a, p in zip(answers, passages, strict=True)
-              if a["answers"] is not None and a["answers"] >= RELEVANT]
-    scored.sort(key=lambda x: -x[0])
-    return [p for _, p in scored[:keep]]
+        async def assess(passage: Passage) -> dict:
+            state = {"legal_request": ask, "required_conditions": requirements,
+                     "decision_passages": passage.passage}
+            try:
+                async with asyncio.timeout(DECISION_CHECK_S):
+                    return await decisions.yes_probabilities(
+                        client, state, checks, usage, "case_law")
+            except TimeoutError:
+                return {}
+
+        answers = await asyncio.gather(*(assess(p) for p in passages))
+
+    scored = []
+    for answer, passage in zip(answers, passages, strict=True):
+        relevant = answer.get("related") or 0.0
+        direct = min((answer.get(key) or 0.0 for key in checks if key != "related"), default=0.0)
+        if direct >= DIRECT:
+            scored.append((True, direct, replace(passage, match="direct")))
+        elif include_related and relevant >= RELEVANT:
+            scored.append((False, relevant, replace(passage, match="related")))
+    scored.sort(key=lambda result: (result[0], result[1]), reverse=True)
+    direct = [passage for is_direct, _, passage in scored if is_direct]
+    related = [passage for is_direct, _, passage in scored if not is_direct]
+    return [*direct, *(related[:2] if strict else related)][:keep]
 
 
 async def case_passages(conn: asyncpg.Connection, source: BedestenDecisions, query: str,
                         ask: str, usage: llm.Usage, keep: int = KEEP,
                         live_limit: int = LIVE_DECISIONS, precedents: bool = False, *,
-                        supplemental: bool = False) -> list[Passage]:
-    """`precedents`: the lawyer asked for decisions themselves; more are read and kept, and
-    they are judged as precedents for the case rather than as answers to a sub-question."""
-    async with asyncio.TaskGroup() as group:
-        local = group.create_task(_local(conn, query))
-        live = group.create_task(
-            _live(source, query, ask, live_limit, supplemental=supplemental))
-    seen, candidates = set(), []
-    for p in [*live.result(), *local.result()]:
-        key = (p.live.ref.case_no, p.live.ref.decision_no) if p.live else (
-            p.local["case_no"], p.local["decision_no"])
-        if key not in seen:
-            seen.add(key)
-            candidates.append(p)
-    return await _screen(ask, candidates, usage, keep, PRECEDENT if precedents else INSTRUCTIONS)
+                        supplemental: bool = False, alternative: str = "",
+                        requirements: tuple[str, ...] = (), include_related: bool = True
+                        ) -> list[Passage]:
+    """Check a shared candidate pool, prioritising decisions that satisfy every condition."""
+    excerpt_query = " ".join((query, alternative, *requirements))
+
+    async def local() -> list[Passage]:
+        try:
+            async with asyncio.timeout(LOCAL_BUDGET_S):
+                return await _local(conn, query)
+        except TimeoutError:
+            return []
+
+    archive, live = await asyncio.gather(
+        local(), _live(source, query, excerpt_query, live_limit,
+                       supplemental=supplemental, alternative=alternative))
+    candidates = {p.identity(): p for p in [*archive, *live]}
+    return await _screen(ask, list(candidates.values()), usage, keep, strict=precedents,
+                         requirements=requirements, include_related=include_related)
