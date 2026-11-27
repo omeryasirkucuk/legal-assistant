@@ -26,7 +26,7 @@ export function SettingsPanel({ onClose }: Props) {
     api.llmSettings()
       .then((value) => {
         setSettings(value);
-        setPersisted(value.is_saved);
+        setPersisted(true);
       })
       .catch(() => setError(t("settingsLoadFailed")))
       .finally(() => setLoading(false));
@@ -45,6 +45,7 @@ export function SettingsPanel({ onClose }: Props) {
         model_draft: settings.model_draft,
         model_cheap: settings.model_cheap,
         model_judge: settings.model_judge,
+        model_write: settings.model_write,
         api_key: apiKey.trim() || undefined,
         clear_api_key: clearKey,
       });
@@ -90,6 +91,13 @@ export function SettingsPanel({ onClose }: Props) {
 
   const field =
     "mt-1 w-full rounded-md border border-rule bg-sheet px-3 py-2.5 text-sm text-ink outline-none focus:border-cite";
+  const roles = [
+    ["model_main", t("mainModel")],
+    ["model_draft", t("draftModel")],
+    ["model_cheap", t("cheapModel")],
+    ["model_judge", t("judgeModel")],
+    ["model_write", t("writerModel")],
+  ] as const;
   const visibleModels = models.filter((model) =>
     `${model.name} ${model.id}`.toLocaleLowerCase().includes(modelSearch.trim().toLocaleLowerCase()),
   );
@@ -122,6 +130,11 @@ export function SettingsPanel({ onClose }: Props) {
         ) : settings?.operator_managed ? (
           <div className="space-y-3 p-6 text-sm text-muted">
             <p>{t("privateModelManaged")}</p>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              {roles.map(([key, label]) => (
+                <div key={key}><dt>{label}</dt><dd className="break-all text-ink">{settings[key]}</dd></div>
+              ))}
+            </dl>
             <button type="button" onClick={testConnection} disabled={testing}
               className="rounded-md border border-rule px-3 py-2 hover:bg-sheet disabled:opacity-60">
               {testing ? t("connectionTesting") : t("testConnection")}
@@ -212,12 +225,7 @@ export function SettingsPanel({ onClose }: Props) {
                 />
               )}
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                {([
-                  ["model_main", t("mainModel")],
-                  ["model_draft", t("draftModel")],
-                  ["model_cheap", t("cheapModel")],
-                  ["model_judge", t("judgeModel")],
-                ] as const).map(([key, label]) => (
+                {roles.map(([key, label]) => (
                   <label key={key} className="block text-sm text-muted">
                     {label}
                     {models.length ? (

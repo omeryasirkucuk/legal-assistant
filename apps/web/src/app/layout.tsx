@@ -16,7 +16,7 @@ const serif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Legal Assistant",
+  title: "Folonto Legal",
 };
 
 export const viewport: Viewport = { interactiveWidget: "resizes-content" };

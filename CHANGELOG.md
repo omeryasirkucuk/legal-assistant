@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 · 2026-11-27
+
+- Keep admin invitation codes in the admin panel with active, used and expired states. New codes expire after 24 hours and remain bound to the specified email address.
+- Let administrators set daily and monthly USD limits per user. Show current-month spend and apply limits to chat and drafting.
+- Populate admin model settings with the effective provider and role models, including the answer writer. Show the assigned model for each response preset in chat.
+- Add the Folonto Legal name and monogram to navigation, the chat landing view, sign-in and the favicon.
+
 ## 0.8.1 · 2026-11-27
 
 - Adapt sign-in, navigation, chat, calendar, case files, document editing and account panels to phones and tablets. Keep wide answers and file menus within the viewport.

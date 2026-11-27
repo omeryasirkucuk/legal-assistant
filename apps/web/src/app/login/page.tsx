@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { Brand } from "@/components/Brand";
 import { t } from "@/lib/i18n";
 
 export default function LoginPage() {
@@ -33,6 +34,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center px-4 py-6 sm:py-16">
       <div className="w-full max-w-sm">
+        <div className="mb-4"><Brand /></div>
         <p className="font-serif text-2xl leading-snug text-ink">{t("appTagline")}</p>
         <form action={submit} className="mt-6 space-y-4 sm:mt-10">
           <h1 className="text-sm font-semibold text-ink">

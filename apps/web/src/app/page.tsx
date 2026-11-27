@@ -44,6 +44,7 @@ import {
 } from "@/lib/api";
 import { FileText } from "lucide-react";
 import { formatUsd } from "@/lib/format";
+import { Brand } from "@/components/Brand";
 import { t } from "@/lib/i18n";
 import { mentionedMatters } from "@/lib/matterMatch";
 import { citationOrder } from "@/lib/markers";
@@ -400,6 +401,7 @@ export default function ChatApp() {
             )}
             {empty && (
               <div className="mt-[clamp(0rem,7dvh,4rem)] max-w-[38rem] md:mt-[18vh]">
+                <div className="mb-4 hidden lg:block"><Brand /></div>
                 <h1 className="font-serif text-3xl text-ink">{t("emptyTitle")}</h1>
                 <p className="mt-3 text-[15px] leading-relaxed text-muted">{t("emptyBody")}</p>
               </div>
@@ -510,9 +512,10 @@ export default function ChatApp() {
       {passwordOpen && <PasswordPanel onClose={() => setPasswordOpen(false)} />}
       {adminOpen && user.is_admin && (
         <AdminPanel ownId={user.id} onClose={() => setAdminOpen(false)}
+          onBudgetSaved={() => { void api.todayStats().then(setToday).catch(() => {}); }}
           onDemoted={() => { setUser({ ...user, is_admin: false }); setAdminOpen(false); }} />
       )}
-      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && user.is_admin && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       {styleOpen && <StylePanel onClose={() => setStyleOpen(false)} />}
       {confirmDialog}
       {newMatterOpen && <MatterForm onSave={createMatter} onClose={() => setNewMatterOpen(false)} />}

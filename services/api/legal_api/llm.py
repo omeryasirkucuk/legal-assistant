@@ -47,6 +47,7 @@ class RuntimeConfig:
     model_draft: str
     model_cheap: str
     model_judge: str
+    model_write: str | None = None
 
 
 _runtime_config: ContextVar[RuntimeConfig | None] = ContextVar("llm_runtime_config", default=None)
@@ -76,7 +77,7 @@ def model_for(role: Role) -> str:
     if configured:
         return {"main": configured.model_main, "draft": configured.model_draft,
                 "cheap": configured.model_cheap, "judge": configured.model_judge,
-                "write": configured.model_main}[role]
+                "write": configured.model_write or configured.model_main}[role]
     if uses_openai_compatible(s):
         return {"main": s.openai_model_main, "draft": s.openai_model_draft,
                 "cheap": s.openai_model_cheap, "judge": s.openai_model_judge,
@@ -260,13 +261,19 @@ def _affordable_tokens(response: httpx.Response, requested: int) -> int | None:
 async def _openai_response(role: Role, params: dict, *, stream: bool = False):
     route = routed(role)
     model = route or model_for(role)
-    payload = _openai_payload(model, params, stream=stream, route=bool(route))
+    settings = get_settings()
+    configured = _connection(settings)
+    base_url = configured.base_url if configured else settings.openai_base_url
+    openrouter = bool(route) or (
+        not settings.protected_data
+        and base_url.rstrip("/") == settings.decision_base_url.rstrip("/") + "/v1"
+    )
+    payload = _openai_payload(model, params, stream=stream, route=openrouter)
     alternate = None
-    if role == "write" and route:
-        settings = get_settings()
+    if role == "write" and openrouter:
         alternate = settings.write_fallback_route
         if not alternate and not settings.write_route:
-            alternate = routed("main")
+            alternate = routed("main") or model_for("main")
     budget = payload.get("max_tokens")
     min_tokens = 1024 if role == "write" else 512
     async with openai_client(bool(route)) as client:
@@ -274,7 +281,7 @@ async def _openai_response(role: Role, params: dict, *, stream: bool = False):
             async with client.stream("POST", "chat/completions", json=payload) as response:
                 if not response.is_success:
                     await response.aread()
-                if route and response.status_code == 402 and attempt < 2 and isinstance(budget, int):
+                if openrouter and response.status_code == 402 and attempt < 2 and isinstance(budget, int):
                     cap = _affordable_tokens(response, payload["max_tokens"])
                     if cap and cap >= min_tokens:
                         payload["max_tokens"] = cap

@@ -219,6 +219,12 @@ export function Composer({ followUp, busy, onSubmit, onStop, footer, placeholder
 
 function PowerMenu({ value, onPick, onClose }: { value: Power; onPick: (p: Power) => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
+  const [models, setModels] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let active = true;
+    api.responseModels().then((value) => { if (active) setModels(value); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     const away = (e: MouseEvent) => box.current && !box.current.contains(e.target as Node) && onClose();
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -239,6 +245,7 @@ function PowerMenu({ value, onPick, onClose }: { value: Power; onPick: (p: Power
           <span>
             <span className="block text-sm font-medium text-ink">{t(`power_${p}`)}</span>
             <span className="block text-xs leading-relaxed text-muted">{t(`power_${p}_hint`)}</span>
+            {models[p] && <span className="mt-1 block break-all text-xs text-muted">{models[p]}</span>}
           </span>
         </button>
       ))}

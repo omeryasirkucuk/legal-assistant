@@ -75,11 +75,13 @@ async def register(body: Registration, response: Response, db: DB) -> UserOut:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid invite code")
     else:
         invite = await db.get(RegistrationInvite, sha256(code).hexdigest())
-        if invite is None or invite.email != email or invite.used_at is not None:
+        now = datetime.now(UTC)
+        if (invite is None or invite.email != email or invite.used_at is not None
+                or invite.expires_at is None or invite.expires_at <= now):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid invite code")
         if await db.scalar(select(User.id).where(User.email == email)) is not None:
             raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
-        invite.used_at = datetime.now(UTC)
+        invite.used_at = now
 
     user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password),
                 is_admin=is_admin)

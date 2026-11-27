@@ -8,9 +8,16 @@ export type Health = {
 };
 
 export type User = { id: string; email: string; name: string; is_admin: boolean; protected_data?: boolean };
-export type AdminUser = Pick<User, "id" | "name" | "email" | "is_admin"> & {
+export type AccountBudget = { daily_budget_usd: number | null; monthly_budget_usd: number | null };
+export type AdminInvite = {
+  id: string; email: string; code: string | null;
+  status: "active" | "used" | "expired"; expires_at: string | null; used_at: string | null;
+};
+export type AdminUser = AccountBudget & Pick<User, "id" | "name" | "email" | "is_admin"> & {
   today_cost_usd: number;
+  monthly_cost_usd: number;
   total_cost_usd: number;
+  default_daily_budget_usd: number;
 };
 export type LLMSettings = {
   provider: "openai_compatible";
@@ -20,6 +27,7 @@ export type LLMSettings = {
   model_draft: string;
   model_cheap: string;
   model_judge: string;
+  model_write: string;
   api_key_configured: boolean;
   operator_managed?: boolean;
 };
@@ -107,6 +115,7 @@ export type Message = {
 export type SourceText = Evidence & { text: string; fetched_at: string };
 export type TodayStats = {
   answers: number; average_s: number; longest_s: number; cost_usd: number; budget_usd: number;
+  monthly_cost_usd: number; monthly_budget_usd: number | null;
 };
 export type StoredFile = {
   id: string; name: string; media_type: string; size: number; origin: "upload" | "generated";
@@ -191,7 +200,12 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
 
 export const api = {
   createInvite: (email: string) =>
-    call<{ email: string; code: string }>("/admin/invites", json({ email })),
+    call<AdminInvite>("/admin/invites", json({ email })),
+  adminInvites: () => call<AdminInvite[]>("/admin/invites", { cache: "no-store" }),
+  setUserBudget: (id: string, budget: AccountBudget) =>
+    call<AccountBudget>(`/admin/users/${id}/budget`, {
+      method: "PATCH", body: JSON.stringify(budget),
+    }),
   adminUsers: () => call<AdminUser[]>("/admin/users", { cache: "no-store" }),
   setUserRole: (id: string, is_admin: boolean) =>
     call<Pick<AdminUser, "is_admin">>(`/admin/users/${id}/role`, {
@@ -302,6 +316,7 @@ export const api = {
   deleteChat: (id: string) => call<void>(`/chats/${id}`, { method: "DELETE" }),
   messages: (id: string) => call<Message[]>(`/chats/${id}/messages`),
   cancelRun: (id: string) => call<void>(`/chats/${id}/run/cancel`, { method: "POST" }),
+  responseModels: () => call<Record<string, string>>("/chats/response-models", { cache: "no-store" }),
   todayStats: () => call<TodayStats>("/chats/stats/today"),
   searchHistory: (q: string) => call<HistoryHit[]>(`/chats/search?q=${encodeURIComponent(q)}`),
   searchMatters: (q: string) =>

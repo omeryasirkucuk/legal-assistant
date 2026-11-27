@@ -3,6 +3,7 @@
 // A phone's top bar: the drawer (sidebar) on the left, where the lawyer is in the middle,
 // a new chat on the right. Hidden from lg up, where the sidebar sits beside the page.
 import { Menu, SquarePen } from "lucide-react";
+import { Brand } from "@/components/Brand";
 import { t } from "@/lib/i18n";
 
 export function MobileBar({ title, onMenu, onNew }: {
@@ -14,6 +15,7 @@ export function MobileBar({ title, onMenu, onNew }: {
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink hover:bg-sheet">
         <Menu size={20} />
       </button>
+      <Brand compact />
       <p className="min-w-0 flex-1 truncate text-center text-sm font-medium text-ink">{title}</p>
       <button onClick={onNew} aria-label={t("newChat")}
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink hover:bg-sheet">

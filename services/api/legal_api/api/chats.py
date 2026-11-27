@@ -17,7 +17,7 @@ from sqlalchemy import or_, select
 
 from legal_api import llm
 from legal_api.agent.detail import detail_stream
-from legal_api.agent.power import power_of
+from legal_api.agent.power import POWERS, power_of
 from legal_api.agent.turn import turn_events
 from legal_api.auth import DB, CurrentUser
 from legal_api.chat import runs
@@ -28,13 +28,11 @@ from legal_api.chat.service import (
     history,
     previous_turn,
     save_answer,
-    spent_today,
     title_from,
     today_stats,
     workspace_context,
 )
 from legal_api.chat.titles import generate_title
-from legal_api.config import get_settings
 from legal_api.db.app_models import Chat, LLMConnectionSettings, Message, MessageEvidence
 from legal_api.db.file_models import StoredFile
 from legal_api.db.session import get_sessionmaker
@@ -50,7 +48,7 @@ from legal_api.matters.service import context as matter_context
 from legal_api.matters.service import files_of as matter_files
 from legal_api.matters.service import owned as owned_matter
 from legal_api.privacy.llm_settings import runtime_config
-from legal_api.spend import record_spend
+from legal_api.spend import guard_budget, record_spend
 from legal_api.workspace.documents import WORD_MEDIA_TYPE
 from legal_api.workspace.workbook import MEDIA_TYPE as XLSX_TYPE
 from legal_api.workspace.workbook import workbook
@@ -137,10 +135,22 @@ async def search_history(q: str, user: CurrentUser, db: DB) -> list[dict]:
     return await search_chats(db, user.id, q)
 
 
+@router.get("/response-models")
+async def response_models(user: CurrentUser, db: DB) -> dict[str, str]:
+    token = llm.set_runtime_config(runtime_config(await db.get(LLMConnectionSettings, 1)))
+    try:
+        return {
+            name: llm.routed(power.write_role) or llm.model_for(power.write_role)
+            for name, power in POWERS.items()
+        }
+    finally:
+        llm.reset_runtime_config(token)
+
+
 @router.get("/stats/today")
 async def stats_today(user: CurrentUser, db: DB) -> dict:
     """Answers given today and how long they took, for the sidebar."""
-    return await today_stats(db, user.id)
+    return await today_stats(db, user)
 
 
 def _message_meta(metadata: dict) -> dict:
@@ -229,11 +239,6 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def _guard_budget(db, user) -> None:
-    if await spent_today(db, user.id) >= get_settings().daily_user_budget_usd:
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "daily budget reached")
-
-
 async def _finished_title(task: asyncio.Task | None) -> str | None:
     """The generated title, or None when there is none or it failed (the chat keeps its
     provisional title from the question)."""
@@ -258,7 +263,7 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
     chat = await _owned_chat(db, user, chat_id)
     if runs.active(chat.id):
         raise HTTPException(status.HTTP_409_CONFLICT, "an answer is already running")
-    await _guard_budget(db, user)
+    await guard_budget(db, user)
     await drop_unanswered(db, chat)   # no run is active, so it will never be answered
     turns = await history(db, chat)
     previous = await previous_turn(db, chat)
@@ -400,7 +405,7 @@ async def detail(chat_id: uuid.UUID, message_id: uuid.UUID, user: CurrentUser,
             yield _sse("detail", {"segments": cached})
         return _stream(replay())
 
-    await _guard_budget(db, user)
+    await guard_budget(db, user)
     question = await db.scalar(select(Message.content).where(
         Message.chat_id == chat.id, Message.role == "user",
         Message.created_at < msg.created_at).order_by(Message.created_at.desc()).limit(1))

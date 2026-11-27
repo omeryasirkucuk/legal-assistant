@@ -30,12 +30,13 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from legal_api import llm
+from legal_api.db.app_models import User
 from legal_api.db.drafting_models import StyleMemory
 from legal_api.db.session import get_sessionmaker
 from legal_api.drafting.style import petition_part
 from legal_api.embeddings import embed_passages, embed_query
 from legal_api.prompts import prompt
-from legal_api.spend import record_spend
+from legal_api.spend import budget_reached, record_spend
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +109,12 @@ async def learn_from_edit(user_id: uuid.UUID, drafted: str, saved: str,
     if difflib.SequenceMatcher(None, before, after).quick_ratio() >= UNCHANGED:
         return
     try:
-        usage = llm.Usage()
-        texts = await _extract(before, after, usage)
         async with get_sessionmaker()() as db:
+            user = await db.get(User, user_id)
+            if user is None or await budget_reached(db, user):
+                return
+            usage = llm.Usage()
+            texts = await _extract(before, after, usage)
             await record_spend(db, user_id, "style_learning", usage)
             await remember(db, user_id, texts, petition_type)
     except Exception:

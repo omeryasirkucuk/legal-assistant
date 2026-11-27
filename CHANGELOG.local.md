@@ -1,5 +1,11 @@
 # Local changelog
 
+## 0.9.0 · 2026-11-27
+
+- Run `make setup` and `make migrate` before restarting the API and rebuilding the web app. The migration adds invite history, account budget overrides and the saved writer model.
+- Reissue any unused invitation made before this release. Its original code and creation time were unavailable in storage.
+- Keep the same `SECRET_KEY` across restarts to retain access to encrypted invite codes and saved model credentials.
+
 ## 0.8.1 · 2026-11-27
 
 - Rebuild the web client for the mobile layout update. Upgrading from 0.8.0 uses the existing database schema.

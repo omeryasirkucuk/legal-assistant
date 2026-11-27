@@ -17,4 +17,5 @@ def runtime_config(row: LLMConnectionSettings | None) -> RuntimeConfig | None:
         model_draft=row.model_draft,
         model_cheap=row.model_cheap,
         model_judge=row.model_judge,
+        model_write=row.model_write,
     )

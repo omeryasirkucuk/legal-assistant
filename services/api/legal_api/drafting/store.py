@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from legal_api import llm
+from legal_api.db.app_models import User
 from legal_api.db.drafting_models import Draft, StyleProfile, StyleSample
 from legal_api.drafting import memory
 from legal_api.drafting.asking import record
@@ -21,7 +22,7 @@ from legal_api.drafting.sample_profile import SampleProfile, analyze
 from legal_api.drafting.style import WORDS_PER_PAGE, measure
 from legal_api.drafting.types import petition_types
 from legal_api.embeddings import embed_passages, embed_query
-from legal_api.spend import record_spend
+from legal_api.spend import budget_reached, record_spend
 
 MAX_RULES = 20
 
@@ -113,18 +114,19 @@ async def add_sample(db: AsyncSession, user_id: uuid.UUID, title: str, text: str
     return sample
 
 
-async def read_unread_samples(db: AsyncSession, user_id: uuid.UUID) -> None:
+async def read_unread_samples(db: AsyncSession, user: User) -> None:
     """Samples kept before the model read samples: read now, once."""
-    rows = [s for s in await samples_of(db, user_id) if not s.profile]
+    rows = [s for s in await samples_of(db, user.id) if not s.profile]
     for s in rows:
+        if await budget_reached(db, user):
+            break
         usage = llm.Usage()
         profile = await analyze(s.title, s.text, usage)
-        await record_spend(db, user_id, "sample_read", usage)
+        await record_spend(db, user.id, "sample_read", usage)
         s.profile = profile.as_dict()
         s.petition_type = s.petition_type or profile.petition_type
         s.embedding = (await asyncio.to_thread(embed_passages,
                                                [_embedding_text(s.text, profile)]))[0]
-    if rows:
         await db.commit()
 
 

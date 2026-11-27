@@ -9,15 +9,14 @@ from datetime import UTC, datetime
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from legal_api import llm
 from legal_api.auth import DB, CurrentUser
-from legal_api.chat.service import spent_today
-from legal_api.config import get_settings
+from legal_api.db.app_models import LLMConnectionSettings
 from legal_api.db.drafting_models import Draft, StyleMemory, StyleSample
 from legal_api.db.file_models import StoredFile
 from legal_api.drafting import memory, store
@@ -36,7 +35,17 @@ from legal_api.files.extract import UnsupportedFile, text_of
 from legal_api.files.labels import file_format
 from legal_api.files.store import MAX_FILE_BYTES, QuotaExceeded
 from legal_api.files.store import read as read_file
-from legal_api.spend import record_spend
+from legal_api.privacy.llm_settings import runtime_config
+from legal_api.spend import guard_budget, record_spend
+
+
+async def model_connection(user: CurrentUser, db: DB):
+    token = llm.set_runtime_config(runtime_config(await db.get(LLMConnectionSettings, 1)))
+    try:
+        yield
+    finally:
+        llm.reset_runtime_config(token)
+
 
 router = APIRouter(tags=["drafting"])
 _background: set[asyncio.Task] = set()
@@ -131,9 +140,9 @@ async def list_types(user: CurrentUser) -> list[dict]:
     return [{"id": t.id, "name": t.name} for t in petition_types().values()]
 
 
-@router.get("/drafting/samples")
+@router.get("/drafting/samples", dependencies=[Depends(model_connection)])
 async def list_samples(user: CurrentUser, db: DB) -> list[SampleOut]:
-    await store.read_unread_samples(db, user.id)
+    await store.read_unread_samples(db, user)
     return [_sample_out(s) for s in await store.samples_of(db, user.id)]
 
 
@@ -157,6 +166,7 @@ async def _add(db, user, title: str, text: str, petition_type: str | None,
         if similar:
             raise HTTPException(status.HTTP_409_CONFLICT, {
                 "code": "similar", "id": str(similar[0].id), "title": similar[0].title})
+    await guard_budget(db, user)
     read_usage = llm.Usage()
     profile = await analyze(title, text, read_usage)
     await record_spend(db, user.id, "sample_read", read_usage)
@@ -172,7 +182,7 @@ async def _add(db, user, title: str, text: str, petition_type: str | None,
     return _sample_out(sample)
 
 
-@router.post("/drafting/samples", status_code=status.HTTP_201_CREATED)
+@router.post("/drafting/samples", status_code=status.HTTP_201_CREATED, dependencies=[Depends(model_connection)])
 async def upload_sample(user: CurrentUser, db: DB, file: Annotated[UploadFile, File()],
                         petition_type: Annotated[str | None, Form()] = None,
                         replace: Annotated[uuid.UUID | None, Form()] = None,
@@ -195,7 +205,7 @@ async def upload_sample(user: CurrentUser, db: DB, file: Annotated[UploadFile, F
     return await _add(db, user, file.filename or "petition", text, petition_type, replace, keep)
 
 
-@router.post("/drafting/samples/text", status_code=status.HTTP_201_CREATED)
+@router.post("/drafting/samples/text", status_code=status.HTTP_201_CREATED, dependencies=[Depends(model_connection)])
 async def paste_sample(body: SampleText, user: CurrentUser, db: DB) -> SampleOut:
     return await _add(db, user, body.title, body.text, body.petition_type)
 
@@ -277,7 +287,7 @@ async def get_draft(draft_id: uuid.UUID, user: CurrentUser, db: DB) -> DraftOut:
     return _draft_out(await _owned_draft(db, user, draft_id))
 
 
-@router.put("/drafts/{draft_id}")
+@router.put("/drafts/{draft_id}", dependencies=[Depends(model_connection)])
 async def save_draft(draft_id: uuid.UUID, body: DraftText, user: CurrentUser, db: DB
                      ) -> DraftOut:
     """The lawyer's edited text; how they changed it moves their style preferences."""
@@ -316,7 +326,7 @@ async def _learn(db, user_id: uuid.UUID, draft: Draft, before: str, after: str) 
     draft.meta = {k: v for k, v in draft.meta.items() if k != "learn_base"}
 
 
-@router.post("/drafts/{draft_id}/learn", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/drafts/{draft_id}/learn", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(model_connection)])
 async def learn_from_session(draft_id: uuid.UUID, user: CurrentUser, db: DB) -> None:
     """The lawyer finished editing: learn once from all the autosaved changes."""
     draft = await _owned_draft(db, user, draft_id)
@@ -327,7 +337,7 @@ async def learn_from_session(draft_id: uuid.UUID, user: CurrentUser, db: DB) -> 
     await db.commit()
 
 
-@router.post("/drafts/{draft_id}/adjust")
+@router.post("/drafts/{draft_id}/adjust", dependencies=[Depends(model_connection)])
 async def adjust_draft(draft_id: uuid.UUID, body: Adjust, user: CurrentUser, db: DB
                        ) -> DraftOut:
     if body.action not in ACTIONS:
@@ -344,8 +354,7 @@ async def adjust_draft(draft_id: uuid.UUID, body: Adjust, user: CurrentUser, db:
         start, end = found
     if not 0 <= start < end <= len(draft.text):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "bad selection")
-    if await spent_today(db, user.id) >= get_settings().daily_user_budget_usd:
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "daily budget reached")
+    await guard_budget(db, user)
     book = await store.style_book(db, user.id)
     usage = llm.Usage()
     try:

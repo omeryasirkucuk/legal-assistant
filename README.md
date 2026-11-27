@@ -1,8 +1,10 @@
-# Legal Assistant (working name)
+# Folonto Legal
 
 A web assistant for Turkish lawyers that answers questions, searches case law and legislation,
 and drafts or edits petitions. Every statute article and court decision it cites is retrieved
 from an official or public source and rendered by the backend, never written from model memory.
+
+The Folonto Legal monogram appears on sign-in, in the workspace and in the browser tab.
 
 ## Layout
 
@@ -47,9 +49,13 @@ part of the request outside the table.
 The API supports Anthropic and OpenAI-compatible chat-completions providers. For Open WebUI,
 an administrator can set **Model settings** to a base URL ending in `/api` such as
 `http://localhost:8080/api`, a key with chat-completions access, and the instance's model IDs.
+Only administrators can view or edit the shared configuration. The form opens with the
+effective model IDs, including the answer writer and the models routed through OpenRouter on Folonto.
+The chat composer shows the model behind each response preset and lets all users choose a preset
+for their request.
 The settings API stores the key encrypted and exposes only whether it is configured. Headless
 settings are in `.env`. Set the input and output rates for a metered compatible provider that
-does not return a cost. The daily budget uses a spend ledger that survives chat deletion.
+does not return a cost. Daily and monthly limits use a spend ledger that survives chat deletion.
 When OpenRouter supplies a smaller affordable token limit, the app can retry before streaming.
 The default writer can use the existing main model on the same route when needed. Set
 `WRITE_ROUTE` to an OpenRouter model ID to change the writer and `WRITE_FALLBACK_ROUTE` to
@@ -73,14 +79,20 @@ change stays signed in. Other sessions for the same account expire.
 ## Account administration
 
 Administrators open **Yönetim paneli** from their name at the bottom of the sidebar. It
-lists every registered account with today's and all-time recorded model spend in USD.
-The daily boundary is midnight UTC, as in the API's spending cap. Choose **Yönetici** or
-**Kullanıcı** in a row and save to change the role. At least one administrator must remain.
+lists each account's daily, monthly and lifetime model spend in USD. Edit either limit in
+the account row and save. A blank daily limit uses `DAILY_USER_BUDGET_USD` (3 USD by default).
+A blank monthly limit allows unlimited monthly spend, subject to the daily limit. A zero limit
+blocks new model operations. The API checks recorded spend before starting new work, so a
+request already started can finish after reaching the limit. Periods roll over at midnight UTC
+and on the first day of the month in UTC. Choose **Yönetici** or **Kullanıcı** in a row and
+save to change the role. At least one administrator must remain.
 
 Under **Yeni kullanıcı daveti**, enter the recipient's email address and choose
 **Davet kodu oluştur**. Copy the displayed code and share it privately with the recipient.
-They enter it with the same email address on the registration screen. Each code is unique
-and is consumed when registration succeeds.
+They enter it with the same email address on the registration screen. The admin panel keeps
+the code and shows whether it is active, used or expired. Registration marks it used, and
+unused codes expire 24 hours after creation. Reissue unused codes from before version 0.9.0,
+as those records have neither a recoverable code nor an issuance timestamp.
 
 ## Calendar and reminders
 

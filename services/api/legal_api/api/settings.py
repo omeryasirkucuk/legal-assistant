@@ -26,6 +26,7 @@ class LLMSettingsUpdate(BaseModel):
     model_draft: str = Field(min_length=1, max_length=200)
     model_cheap: str = Field(min_length=1, max_length=200)
     model_judge: str = Field(min_length=1, max_length=200)
+    model_write: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 def _encrypt(value: str) -> str:
@@ -35,22 +36,41 @@ def _encrypt(value: str) -> str:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
 
 
+def _default_openai_connection() -> tuple[str, str]:
+    s = get_settings()
+    if all(llm.routed(role) for role in ("main", "draft", "cheap", "judge", "write")):
+        return s.decision_base_url.rstrip("/") + "/v1", s.decision_api_key
+    return s.openai_base_url, s.openai_api_key
+
+
 def _out(row: LLMConnectionSettings | None) -> dict:
     s = get_settings()
-    if s.protected_data:
-        return {"provider": "openai_compatible", "operator_managed": True, "is_saved": True,
-                "base_url": "", "api_key_configured": bool(s.private_model_api_key),
-                "model_main": s.openai_model_main, "model_draft": s.openai_model_draft,
-                "model_cheap": s.openai_model_cheap, "model_judge": s.openai_model_judge}
+    managed = s.protected_data
+    base_url, api_key = _default_openai_connection()
+    config = llm.RuntimeConfig(
+        "openai_compatible", row.base_url, "", row.model_main, row.model_draft,
+        row.model_cheap, row.model_judge, row.model_write,
+    ) if row else None
+    token = llm.set_runtime_config(config)
+    try:
+        effective = {
+            "model_main": llm.routed("main") or llm.model_for("main"),
+            "model_draft": llm.routed("draft") or llm.model_for("draft"),
+            "model_cheap": llm.routed("cheap") or llm.model_for("cheap"),
+            "model_judge": llm.routed("judge") or llm.model_for("judge"),
+            "model_write": llm.routed("write") or llm.model_for("write"),
+        }
+    finally:
+        llm.reset_runtime_config(token)
     return {
         "provider": "openai_compatible",
-        "is_saved": row is not None,
-        "base_url": row.base_url if row else s.openai_base_url,
-        "model_main": row.model_main if row else s.openai_model_main,
-        "model_draft": row.model_draft if row else s.openai_model_draft,
-        "model_cheap": row.model_cheap if row else s.openai_model_cheap,
-        "model_judge": row.model_judge if row else s.openai_model_judge,
-        "api_key_configured": bool(row.api_key_encrypted if row else s.openai_api_key),
+        "operator_managed": managed,
+        "is_saved": managed or row is not None,
+        "base_url": "" if managed else row.base_url if row else base_url,
+        "api_key_configured": bool(
+            s.private_model_api_key if managed else row.api_key_encrypted if row else api_key
+        ),
+        **effective,
     }
 
 
@@ -73,30 +93,30 @@ async def update_llm_settings(body: LLMSettingsUpdate, user: CurrentUser, db: DB
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             "base_url must be an http(s) URL without embedded credentials")
 
+    default_url, default_key = _default_openai_connection()
     row = await db.get(LLMConnectionSettings, 1)
+    first_save = row is None
     if row is None:
-        s = get_settings()
-        row = LLMConnectionSettings(
-            id=1,
-            base_url=base_url,
-            model_main=body.model_main.strip(),
-            model_draft=body.model_draft.strip(),
-            model_cheap=body.model_cheap.strip(),
-            model_judge=body.model_judge.strip(),
-            api_key_encrypted=_encrypt(s.openai_api_key) if s.openai_api_key else None,
-        )
+        row = LLMConnectionSettings(id=1)
         db.add(row)
-    else:
-        row.base_url = base_url
-        row.model_main = body.model_main.strip()
-        row.model_draft = body.model_draft.strip()
-        row.model_cheap = body.model_cheap.strip()
-        row.model_judge = body.model_judge.strip()
+    elif row.base_url != base_url:
+        row.api_key_encrypted = None
+
+    row.base_url = base_url
+    row.model_main = body.model_main.strip()
+    row.model_draft = body.model_draft.strip()
+    row.model_cheap = body.model_cheap.strip()
+    row.model_judge = body.model_judge.strip()
+
+    if body.model_write is not None:
+        row.model_write = body.model_write.strip()
 
     if body.clear_api_key:
         row.api_key_encrypted = None
     elif body.api_key is not None and body.api_key.strip():
         row.api_key_encrypted = _encrypt(body.api_key.strip())
+    elif first_save and default_key and base_url == default_url.rstrip("/"):
+        row.api_key_encrypted = _encrypt(default_key)
 
     await db.commit()
     await db.refresh(row)
@@ -110,9 +130,7 @@ async def list_llm_models(user: CurrentUser, db: DB) -> list[dict]:
         raise HTTPException(status.HTTP_409_CONFLICT, "model is managed by the operator")
     row = await db.get(LLMConnectionSettings, 1)
     config = runtime_config(row)
-    settings = get_settings()
-    base_url = config.base_url if config else settings.openai_base_url
-    api_key = config.api_key if config else settings.openai_api_key
+    base_url, api_key = (config.base_url, config.api_key) if config else _default_openai_connection()
     headers = {"authorization": f"Bearer {api_key}"} if api_key else {}
     try:
         async with httpx.AsyncClient(base_url=base_url.rstrip("/"), headers=headers,
@@ -144,8 +162,6 @@ async def list_llm_models(user: CurrentUser, db: DB) -> list[dict]:
 async def test_llm_connection(user: CurrentUser, db: DB) -> dict:
     require_admin(user)
     row = await db.get(LLMConnectionSettings, 1)
-    if row is None and not get_settings().protected_data:
-        raise HTTPException(status.HTTP_409_CONFLICT, "save a model connection first")
     token = llm.set_runtime_config(runtime_config(row))
     try:
         result = await llm.create(

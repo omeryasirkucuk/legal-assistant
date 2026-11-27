@@ -9,6 +9,7 @@ import { CalendarDays, FolderOpen, FolderPlus, PanelLeft, Search, SquarePen, X }
 import { SearchResults } from "@/components/SearchResults";
 import { api, type ChatSummary, type DeskHits, type Matter, type TodayStats, type User } from "@/lib/api";
 import { daysUntil, urgency } from "@/lib/dates";
+import { Brand } from "@/components/Brand";
 import { t } from "@/lib/i18n";
 import { useWide } from "@/lib/useWide";
 import { UserMenu, initials } from "./UserMenu";
@@ -121,6 +122,7 @@ export function Sidebar(props: Props) {
   if (collapsed && wide) {
     return (
       <aside className="relative flex h-full w-14 shrink-0 flex-col items-center gap-1 border-r border-rule bg-desk py-3">
+        <div className="mb-2"><Brand compact /></div>
         <RailButton label={t("expandSidebar")} onClick={onToggle}><PanelLeft size={18} /></RailButton>
         <RailButton label={t("newChat")} onClick={onNew}><SquarePen size={18} /></RailButton>
         <RailButton label={t("calendar")} onClick={props.onCalendar}><CalendarDays size={18} /></RailButton>
@@ -155,7 +157,8 @@ export function Sidebar(props: Props) {
     )}
     <aside className={`flex flex-col bg-desk ${shell}`} aria-hidden={!wide && !drawerOpen ? true : undefined}
       inert={!wide && !drawerOpen ? true : undefined}>
-      <div className="flex items-center justify-between px-3 pb-2 pt-3">
+      <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-3">
+        <Brand />
         {wide
           ? <RailButton label={t("collapseSidebar")} onClick={onToggle}><PanelLeft size={18} /></RailButton>
           : <RailButton label={t("close")} onClick={onDrawerClose}><X size={18} /></RailButton>}

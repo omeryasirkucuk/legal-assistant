@@ -11,10 +11,9 @@ from sqlalchemy import Float, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from legal_api.agent.turn import EvidenceCopy, Previous
-from legal_api.config import get_settings
-from legal_api.db.app_models import Chat, LlmSpend, Message, MessageEvidence
+from legal_api.db.app_models import Chat, Message, MessageEvidence, User
 from legal_api.files import store as file_store
-from legal_api.spend import start_of_utc_day
+from legal_api.spend import daily_budget, period_spend, start_of_utc_day
 from legal_api.workspace.documents import WORD_MEDIA_TYPE
 from legal_api.workspace.session import Context
 
@@ -136,12 +135,8 @@ async def save_answer(db: AsyncSession, chat: Chat, result) -> Message:
 
 async def spent_today(db: AsyncSession, user_id: uuid.UUID) -> float:
     """Recorded model spend since 00:00 UTC, independent of chat retention."""
-    total = await db.scalar(
-        select(func.coalesce(func.sum(LlmSpend.cost_usd), 0.0)).where(
-            LlmSpend.user_id == user_id, LlmSpend.created_at >= start_of_utc_day()
-        )
-    )
-    return float(total or 0.0)
+    day, _ = await period_spend(db, user_id)
+    return day
 
 
 def message_cost():
@@ -158,16 +153,17 @@ async def chat_costs(db: AsyncSession, chat_ids: list[uuid.UUID]) -> dict[uuid.U
     return {chat_id: round(float(total or 0), 4) for chat_id, total in rows}
 
 
-async def today_stats(db: AsyncSession, user_id: uuid.UUID) -> dict:
+async def today_stats(db: AsyncSession, user: User) -> dict:
     """The user's answers since 00:00 UTC: how many, how long they took, what they cost."""
     seconds = cast(Message.meta["timings"]["total_s"].astext, Float)
     count, average, longest = (await db.execute(
         select(func.count(), func.avg(seconds), func.max(seconds))
         .join(Chat, Chat.id == Message.chat_id)
-        .where(Chat.user_id == user_id, Message.role == "assistant",
+        .where(Chat.user_id == user.id, Message.role == "assistant",
                Message.created_at >= start_of_utc_day()))).one()
+    day, month = await period_spend(db, user.id)
     return {"answers": int(count or 0), "average_s": round(float(average or 0), 1),
             "longest_s": round(float(longest or 0), 1),
             # The meter shows what the budget counts: answers and everything else.
-            "cost_usd": round(await spent_today(db, user_id), 4),
-            "budget_usd": get_settings().daily_user_budget_usd}
+            "cost_usd": round(day, 6), "budget_usd": daily_budget(user),
+            "monthly_cost_usd": round(month, 6), "monthly_budget_usd": user.monthly_budget_usd}

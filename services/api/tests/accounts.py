@@ -2,6 +2,7 @@
 
 import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 
 from httpx import AsyncClient
@@ -20,7 +21,9 @@ async def register_invited(client: AsyncClient, email: str, name: str, password:
             bootstrap_admin = uuid.uuid4()
             db.add(User(id=bootstrap_admin, email=f"{bootstrap_admin}@example.com",
                         name="Test bootstrap administrator", password_hash="", is_admin=True))
-        db.add(RegistrationInvite(code_hash=digest, email=email.lower()))
+        db.add(RegistrationInvite(
+            code_hash=digest, email=email.lower(), expires_at=datetime.now(UTC) + timedelta(hours=24),
+        ))
         await db.commit()
     try:
         response = await client.post("/auth/register", json={

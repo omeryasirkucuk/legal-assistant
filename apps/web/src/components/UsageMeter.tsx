@@ -24,7 +24,7 @@ export function UsageMeter({ today, onOpenFiles }: { today: TodayStats | null; o
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<FileUsage | null>(null);
   const box = useRef<HTMLDivElement>(null);
-  const share = today && today.budget_usd ? today.cost_usd / today.budget_usd : 0;
+  const share = today ? (today.budget_usd === 0 ? 1 : today.cost_usd / today.budget_usd) : 0;
 
   useEffect(() => {
     if (!open) return;
@@ -57,6 +57,12 @@ export function UsageMeter({ today, onOpenFiles }: { today: TodayStats | null; o
             {t("usageSpend", { cost: formatUsd(today.cost_usd), budget: formatUsd(today.budget_usd) })}
           </p>
           <p className="mt-0.5 text-xs text-faint">{t("usageResets")}</p>
+          <p className="mt-2 text-muted">
+            {t("usageMonthSpend", {
+              cost: formatUsd(today.monthly_cost_usd),
+              budget: today.monthly_budget_usd === null ? t("adminUnlimited") : formatUsd(today.monthly_budget_usd),
+            })}
+          </p>
           {files && (
             <>
               <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-paper">

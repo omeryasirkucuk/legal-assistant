@@ -36,6 +36,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True)
     name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String)
+    daily_budget_usd: Mapped[float | None] = mapped_column(Float)
+    monthly_budget_usd: Mapped[float | None] = mapped_column(Float)
     session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -46,6 +48,8 @@ class RegistrationInvite(Base):
 
     code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     email: Mapped[str] = mapped_column(String(320))
+    code_encrypted: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -61,6 +65,7 @@ class LLMConnectionSettings(Base):
     model_draft: Mapped[str] = mapped_column(String(200))
     model_cheap: Mapped[str] = mapped_column(String(200))
     model_judge: Mapped[str] = mapped_column(String(200))
+    model_write: Mapped[str | None] = mapped_column(String(200))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now,
                                                  onupdate=_now)
 
