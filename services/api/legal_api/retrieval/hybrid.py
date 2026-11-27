@@ -7,6 +7,7 @@ decision's structured citation fields straight from the database.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import date
 
@@ -59,7 +60,8 @@ def fuse(rankings: list[list[int]], k: int = RRF_K) -> dict[int, float]:
 
 async def search(conn: asyncpg.Connection, query: str, limit: int = 10) -> list[Hit]:
     fts_ids = [r["id"] for r in await conn.fetch(_FTS_SQL, query, CANDIDATES)]
-    vector_ids = [r["id"] for r in await conn.fetch(_VECTOR_SQL, embed_query(query), CANDIDATES)]
+    vector = await asyncio.to_thread(embed_query, query)
+    vector_ids = [r["id"] for r in await conn.fetch(_VECTOR_SQL, vector, CANDIDATES)]
     scores = fuse([fts_ids, vector_ids])
     rows = {r["chunk_id"]: r for r in await conn.fetch(_HITS_SQL, list(scores))}
 

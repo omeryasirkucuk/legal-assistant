@@ -18,6 +18,8 @@ from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
+
 from legal_api import llm
 
 logger = logging.getLogger(__name__)
@@ -90,9 +92,17 @@ def start(chat_id: uuid.UUID,
             await work(run)
         except asyncio.CancelledError:
             run.emit("cancelled", {})
-        except Exception as exc:
-            logger.error("answer run failed for chat %s (%s)", chat_id, type(exc).__name__)
-            run.emit("error", {"unavailable": True} if llm.unavailable(exc) else {})
+        except Exception as exc:  # noqa: BLE001 - report all failures at the task boundary
+            while isinstance(exc, ExceptionGroup) and len(exc.exceptions) == 1:
+                exc = exc.exceptions[0]
+            status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else (
+                getattr(exc, "status_code", None))
+            phases = {data["name"]: data["state"] for kind, data in run.events if kind == "step"}
+            phase = next((name for name in reversed(phases) if phases[name] == "active"), None)
+            logger.error("answer run failed for chat %s (%s, phase=%s, status=%s)",
+                         chat_id, type(exc).__name__, phase, status)
+            run.emit("error", {"timed_out": True} if isinstance(exc, TimeoutError) else (
+                {"unavailable": True} if llm.unavailable(exc) else {}))
         finally:
             run.finish()
 

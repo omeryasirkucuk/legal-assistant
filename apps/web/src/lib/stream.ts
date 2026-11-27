@@ -26,7 +26,7 @@ export type StreamEvent =
   | { type: "step"; data: Step }
   | { type: "line"; data: AnswerLine }
   | { type: "title"; data: { chat_id: string; title: string } }
-  | { type: "error"; data: { unavailable?: boolean } };
+  | { type: "error"; data: { unavailable?: boolean; timed_out?: boolean } };
 
 async function readEvents(res: Response, onEvent: (event: StreamEvent) => void): Promise<void> {
   if (!res.body) throw new ApiError(res.status);

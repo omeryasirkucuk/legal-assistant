@@ -90,6 +90,7 @@
   "repaired": "İlk taslaktaki doğrulanamayan kısımlar düzeltildi.",
   "refused": "Bu soruyu yanıtlayamadım.",
   "streamError": "Cevap yarıda kesildi.",
+  "answerTimeout": "Yanıt süre sınırını aştı. Soruyu yeniden gönderebilirsin.",
   "unanswered": "Bu soru cevaplanamadı.",
   "askAgain": "Yeniden sor",
   "searchEmpty": "Arşivde bu aramayla eşleşen karar bulunamadı.",

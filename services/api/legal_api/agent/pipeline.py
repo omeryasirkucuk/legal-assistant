@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field, replace
 
 import anthropic
@@ -27,7 +27,7 @@ from legal_api.agent.power import POWERS, Power
 from legal_api.agent.research import Research, research
 from legal_api.agent.sources import Source, SourceFinder
 from legal_api.agent.understand import Understanding, understand
-from legal_api.agent.write import MAX_TOKENS, Written, write
+from legal_api.agent.write import MAX_TOKENS, Written, assemble, write
 from legal_api.calc.court_costs_sources import court_cost_sources
 from legal_api.calc.penalty_sources import penalty_sources
 from legal_api.calc.severance import stated_dismissal_estimate
@@ -42,7 +42,7 @@ from legal_api.files.context import Attachment, for_understanding, for_writer
 from legal_api.grounding.evidence import Evidence, EvidenceLedger
 from legal_api.locale import calculation_terms
 from legal_api.matters.agenda import Agenda
-from legal_api.retrieval.statutes import indexed_laws
+from legal_api.retrieval.statutes import article_request, get_article, indexed_laws
 from legal_api.sources.gateway import Gateway
 from legal_api.workspace.public import PublicResearch
 from legal_api.workspace.session import Context, Workspace
@@ -79,7 +79,7 @@ class WrittenResult:
 
     @property
     def checked(self) -> dict | None:
-        if self.understanding.task == "workspace":
+        if self.understanding.task in {"workspace", "direct"}:
             return None
         return {"issues": [], "claims": self.written.flagged, "citation_check": "source_passages"}
 
@@ -98,7 +98,9 @@ async def answer_events(question: str, history: list[dict] | None = None,
                         attachments: list[Attachment] | None = None,
                         just_asked: bool = False,
                         agenda: Agenda | None = None,
-                        workspace: Context | None = None) -> AsyncIterator[Event]:
+                        workspace: Context | None = None,
+                        style_loader: Callable[[], Awaitable[StyleBook]] | None = None
+                        ) -> AsyncIterator[Event]:
     """`style`: the lawyer's style, used when the message asks for a petition; `power`: how
     much work the answer gets; `attachments`: the lawyer's documents for this message;
     `just_asked`: the previous turn asked the lawyer for facts (drafting/asking.py);
@@ -120,6 +122,27 @@ async def answer_events(question: str, history: list[dict] | None = None,
     try:
         finder = SourceFinder(ledger, db, gateway)
         yield step_event("analyse")
+        exact = article_request(question) if not (attachments or history or search_text) else None
+        if exact:
+            async with db.acquire() as conn:
+                hit = await get_article(conn, *exact)
+            if hit is not None:
+                evidence = finder.article_source(hit).evidence
+                segment = Segment(f"**{evidence.citation}**\n\n{evidence.text}",
+                                  (evidence.key,))
+                written = Written([segment], assemble([segment]), [])
+                mark("total_s")
+                res = WrittenResult(question, Understanding(task="lookup"), written, ledger,
+                                    usage, timings, {"route": "indexed_article"})
+                if result is not None:
+                    result["result"] = res
+                yield step_event("analyse", "done", issues=0)
+                yield Event("evidence", {"key": evidence.key, "kind": evidence.kind,
+                                         "citation": evidence.citation, "url": evidence.url})
+                yield Event("delta", {"text": segment.text})
+                yield Event("final", {"text": res.text, "checked": res.checked,
+                                      "cost_usd": round(usage.cost_usd, 4), "timings": timings})
+                return
         async with db.acquire() as conn:
             laws = await indexed_laws(conn)
         local_only = False
@@ -155,6 +178,8 @@ async def answer_events(question: str, history: list[dict] | None = None,
                 result["result"] = res
             return
         if u.task == "drafting":
+            if style_loader is not None:
+                style = await style_loader()
             kind = kind_of(u.case_kind)
             gaps = await find_gaps(_conversation(history or [], for_understanding(
                 question, attachments)), kind, usage)
@@ -179,15 +204,25 @@ async def answer_events(question: str, history: list[dict] | None = None,
             found = Research(trace={"calendar_only": True})
         else:
             task = asyncio.create_task(
-                research(db, finder, search_text or question, u, usage, progress, power))
-            while not task.done() or not queue.empty():
-                getter = asyncio.create_task(queue.get())
-                done, _ = await asyncio.wait({getter, task}, return_when=asyncio.FIRST_COMPLETED)
-                if getter in done:
-                    yield getter.result()
-                else:
-                    getter.cancel()
-            found = task.result()
+                research(db, finder, search_text or question,
+                         u, usage, progress, power))
+            getter = None
+            try:
+                while not task.done() or not queue.empty():
+                    getter = asyncio.create_task(queue.get())
+                    done, _ = await asyncio.wait({getter, task}, return_when=asyncio.FIRST_COMPLETED)
+                    if getter in done:
+                        yield getter.result()
+                    else:
+                        getter.cancel()
+                        await asyncio.gather(getter, return_exceptions=True)
+                found = task.result()
+            finally:
+                pending = [child for child in (task, getter) if child is not None]
+                for child in pending:
+                    if not child.done():
+                        child.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
         if u.calendar and agenda is not None:
             found.sources.insert(0, agenda.source(ledger))
             found.trace["calendar"] = True

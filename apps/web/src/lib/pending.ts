@@ -15,6 +15,7 @@ export type Pending = {
   finalText?: string;
   error?: boolean;
   budget?: boolean;
+  timedOut?: boolean;
   unavailable?: boolean;        // the model provider refuses calls (no credit, bad key)
 };
 

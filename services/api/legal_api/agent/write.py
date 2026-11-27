@@ -13,8 +13,12 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from dataclasses import dataclass
 from functools import cache
+
+import anthropic
+import httpx
 
 from legal_api import decisions, llm
 from legal_api.agent.atoms import CitationStream, Segment, openai_segments_from, segments_from
@@ -26,6 +30,7 @@ from legal_api.locale import reference_terms
 from legal_api.prompts import prompt
 
 MAX_DOCUMENT_CHARS = 8000
+CITATION_RETRY_S = 8
 CITE_AGAIN = ("<note>The previous attempt produced no verifiable citation. Follow the citation "
               "instructions for each sourced legal statement.</note>")
 # Includes the model's thinking; 4,000 cut a consultation answer off mid-section.
@@ -209,25 +214,32 @@ async def write(message: str, u: Understanding, sources: list[Source], usage: ll
     content = [*_documents(sources), *(context or []),
                {"type": "text", "text": _request(message, u, instruction, previous)}]
     final = None
+    segments: list[Segment] = []
     for attempt in range(2):
         citations = CitationStream()
-        async for item in llm.stream(power.write_role, usage, "write", max_tokens=max_tokens,
-                                     system=system,
-                                     output_config={"effort": power.write_effort},
-                                     messages=[{"role": "user", "content": content}]):
-            if isinstance(item, str):
-                if attempt == 0:
-                    visible = citations.feed(item)
-                    if visible:
-                        yield visible
-            else:
-                final = item
+        response = None
+        chunks = llm.stream(power.write_role, usage, "write", max_tokens=max_tokens,
+                            system=system, output_config={"effort": power.write_effort},
+                            messages=[{"role": "user", "content": content}])
+        try:
+            async with asyncio.timeout(CITATION_RETRY_S if attempt else None), aclosing(chunks):
+                async for item in chunks:
+                    if isinstance(item, str):
+                        if attempt == 0 and (visible := citations.feed(item)):
+                            yield visible
+                    else:
+                        response = item
+        except (TimeoutError, anthropic.APIError, httpx.HTTPError):
+            if not segments:
+                raise
+            break
         if attempt == 0 and (tail := citations.finish()):
             yield tail
-        segments = _segments(final, sources, power.write_role) if final else []
-        # An answer that cites nothing cannot be checked or followed to its sources (one came
-        # back as a single uncited block); it is written once more.
-        if not sources or any(s.keys for s in segments) or (final and final.stop_reason == "refusal"):
+        candidate = _segments(response, sources, power.write_role) if response else []
+        has_citations = any(s.keys for s in candidate)
+        if not segments or has_citations:
+            final, segments = response, candidate
+        if not sources or has_citations or (response and response.stop_reason == "refusal"):
             break
         content[-1] = {"type": "text", "text": _request(message, u, instruction, previous)
                        + "\n" + CITE_AGAIN}

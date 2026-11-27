@@ -7,9 +7,11 @@ add the prefix themselves.
 from __future__ import annotations
 
 from functools import cache
+from threading import Lock
 
 MODEL_NAME = "intfloat/multilingual-e5-small"
 DIM = 384
+_encode_lock = Lock()
 
 
 def _device() -> str:
@@ -26,16 +28,22 @@ def _device() -> str:
 def _model():
     from sentence_transformers import SentenceTransformer
 
-    model = SentenceTransformer(MODEL_NAME, device=_device())
+    device = _device()
+    try:
+        model = SentenceTransformer(MODEL_NAME, device=device, local_files_only=True)
+    except OSError:
+        model = SentenceTransformer(MODEL_NAME, device=device)
     model.max_seq_length = 512
     return model
 
 
 def embed_passages(texts: list[str], batch_size: int = 128) -> list[list[float]]:
-    vectors = _model().encode([f"passage: {t}" for t in texts], batch_size=batch_size,
-                              normalize_embeddings=True, show_progress_bar=False)
+    with _encode_lock:
+        vectors = _model().encode([f"passage: {t}" for t in texts], batch_size=batch_size,
+                                  normalize_embeddings=True, show_progress_bar=False)
     return vectors.tolist()
 
 
 def embed_query(text: str) -> list[float]:
-    return _model().encode(f"query: {text}", normalize_embeddings=True).tolist()
+    with _encode_lock:
+        return _model().encode(f"query: {text}", normalize_embeddings=True).tolist()

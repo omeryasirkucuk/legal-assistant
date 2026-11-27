@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.2 · 2026-11-27
+
+- Load the local petition style model only for requests classified as drafting.
+- Reply directly to standalone greetings, thanks and capability questions.
+- Return the text and source of an explicitly requested indexed article directly from the local index.
+- Run legislation and case-law searches concurrently. Use cached embedding model files and move query encoding off the server event loop.
+- Save completed answers without waiting for a slow title. Preserve the first answer with citation warnings if the citation retry stalls.
+- Bound chat generation to 60 seconds, or 105 seconds in deep research, and report timeouts with a retry action. Record time to first text and total generation time.
+
 ## 0.9.1 · 2026-11-27
 
 - Center the chat welcome screen, conversation and message box in the workspace.

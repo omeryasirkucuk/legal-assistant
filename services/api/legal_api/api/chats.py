@@ -8,6 +8,7 @@ import logging
 import time
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, status
@@ -18,6 +19,7 @@ from sqlalchemy import or_, select
 from legal_api import llm
 from legal_api.agent.detail import detail_stream
 from legal_api.agent.power import POWERS, power_of
+from legal_api.agent.route import direct_intent
 from legal_api.agent.turn import turn_events
 from legal_api.auth import DB, CurrentUser
 from legal_api.chat import runs
@@ -48,6 +50,7 @@ from legal_api.matters.service import context as matter_context
 from legal_api.matters.service import files_of as matter_files
 from legal_api.matters.service import owned as owned_matter
 from legal_api.privacy.llm_settings import runtime_config
+from legal_api.retrieval.statutes import article_request
 from legal_api.spend import guard_budget, record_spend
 from legal_api.workspace.documents import WORD_MEDIA_TYPE
 from legal_api.workspace.workbook import MEDIA_TYPE as XLSX_TYPE
@@ -55,6 +58,9 @@ from legal_api.workspace.workbook import workbook
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 logger = logging.getLogger(__name__)
+
+ANSWER_TIMEOUT_S = 60
+DEEP_ANSWER_TIMEOUT_S = 105
 
 
 class ChatOut(BaseModel):
@@ -239,14 +245,22 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def _finished_title(task: asyncio.Task | None) -> str | None:
+async def _title_with_budget(text: str, usage: llm.Usage) -> str | None:
+    try:
+        async with asyncio.timeout(3):
+            return await generate_title(text, usage)
+    except TimeoutError:
+        return None
+
+
+def _finished_title(task: asyncio.Task | None) -> str | None:
     """The generated title, or None when there is none or it failed (the chat keeps its
     provisional title from the question)."""
-    if task is None:
+    if task is None or not task.done() or task.cancelled():
         return None
     try:
-        return await task
-    except Exception as exc:
+        return task.result()
+    except Exception as exc:  # noqa: BLE001 - a title failure cannot fail a completed answer
         logger.error("title generation failed (%s)", type(exc).__name__)
         return None
 
@@ -301,8 +315,11 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
     power = power_of(body.power)
     question_id = str(question.id)
     llm_config = runtime_config(await db.get(LLMConnectionSettings, 1))
-    style = await style_book(db, user.id, text)   # used if the message asks for a petition
     chat_pk, user_pk = chat.id, user.id
+
+    async def load_style():
+        async with get_sessionmaker()() as session:
+            return await style_book(session, user_pk, text)
 
     async def work(run: runs.Run) -> None:
         token = llm.set_runtime_config(llm_config)
@@ -320,18 +337,32 @@ async def ask(chat_id: uuid.UUID, body: Ask, user: CurrentUser, db: DB) -> Strea
             llm.reset_runtime_config(token)
 
     async def answer_and_save(run: runs.Run) -> None:
+        started = time.monotonic()
         run.emit("question", {"id": question_id, "content": text,
                               "started_at": time.time() * 1000})
         holder: dict = {}
         usage = llm.Usage()
         # The first question names the chat; written alongside the answer.
-        title_task = (asyncio.create_task(generate_title(text, usage))
-                      if previous is None else None)
+        title_task = (asyncio.create_task(_title_with_budget(text, usage))
+                      if previous is None and (files or not (direct_intent(text) or article_request(text)))
+                      else None)
+        first_delta = None
         try:
-            async for event in turn_events(text, turns, previous, holder, style, power,
-                                           attachments, agenda, usage=usage, workspace=context):
-                run.emit(event.type, event.data)
-            title = await _finished_title(title_task)
+            events = turn_events(text, turns, previous, holder, power=power,
+                                 attachments=attachments, agenda=agenda, usage=usage,
+                                 workspace=context, style_loader=load_style)
+            timeout = DEEP_ANSWER_TIMEOUT_S if power.name == "deep" else ANSWER_TIMEOUT_S
+            async with asyncio.timeout(timeout), aclosing(events):
+                async for event in events:
+                    if event.type == "delta" and first_delta is None:
+                        first_delta = round(time.monotonic() - started, 3)
+                    if event.type == "final":
+                        timings = event.data.setdefault("timings", {})
+                        if first_delta is not None:
+                            timings["first_delta_s"] = first_delta
+                        timings["total_s"] = round(time.monotonic() - started, 3)
+                    run.emit(event.type, event.data)
+            title = _finished_title(title_task)
         finally:
             if title_task is not None:
                 if not title_task.done():

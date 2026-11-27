@@ -101,7 +101,8 @@ async def _live(source: BedestenDecisions, query: str, ask: str,
         await asyncio.wait_for(fetch_all(), LIVE_BUDGET_S)
     except (SourceError, TimeoutError):
         pass
-    return [Passage(_closest_passage(d.text, ask), d.text, live=d) for d in found]
+    return [Passage(await asyncio.to_thread(_closest_passage, d.text, ask), d.text, live=d)
+            for d in found]
 
 
 async def _screen(ask: str, passages: list[Passage], usage: llm.Usage,
@@ -126,10 +127,11 @@ async def case_passages(conn: asyncpg.Connection, source: BedestenDecisions, que
                         ) -> list[Passage]:
     """`precedents`: the lawyer asked for decisions themselves; more are read and kept, and
     they are judged as precedents for the case rather than as answers to a sub-question."""
-    local = await _local(conn, query)
-    live = await _live(source, query, ask, live_limit)
+    async with asyncio.TaskGroup() as group:
+        local = group.create_task(_local(conn, query))
+        live = group.create_task(_live(source, query, ask, live_limit))
     seen, candidates = set(), []
-    for p in [*live, *local]:
+    for p in [*live.result(), *local.result()]:
         key = (p.live.ref.case_no, p.live.ref.decision_no) if p.live else (
             p.local["case_no"], p.local["decision_no"])
         if key not in seen:

@@ -40,9 +40,18 @@ async def history(db: AsyncSession, chat: Chat) -> list[dict]:
     conversation but must retrieve sources again before relying on anything in it."""
     rows = (await db.scalars(select(Message).where(Message.chat_id == chat.id)
                              .order_by(Message.created_at.desc())
-                             .limit(HISTORY_TURNS * 2))).all()[::-1]
+                             .limit(HISTORY_TURNS * 2))).all()
+    selected = []
+    skip_question = False
+    for row in rows:
+        if row.role == "assistant":
+            skip_question = ((row.meta or {}).get("answer") or {}).get("task") == "direct"
+        if not skip_question:
+            selected.append(row)
+        if row.role == "user":
+            skip_question = False
     turns = [{"role": m.role, "content": _as_history(m.content)}
-             for m in rows if m.content.strip()]
+             for m in reversed(selected) if m.content.strip()]
     while turns and turns[0]["role"] != "user":
         turns.pop(0)
     return turns
@@ -62,7 +71,9 @@ async def drop_unanswered(db: AsyncSession, chat: Chat) -> None:
 async def previous_turn(db: AsyncSession, chat: Chat) -> Previous | None:
     """The chat's last answer, the question it answered and its sources."""
     answer = await db.scalar(select(Message).where(Message.chat_id == chat.id,
-                                                   Message.role == "assistant")
+                                                   Message.role == "assistant",
+                                                   Message.meta["answer"]["task"].astext
+                                                   .is_distinct_from("direct"))
                              .order_by(Message.created_at.desc()).limit(1))
     if answer is None:
         return None

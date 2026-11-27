@@ -9,6 +9,7 @@ to are followed, and court decisions are added when the answer depends on practi
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 
 import asyncpg
@@ -158,48 +159,66 @@ async def nearby(db: asyncpg.Pool, ask: str, kept: list[StatuteHit], judged: set
     return [s.hit for s in good[:MAX_NEIGHBOURS]]
 
 
-async def research(db: asyncpg.Pool, finder: SourceFinder, question: str, u: Understanding,
-                   usage: llm.Usage, progress, power: Power = POWERS["balanced"]) -> Research:
-    """`progress(step, state, **counts)` reports each step for the UI."""
+async def _statute_sources(db: asyncpg.Pool, finder: SourceFinder, question: str,
+                           ask: str, u: Understanding, usage: llm.Usage, progress,
+                           power: Power) -> Research:
     progress("search", "active")
     found = await candidates(db, question, u)
     hits = found.hits
     progress("search", "done", count=len(hits))
     progress("screen", "active")
-    screened = await screen(screening_question(question, u), hits, usage, NEEDED)
+    screened = await screen(ask, hits, usage, NEEDED)
     answering, kept = select([(s.hit, s.p_answers) for s in screened], found,
                              power.max_articles)
-    kept += await nearby(db, screening_question(question, u), kept, {h.id for h in hits}, usage)
+    kept += await nearby(db, ask, kept, {h.id for h in hits}, usage)
     kept += await siblings(db, kept)
     progress("screen", "done", count=len(kept))
     progress("references", "active")
-    # Judged against the question with its characterisation: a follow-up ("is there a
-    # precedent on this?") does not state the case by itself.
-    ask = screening_question(question, u)
     followed = await follow_references(db, ask, answering, usage)
     progress("references", "done", count=len(followed))
     sources = [finder.article_source(h) for h in kept]
     sources += [finder.article_source(
         f.hit, (finder.article_source(f.by).evidence.citation, f.sentence.strip())) for f in followed]
-    decisions: list[Source] = []
-    # Decisions are searched whenever practice matters, and always when the lawyer asks for
-    # decisions themselves (a request for precedents once got none: nothing was searched).
-    asked_for_cases = u.task == "search"
-    fast_petition = u.task == "drafting" and power.name == "fast"   # no decisions (D50)
-    if not fast_petition and (u.case_law_query or u.task == "consultation" or asked_for_cases
-                              or power.always_decisions):
-        progress("caselaw", "active")
-        decisions = await finder.decisions_for(
-            u.case_law_query or u.characterisation, ask, usage,
-            keep=max(SEARCH_DECISIONS if asked_for_cases else 0, power.keep_decisions),
-            live_limit=max(SEARCH_LIVE if asked_for_cases else 0, power.live_decisions),
-            precedents=asked_for_cases)
-        progress("caselaw", "done", count=len(decisions))
-    unique: dict[str, Source] = {}
-    for s in [*sources, *decisions]:
-        unique.setdefault(s.evidence.key, s)
-    return Research(list(unique.values()), {
+    return Research(sources, {
         "candidates": len(hits), "answering": [f"{h.law_number}/{h.label}" for h in answering],
         "kept": [f"{h.law_number}/{h.label}" for h in kept],
-        "referenced": [f"{f.hit.law_number}/{f.hit.label}" for f in followed],
-        "decisions": len(decisions)})
+        "referenced": [f"{f.hit.law_number}/{f.hit.label}" for f in followed]})
+
+
+async def _decision_sources(finder: SourceFinder, query: str, ask: str, usage: llm.Usage,
+                            progress, power: Power, asked_for_cases: bool) -> list[Source]:
+    progress("caselaw", "active")
+    sources = await finder.decisions_for(
+        query, ask, usage,
+        keep=max(SEARCH_DECISIONS if asked_for_cases else 0, power.keep_decisions),
+        live_limit=max(SEARCH_LIVE if asked_for_cases else 0, power.live_decisions),
+        precedents=asked_for_cases)
+    progress("caselaw", "done", count=len(sources))
+    return sources
+
+
+async def research(db: asyncpg.Pool, finder: SourceFinder, question: str, u: Understanding,
+                   usage: llm.Usage, progress, power: Power = POWERS["balanced"]) -> Research:
+    """`progress(step, state, **counts)` reports each step for the UI."""
+    ask = screening_question(question, u)
+    asked_for_cases = u.task == "search"
+    fast_petition = u.task == "drafting" and power.name == "fast"
+    search_decisions = not fast_petition and (
+        u.case_law_query or asked_for_cases or power.always_decisions
+        or u.task == "consultation")
+
+    async with asyncio.TaskGroup() as group:
+        statutes = group.create_task(_statute_sources(
+            db, finder, question, ask, u, usage, progress, power))
+        cases = group.create_task(_decision_sources(
+            finder, u.case_law_query or u.characterisation, ask, usage, progress, power,
+            asked_for_cases)) if search_decisions else None
+
+    found = statutes.result()
+    decisions = cases.result() if cases else []
+    unique: dict[str, Source] = {}
+    for source in [*found.sources, *decisions]:
+        unique.setdefault(source.evidence.key, source)
+    found.sources = list(unique.values())
+    found.trace["decisions"] = len(decisions)
+    return found

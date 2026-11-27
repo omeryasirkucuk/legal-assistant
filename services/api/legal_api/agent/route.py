@@ -12,9 +12,12 @@ answer is treated as a follow-up, as before.
 
 from __future__ import annotations
 
+import asyncio
+import re
 from typing import Literal
 
 from legal_api import decisions, llm
+from legal_api.locale import chat_turns
 
 Route = Literal["new", "reformat", "followup"]
 
@@ -31,6 +34,15 @@ CRITERIA = {
 }
 
 
+def direct_intent(message: str) -> str | None:
+    """Only match complete utterances; a greeting introducing a question needs research."""
+    phrase = " ".join(re.findall(r"\w+", message.casefold().replace("i\u0307", "i")))
+    for intent, entry in chat_turns().items():
+        if phrase in entry["phrases"]:
+            return intent
+    return None
+
+
 async def route(message: str, previous_question: str | None, previous_answer: str | None,
                 usage: llm.Usage) -> Route:
     if not previous_question or not previous_answer:
@@ -39,6 +51,9 @@ async def route(message: str, previous_question: str | None, previous_answer: st
         return "followup"
     state = {"previous_question": previous_question,
              "previous_answer": previous_answer[:6000], "new_message": message}
-    async with decisions.client() as client:
-        picked = await decisions.choose(client, state, INSTRUCTIONS, CRITERIA, usage, "route")
+    try:
+        async with asyncio.timeout(2), decisions.client() as client:
+            picked = await decisions.choose(client, state, INSTRUCTIONS, CRITERIA, usage, "route")
+    except TimeoutError:
+        return "followup"
     return picked[0] if picked else "followup"

@@ -1,5 +1,10 @@
 # Local changelog
 
+## 0.9.2 · 2026-11-27
+
+- Run `make setup`, restart the API and reload the rebuilt web client. No database migration is required.
+- Check `timings.first_delta_s` and `timings.total_s` on chat final events to compare response latency. A cold local search uses cached embedding weights when available. Direct replies and indexed article lookups do not load the embedding model.
+
 ## 0.9.1 · 2026-11-27
 
 - Rebuild the web client and check chat alignment on desktop and mobile. Click or tab into
