@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Clean obsolete Folonto Docker images and bound unused build cache after each verified production release. Retain the previous healthy API and web images for rollback.
+
 ## 0.9.6 · 2026-11-27
 
 - Give grounded chat answers 90 seconds to finish, or 120 seconds in deep research. Limit supplemental live case-law retrieval to 8 seconds so legislation-based answers can start sooner.

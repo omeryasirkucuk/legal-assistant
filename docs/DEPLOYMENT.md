@@ -7,7 +7,8 @@ The proxy redirects HTTP to HTTPS. Postgres and the API are reachable within the
 
 ## Configure and release
 
-Place the checkout at `/opt/legal-folonto` with Docker and Docker Compose installed. Copy
+Place the checkout at `/opt/legal-folonto` with Docker, Docker Compose and the Buildx plugin installed.
+On the Ubuntu VM, install the plugin with `sudo apt-get install docker-buildx`. Copy
 `deploy/.env.example` to `deploy/.env` with mode 600. Set a random hex Postgres password,
 an independent random session secret, and an independent 32-byte URL-safe base64 document
 encryption key. Save a recovery copy of the encryption key separately. For a fresh database,
@@ -20,15 +21,32 @@ and delete only objects under the bucket's `sealed/` prefix. Keep the bucket, as
 object keys and document key consistent with the database backups. S3 is the production
 document store. Keep the production configuration and bucket out of local development.
 
-Run from the repository root on the VM:
+Install the tunnel configuration below before the first release. Run the release script
+from the repository root on the VM:
 
 ```sh
-docker compose --env-file deploy/.env -f deploy/compose.yml build
-docker compose --env-file deploy/.env -f deploy/compose.yml up -d --wait db
-docker compose --env-file deploy/.env -f deploy/compose.yml run --rm api alembic upgrade head
-docker compose --env-file deploy/.env -f deploy/compose.yml up -d
-docker compose --env-file deploy/.env -f deploy/compose.yml run --rm api python -m legal_api.corpus.statutes
+sudo bash deploy/release.sh
 ```
+
+The script locks the release, saves the currently healthy API and web images,
+builds the new images, migrates the database and starts the stack. It indexes
+the core statutes if readiness requires it. After the local health and public health,
+readiness and sign-in checks pass, it keeps the previous serving pair as `:rollback`,
+removes unused older Folonto API and web images
+and expires unused cache from the VM's default Docker builder, targeting 1 GB of total cache.
+It protects images attached to containers, the new images and the previous serving pair.
+The PostgreSQL and model volumes stay in place.
+
+To run the same verified cleanup against an existing release on the Oracle VM:
+
+```sh
+sudo bash deploy/release.sh --cleanup-only
+```
+
+For a rollback where the database schema still supports the previous release, tag the
+saved `legal-folonto-api:rollback` and `legal-folonto-web:rollback` images as `:latest`,
+run Compose with `up -d --no-build api web` using the production env file and Compose file,
+and verify the endpoints below. For a schema rollback, follow the matching database recovery plan.
 
 The first corpus run downloads the embedding model. Later runs use its separate cache volume.
 Load the optional local decision archive using the ingestion commands in

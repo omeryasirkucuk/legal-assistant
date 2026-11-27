@@ -143,7 +143,14 @@ into a calendar app that supports iCalendar. The file includes the event's title
 location and notes. The external app controls notification delivery for imported events.
 
 For local upgrades to 0.8.0, run `make setup` and `make migrate` before restarting the API
-and rebuilding the frontend. For Folonto production, follow the [deployment runbook](docs/DEPLOYMENT.md).
+and rebuilding the frontend.
+
+## Folonto production
+
+Run `sudo bash deploy/release.sh` from the production checkout on the Oracle VM.
+After the release passes its health and readiness checks, the script removes unused
+older application images and keeps the previous healthy API and web images for rollback.
+The [deployment runbook](docs/DEPLOYMENT.md) covers setup, cleanup and rollback.
 
 ## Mobile and tablet use
 
